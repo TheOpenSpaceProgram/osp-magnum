@@ -43,12 +43,12 @@ set_target_properties( osp-gdextension
 
 
 # Copy over additional files from the support_files directory
-add_custom_command(
-    TARGET osp-gdextension POST_BUILD
-    COMMAND ${CMAKE_COMMAND} -E copy_directory
-            "${CMAKE_CURRENT_SOURCE_DIR}/support_files"
-            ${BUILD_OUTPUT_DIR}
-)
+#add_custom_command(
+#    TARGET osp-gdextension POST_BUILD
+#    COMMAND ${CMAKE_COMMAND} -E copy_directory
+#            "${CMAKE_CURRENT_SOURCE_DIR}/support_files"
+#            ${BUILD_OUTPUT_DIR}
+#)
 
 file(GLOB_RECURSE CPP_FILES CONFIGURE_DEPENDS *.cpp)
 file(GLOB_RECURSE H_FILES CONFIGURE_DEPENDS *.h)
@@ -56,7 +56,7 @@ target_sources(osp-gdextension PRIVATE "${CPP_FILES}" "${H_FILES}")
 
 target_include_directories(osp-gdextension PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
 
-target_link_libraries(osp-gdextension PRIVATE godot-cpp OpenSpaceProgram Adera PlanetA OspJolt OspTestApp toml11)
+target_link_libraries(osp-gdextension PRIVATE godot-cpp OpenSpaceProgram Adera AderaApp PlanetA OspJolt toml11)
 
 target_compile_options(osp-gdextension PRIVATE "-static")
 

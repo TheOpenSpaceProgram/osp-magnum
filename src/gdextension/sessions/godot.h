@@ -24,9 +24,9 @@
  */
 #pragma once
 
-#include "../scenarios.h"
-#include "flying_scene.h"
 #include "render.h"
+
+#include <osp/framework/builder.h>
 
 #include <osp/activescene/basic.h>
 #include <osp/drawing/drawing.h>
@@ -36,28 +36,23 @@ namespace godot
 class FlyingScene;
 }
 
-namespace testapp::scenes
+namespace ospgdext
 {
 using namespace osp;
 
-osp::Session setup_godot(godot::FlyingScene       *pMainApp,
-                         osp::TopTaskBuilder      &rBuilder,
-                         osp::ArrayView<entt::any> topData,
-                         osp::Session const       &application,
-                         osp::Session const       &windowApp);
+
+extern osp::fw::FeatureDef const ftrGodot;
 
 /**
  * @brief stuff needed to render a scene using Magnum
  */
-osp::Session setup_godot_scene(osp::TopTaskBuilder      &rBuilder,
-                               osp::ArrayView<entt::any> topData,
-                               osp::Session const       &application,
-                               osp::Session const       &windowApp,
-                               osp::Session const       &sceneRenderer,
-                               osp::Session const       &magnum,
-                               osp::Session const       &scene,
-                               osp::Session const       &commonScene);
+extern osp::fw::FeatureDef const ftrGodotScene;
 
+extern osp::fw::FeatureDef const ftrFlatMaterial;
+
+extern osp::fw::FeatureDef const ftrCameraControlGD;
+
+#if 0
 /**
  * @brief Magnum MeshVisualizer shader and optional material for drawing ActiveEnts with it
  */
@@ -99,7 +94,7 @@ Session setup_camera_ctrl_godot(TopTaskBuilder      &rBuilder,
                                 Session const       &windowApp,
                                 Session const       &sceneRenderer,
                                 Session const       &magnumScene);
-
+#endif
 struct ACtxDrawFlat
 {
 
@@ -179,5 +174,5 @@ void sync_drawent_flat(ITA_T const &first, ITB_T const &last, ArgsForSyncDrawEnt
     });
 }
 
-} // namespace testapp::scenes
+} // namespace ospgdext::scenes
 

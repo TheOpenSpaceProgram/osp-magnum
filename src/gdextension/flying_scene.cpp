@@ -1,22 +1,11 @@
 #include "flying_scene.h"
 
-#include "osp/tasks/top_utils.h"
-#include "osp/util/UserInputHandler.h"
 #include "scenarios.h"
+#include "feature_interfaces.h"
 #include "sessions/godot.h"
-#include "testapp/sessions/common.h"
-#include "testapp/testapp.h"
+#include "spdlog/pattern_formatter.h"
+#include "spdlog/sinks/callback_sink.h"
 
-#include <Corrade/Utility/Debug.h>
-#include <Magnum/MeshTools/Transform.h>
-#include <Magnum/Primitives/Cone.h>
-#include <Magnum/Primitives/Cube.h>
-#include <Magnum/Primitives/Cylinder.h>
-#include <Magnum/Primitives/Grid.h>
-#include <Magnum/Primitives/Icosphere.h>
-#include <Magnum/Trade/ImageData.h>
-#include <Magnum/Trade/MeshData.h>
-#include <Magnum/Trade/TextureData.h>
 #include <godot_cpp/classes/global_constants.hpp>
 #include <godot_cpp/classes/input.hpp>
 #include <godot_cpp/classes/input_event.hpp>
@@ -34,15 +23,49 @@
 #include <godot_cpp/variant/transform3d.hpp>
 #include <godot_cpp/variant/utility_functions.hpp>
 #include <godot_cpp/variant/vector2.hpp>
+
+#include <adera_app/feature_interfaces.h>
+#include <adera_app/application.h>
+#include <adera_app/features/common.h>
+#include <adera_app/features/jolt.h>
+#include <adera_app/features/misc.h>
+#include <adera_app/features/physics.h>
+#include <adera_app/features/shapes.h>
+#include <adera_app/features/terrain.h>
+#include <adera_app/features/universe.h>
+#include <adera_app/features/vehicles.h>
+#include <adera_app/features/vehicles_machines.h>
+
 #include <osp/core/Resources.h>
 #include <osp/core/string_concat.h>
 #include <osp/drawing/own_restypes.h>
-#include <osp/tasks/top_execute.h>
+#include <osp/framework/builder.h>
+#include <osp/util/UserInputHandler.h>
 #include <osp/util/logging.h>
 #include <osp/vehicles/ImporterData.h>
 #include <osp/vehicles/load_tinygltf.h>
 
+#include <Corrade/Utility/Debug.h>
+#include <Magnum/MeshTools/Transform.h>
+#include <Magnum/Primitives/Cone.h>
+#include <Magnum/Primitives/Cube.h>
+#include <Magnum/Primitives/Cylinder.h>
+#include <Magnum/Primitives/Grid.h>
+#include <Magnum/Primitives/Icosphere.h>
+#include <Magnum/Trade/ImageData.h>
+#include <Magnum/Trade/MeshData.h>
+#include <Magnum/Trade/TextureData.h>
+
+#include <spdlog/sinks/stdout_color_sinks.h>
+
+#include <string_view>
+
+using namespace adera;
+using namespace ftr_inter;
 using namespace godot;
+using namespace osp::draw;
+using namespace osp::fw;
+using namespace ospgdext;
 
 void FlyingScene::_bind_methods()
 {
@@ -62,16 +85,62 @@ FlyingScene::FlyingScene()
 
 FlyingScene::~FlyingScene()
 {
-    delete (ExecutorType *)m_testApp.m_pExecutor;
+    //delete (ExecutorType *)m_pExecutor;
 }
 
-void FlyingScene::_enter_tree()
+osp::Logger_t g_mainThreadLogger;
+
+
+class GodotLogSink final : public spdlog::sinks::base_sink<spdlog::details::null_mutex>
 {
-    godot::UtilityFunctions::print("Enter tree");
-    m_testApp.m_pExecutor = new ExecutorType();
-    m_testApp.m_topData.resize(64);
+protected:
+    void sink_it_(spdlog::details::log_msg const &msg) override
+    {
+        spdlog::memory_buf_t formatBuf;
+        this->formatter_->format(msg, formatBuf);
+        formatBuf.push_back('\x00');
+
+        // kinda stupid that print functions only support godot::String, which is utf-32, and
+        // godot just converts it back to utf-8 to print to the terminal.
+        godot::String gdStr{formatBuf.begin()};
+        switch (msg.level)
+        {
+            case spdlog::level::err:
+                godot::UtilityFunctions::printerr(std::move(gdStr));
+                break;
+            default:
+                godot::UtilityFunctions::print(std::move(gdStr));
+                break;
+        }
+    }
+    void flush_() override { }
+};
+
+void FlyingScene::_enter_tree() // practically main()?
+{
+    auto pSink = std::make_shared<GodotLogSink>();
+    pSink->set_pattern("[%T.%e] [%n] [%^%l%$] [%s:%#] %v");
+    g_mainThreadLogger = std::make_shared<spdlog::logger>("main-thread", pSink);
+    osp::set_thread_logger(g_mainThreadLogger);
+
+
+    OSP_LOG_INFO("Enter tree");
+    register_stage_enums();
+
+    m_mainContext = m_framework.m_contextIds.create();
+
+    ContextBuilder mainCB { m_mainContext, {}, m_framework };
+    mainCB.add_feature(ftrMain);
+    ContextBuilder::finalize(std::move(mainCB));
+
+    auto const fiMain         = m_framework.get_interface<FIMainApp>(m_mainContext);
+    auto       &rResources    = m_framework.data_get<osp::Resources&>(fiMain.di.resources);
+    rResources.resize_types(osp::ResTypeIdReg_t::size());
+    m_defaultPkg = rResources.pkg_create();
+
+
     load_a_bunch_of_stuff();
-    godot::UtilityFunctions::print("Resources loaded");
+    OSP_LOG_INFO("Resources loaded");
 
     RenderingServer *renderingServer = RenderingServer::get_singleton();
     m_scenario                       = get_world_3d()->get_scenario();
@@ -88,22 +157,30 @@ void FlyingScene::_enter_tree()
     Transform3D lform = Transform3D(Basis().rotated(Vector3(1, 1, 1), -1.), Vector3(0., 0., 0.));
     renderingServer->instance_set_transform(m_lightInstance, lform);
 
-    godot::UtilityFunctions::print("Created viewport, scenario, and light");
+    OSP_LOG_INFO("Created viewport, scenario, and light");
 
-    godot::UtilityFunctions::print("Scene is ", m_scene);
-    auto const it = scenarios().find(m_scene.utf8().get_data());
+    CharString const utf8 = m_scene.utf8();
+    OSP_LOG_INFO("Scene is {}", utf8.ptr());
+    auto const it = scenarios().find("vehicles" /*m_scene.utf8().get_data()*/);
     if ( it == std::end(scenarios()) )
     {
-        godot::UtilityFunctions::print("Unknown scene");
-        m_testApp.clear_resource_owners();
+        OSP_LOG_INFO("Unknown scene");
+        clear_resource_owners();
         return;
     }
+    ScenarioOption const &rSelectedScenario = it->second;
 
-    m_testApp.m_rendererSetup = it->second.m_setup(m_testApp);
+    // Loads data into the framework; contains nothing godot-related
+    rSelectedScenario.loadFunc(m_framework, m_mainContext, m_defaultPkg);
+
+
 }
 
 void FlyingScene::_ready()
 {
+    // Setup godot-related stuff based on whatever features the scenario loaded into the framework
+
+
     setup_app();
 }
 
@@ -114,9 +191,14 @@ void FlyingScene::_physics_process(double delta)
 
 void FlyingScene::_process(double delta)
 {
-    m_pUserInput->update_controls();
+    auto const mainApp  = m_framework.get_interface<FIMainApp>(m_mainContext);
+    auto const& appCtxs = m_framework.data_get<AppContexts>(mainApp.di.appContexts);
+    auto const windowApp = m_framework.get_interface<FIWindowApp>(appCtxs.window);
+    auto &rUserInput = m_framework.data_get<UserInputHandler>(windowApp.di.userInput);
+
+    rUserInput.update_controls();
     draw_event();
-    m_pUserInput->clear_events();
+    rUserInput.clear_events();
     // print the corrade messages
     if ( m_dbgStream.tellp() != std::streampos(0) )
     {
@@ -140,6 +222,98 @@ void FlyingScene::_exit_tree()
     destroy_app();
 }
 
+void FlyingScene::drive_scene_cycle(UpdateParams p)
+{
+    Framework &rFW = m_framework;
+
+    auto const mainApp          = rFW.get_interface<FIMainApp>  (m_mainContext);
+    auto const &rAppCtxs        = rFW.data_get<AppContexts>     (mainApp.di.appContexts);
+    auto       &rMainLoopCtrl   = rFW.data_get<MainLoopControl> (mainApp.di.mainLoopCtrl);
+    rMainLoopCtrl.doUpdate      = p.update;
+
+    auto const scene            = rFW.get_interface<FIScene>    (rAppCtxs.scene);
+    if (scene.id.has_value())
+    {
+        auto       &rSceneLoopCtrl  = rFW.data_get<SceneLoopControl>(scene.di.loopControl);
+        auto       &rDeltaTimeIn    = rFW.data_get<float>           (scene.di.deltaTimeIn);
+        rSceneLoopCtrl.doSceneUpdate = p.sceneUpdate;
+        rDeltaTimeIn                = p.deltaTimeIn;
+    }
+
+    auto const windowApp        = rFW.get_interface<FIWindowApp>      (rAppCtxs.window);
+    auto       &rWindowLoopCtrl = rFW.data_get<WindowAppLoopControl>  (windowApp.di.windowAppLoopCtrl);
+    rWindowLoopCtrl.doRender    = p.render;
+    rWindowLoopCtrl.doSync      = p.sync;
+    rWindowLoopCtrl.doResync    = p.resync;
+
+    m_executor.signal(m_framework, mainApp.pl.mainLoop);
+    m_executor.signal(m_framework, windowApp.pl.inputs);
+    m_executor.signal(m_framework, windowApp.pl.sync);
+    m_executor.signal(m_framework, windowApp.pl.resync);
+
+    m_executor.wait(m_framework);
+}
+
+void FlyingScene::run_context_cleanup(ContextId ctx)
+{
+    auto const cleanup = m_framework.get_interface<FICleanupContext> (ctx);
+    if ( cleanup.id.has_value() )
+    {
+        // Run cleanup pipeline for the window context
+        m_executor.run(m_framework, cleanup.pl.cleanup);
+        m_executor.wait(m_framework);
+
+        if (m_executor.is_running(m_framework))
+        {
+            OSP_LOG_CRITICAL("Deadlock in cleanup pipeline");
+            std::abort();
+        }
+    }
+}
+
+void FlyingScene::clear_resource_owners()
+{
+    using namespace osp::restypes;
+
+    auto const mainApp = m_framework.get_interface<FIMainApp>(m_mainContext);
+
+    auto &rResources = m_framework.data_get<osp::Resources>(mainApp.di.resources);
+
+    // Texture resources contain osp::TextureImgSource, which refererence counts
+    // their associated image data
+    for (osp::ResId const id : rResources.ids(gc_texture))
+    {
+        auto * const pData = rResources.data_try_get<osp::TextureImgSource>(gc_texture, id);
+        if (pData != nullptr)
+        {
+            rResources.owner_destroy(gc_image, std::move(*pData));
+        }
+    };
+
+    // Importer data own a lot of other resources
+    for (osp::ResId const id : rResources.ids(gc_importer))
+    {
+        auto * const pData = rResources.data_try_get<osp::ImporterData>(gc_importer, id);
+        if (pData != nullptr)
+        {
+            for (osp::ResIdOwner_t &rOwner : std::move(pData->m_images))
+            {
+                rResources.owner_destroy(gc_image, std::move(rOwner));
+            }
+
+            for (osp::ResIdOwner_t &rOwner : std::move(pData->m_textures))
+            {
+                rResources.owner_destroy(gc_texture, std::move(rOwner));
+            }
+
+            for (osp::ResIdOwner_t &rOwner : std::move(pData->m_meshes))
+            {
+                rResources.owner_destroy(gc_mesh, std::move(rOwner));
+            }
+        }
+    };
+}
+
 void FlyingScene::load_a_bunch_of_stuff()
 {
     using namespace osp::restypes;
@@ -147,40 +321,8 @@ void FlyingScene::load_a_bunch_of_stuff()
     using Primitives::ConeFlag;
     using Primitives::CylinderFlag;
 
-    osp::TopTaskBuilder builder{ m_testApp.m_tasks,
-                                 m_testApp.m_applicationGroup.m_edges,
-                                 m_testApp.m_taskData };
-    auto const          plApp = m_testApp.m_application.create_pipelines<PlApplication>(builder);
-
-    builder.pipeline(plApp.mainLoop).loops(true).wait_for_signal(EStgOptn::ModifyOrSignal);
-
-    // declares idResources and idMainLoopCtrl
-    OSP_DECLARE_CREATE_DATA_IDS(
-        m_testApp.m_application, m_testApp.m_topData, TESTAPP_DATA_APPLICATION);
-
-    auto &rResources    = osp::top_emplace<osp::Resources>(m_testApp.m_topData, idResources);
-    auto &rMainLoopCtrl = osp::top_emplace<MainLoopControl>(m_testApp.m_topData, idMainLoopCtrl);
-    m_mainLoopCtrl      = &rMainLoopCtrl; // set main loop control
-
-    builder.task()
-        .name("Schedule Main Loop")
-        .schedules({ plApp.mainLoop(EStgOptn::Schedule) })
-        .push_to(m_testApp.m_application.m_tasks)
-        .args({ idMainLoopCtrl })
-        .func([](MainLoopControl const &rMainLoopCtrl) noexcept -> osp::TaskActions {
-            if ( ! rMainLoopCtrl.doUpdate && ! rMainLoopCtrl.doSync && ! rMainLoopCtrl.doResync
-                 && ! rMainLoopCtrl.doRender )
-            {
-                return osp::TaskAction::Cancel;
-            }
-            else
-            {
-                return {};
-            }
-        });
-
-    rResources.resize_types(osp::ResTypeIdReg_t::size());
-
+    auto const fiMain      = m_framework.get_interface<FIMainApp>(m_mainContext);
+    auto       &rResources = m_framework.data_get<osp::Resources&>(fiMain.di.resources);
     rResources.data_register<Trade::ImageData2D>(gc_image);
     rResources.data_register<Trade::TextureData>(gc_texture);
     rResources.data_register<osp::TextureImgSource>(gc_texture);
@@ -188,8 +330,6 @@ void FlyingScene::load_a_bunch_of_stuff()
     rResources.data_register<osp::ImporterData>(gc_importer);
     rResources.data_register<osp::Prefabs>(gc_importer);
     osp::register_tinygltf_resources(rResources);
-    m_testApp.m_defaultPkg                       = rResources.pkg_create();
-
     // Load sturdy glTF files
     // FIXME this works in editor, but probably not for exported game.
     const std::string_view              datapath = { "OSPData/adera/" };
@@ -203,21 +343,22 @@ void FlyingScene::load_a_bunch_of_stuff()
         "ph_rcs.sturdy.gltf"
         //"ph_rcs_plume.sturdy.gltf"
     };
-
     // TODO: Make new gltf loader. This will read gltf files and dump meshes,
     //       images, textures, and other relevant data into osp::Resources
     for ( auto const &meshName : meshes )
     {
-        osp::ResId res = osp::load_tinygltf_file(
-            osp::string_concat(datapath, meshName), rResources, m_testApp.m_defaultPkg);
-        osp::assigns_prefabs_tinygltf(rResources, res);
+        auto str = osp::string_concat(datapath, meshName);
+        osp::ResId res = osp::load_tinygltf_file(str, rResources, m_defaultPkg);
+        if (res != lgrn::id_null<ResId>())
+        {
+            osp::assigns_prefabs_tinygltf(rResources, res);
+        }
     }
 
     // Add a default primitives
-    auto const add_mesh_quick = [&rResources = rResources, &m_testApp = m_testApp](
-                                    std::string_view const name, Trade::MeshData &&data) {
-        osp::ResId const meshId =
-            rResources.create(gc_mesh, m_testApp.m_defaultPkg, osp::SharedString::create(name));
+    auto const add_mesh_quick = [&rResources = rResources, this] (std::string_view const name, Trade::MeshData&& data)
+    {
+        osp::ResId const meshId = rResources.create(gc_mesh, m_defaultPkg, osp::SharedString::create(name));
         rResources.data_add<Trade::MeshData>(gc_mesh, meshId, std::move(data));
     };
 
@@ -235,66 +376,133 @@ void FlyingScene::load_a_bunch_of_stuff()
     add_mesh_quick("cone", std::move(cone));
     add_mesh_quick("grid64solid", Primitives::grid3DSolid({ 63, 63 }));
 
-    // OSP_LOG_INFO("Resource loading complete");
+    OSP_LOG_INFO("Resource loading complete");
 }
+
+ContextId make_scene_renderer(Framework &rFW, ContextId mainCtx, ContextId sceneCtx, ContextId windowCtx, PkgId defaultPkg)
+{
+    auto const godot = rFW.get_interface<FIGodot>         (windowCtx);
+
+    ContextId const scnRdrCtx = rFW.m_contextIds.create();
+
+    // TODO: comment below is lying, and just adds features without guidance.
+
+    // Choose which renderer features to use based on information on which features the scene
+    // context contains.
+
+    ContextBuilder  scnRdrCB { scnRdrCtx, { mainCtx, windowCtx, sceneCtx }, rFW };
+
+    if (rFW.get_interface<FIScene>(sceneCtx).id.has_value())
+    {
+        scnRdrCB.add_feature(ftrSceneRenderer);
+        scnRdrCB.add_feature(ftrGodotScene);
+
+        auto scnRender      = rFW.get_interface<FISceneRenderer>        (scnRdrCtx);
+        auto &rScnRender    = rFW.data_get<draw::ACtxSceneRender>       (scnRender.di.scnRender);
+        //auto &rCamera       = rFW.data_get<draw::Camera>                (gdScn.di.camera);
+
+        MaterialId const matFlat  = rScnRender.m_materialIds.create();
+        rScnRender.m_materials.resize(rScnRender.m_materialIds.size());
+
+        scnRdrCB.add_feature(ftrCameraControlGD);
+
+        scnRdrCB.add_feature(ftrFlatMaterial, matFlat);
+        scnRdrCB.add_feature(ftrThrower);
+        scnRdrCB.add_feature(ftrPhysicsShapesDraw, matFlat);
+        scnRdrCB.add_feature(ftrCursor, TplPkgIdMaterialId{defaultPkg, matFlat});
+
+
+        if (rFW.get_interface_id<FIPrefabs>(sceneCtx).has_value())
+        {
+            scnRdrCB.add_feature(ftrPrefabDraw, matFlat);
+        }
+
+        if (rFW.get_interface_id<FIVehicleSpawn>(sceneCtx).has_value())
+        {
+            scnRdrCB.add_feature(ftrVehicleControl);
+            scnRdrCB.add_feature(ftrVehicleCamera);
+            scnRdrCB.add_feature(ftrVehicleSpawnDraw);
+        }
+        else
+        {
+            scnRdrCB.add_feature(ftrCameraFree);
+        }
+
+        if (rFW.get_interface_id<FIRocketsJolt>(sceneCtx).has_value())
+        {
+            scnRdrCB.add_feature(ftrMagicRocketThrustIndicator, TplPkgIdMaterialId{ defaultPkg, matFlat });
+        }
+
+
+
+    }
+
+
+
+    ContextBuilder::finalize(std::move(scnRdrCB));
+    return scnRdrCtx;
+} // make_scene_renderer
 
 void FlyingScene::setup_app()
 {
-    osp::TopTaskBuilder builder{ m_testApp.m_tasks,
-                                 m_testApp.m_renderer.m_edges,
-                                 m_testApp.m_taskData };
+    // Setup Godot 'window application' renderer context
+    // This is intended to stay alive as long as godot is open (forever), unlike the scene renderer
+    // which is intended to be swapped out when the scene changes.
 
-    m_testApp.m_windowApp =
-        scenes::setup_window_app(builder, m_testApp.m_topData, m_testApp.m_application);
-    m_testApp.m_magnum = scenes::setup_godot(
-        this, builder, m_testApp.m_topData, m_testApp.m_application, m_testApp.m_windowApp);
+    auto      const mainApp   = m_framework.get_interface<FIMainApp>(m_mainContext);
+    ContextId const sceneCtx  = m_framework.data_get<AppContexts>(mainApp.di.appContexts).scene;
+    ContextId const windowCtx = m_framework.m_contextIds.create();
+    ContextBuilder  windowCB { windowCtx, { m_mainContext, sceneCtx }, m_framework };
+    windowCB.add_feature(adera::ftrWindowApp);
+    windowCB.add_feature(ftrGodot, entt::make_any<godot::FlyingScene*>(this));
+    ContextBuilder::finalize(std::move(windowCB));
 
-    godot::UtilityFunctions::print("setup_godot");
+    OSP_LOG_INFO("Setup godot");
 
-    // Setup renderer sessions
+    // Setup scene renderer sessions
 
-    m_testApp.m_rendererSetup(m_testApp);
-    godot::UtilityFunctions::print("renderer");
-    m_testApp.m_graph = osp::make_exec_graph(
-        m_testApp.m_tasks, { &m_testApp.m_renderer.m_edges, &m_testApp.m_scene.m_edges });
-    m_executor.load(m_testApp);
-    m_testApp.m_pExecutor = &m_executor;
+    ContextId const sceneRenderCtx = make_scene_renderer(m_framework, m_mainContext, sceneCtx, windowCtx, m_defaultPkg);
+
+    // All contexts and features are now created, keep track of them
+
+    auto &rAppCtxs = m_framework.data_get<AppContexts>(mainApp.di.appContexts);
+    rAppCtxs.window = windowCtx;
+    rAppCtxs.sceneRender = sceneRenderCtx;
+
     // Start the main loop
 
-    osp::PipelineId const mainLoop =
-        m_testApp.m_application.get_pipelines<PlApplication>().mainLoop;
-    m_testApp.m_pExecutor->run(m_testApp, mainLoop);
+    m_executor.load(m_framework);
+    m_executor.run(m_framework, mainApp.pl.mainLoop);
 
-    // Resyncronize renderer
-
-    *m_mainLoopCtrl = MainLoopControl{
-        .doUpdate = false,
-        .doSync   = true,
-        .doResync = true,
-        .doRender = false,
-    };
-
-    signal_all();
-
-    m_testApp.m_pExecutor->wait(m_testApp);
+    // Resynchronize renderer; Resync+Sync without stepping through time.
+    // This makes sure meshes, textures, shaders, and other GPU-related resources specified by
+    // the scene are properly loaded and assigned to entities within the renderer.
+    drive_scene_cycle({.deltaTimeIn = 0.0f,
+                       .update      = true,
+                       .sceneUpdate = false,
+                       .resync      = true,
+                       .sync        = true,
+                       .render      = false });
 }
 
 void FlyingScene::draw_event()
 {
-    *m_mainLoopCtrl = MainLoopControl{
-        .doUpdate = true,
-        .doSync   = true,
-        .doResync = false,
-        .doRender = true,
-    };
-
-    signal_all();
-
-    m_testApp.m_pExecutor->wait(m_testApp);
+    drive_scene_cycle({.deltaTimeIn = 1.0f/60.0f,
+                       .update      = true,
+                       .sceneUpdate = true,
+                       .resync      = false,
+                       .sync        = true,
+                       .render      = true });
 }
 
 void FlyingScene::_input(const Ref<InputEvent> &input)
 {
+    auto const mainApp  = m_framework.get_interface<FIMainApp>(m_mainContext);
+    auto const& appCtxs = m_framework.data_get<AppContexts>(mainApp.di.appContexts);
+    auto const windowApp = m_framework.get_interface<FIWindowApp>(appCtxs.window);
+    auto &rUserInput = m_framework.data_get<UserInputHandler>(windowApp.di.userInput);
+
+
     // FIXME using dynamic_cast is a bit ugly, but afaik it's the best way if we bypass Godot's
     // InputMap (which we probably shouldn't in the long term)
 
@@ -319,7 +527,7 @@ void FlyingScene::_input(const Ref<InputEvent> &input)
         {
             return;
         }
-        m_pUserInput->event_raw(
+        rUserInput.event_raw(
             osp::input::sc_keyboard, (int)inputKey->get_physical_keycode(), dir);
         return;
     }
@@ -343,7 +551,7 @@ void FlyingScene::_input(const Ref<InputEvent> &input)
             {
                 return;
             }
-            m_pUserInput->event_raw(
+            rUserInput.event_raw(
                 osp::input::sc_mouse, (int)inputMouseButton->get_button_index(), dir);
             return;
         }
@@ -364,7 +572,7 @@ void FlyingScene::_input(const Ref<InputEvent> &input)
         {
             scroll_delta.x() -= static_cast<int>(inputMouseButton->get_factor());
         }
-        m_pUserInput->scroll_delta(scroll_delta);
+        rUserInput.scroll_delta(scroll_delta);
         return;
     }
 
@@ -374,44 +582,53 @@ void FlyingScene::_input(const Ref<InputEvent> &input)
     {
         godot::Vector2 mdelta = inputMouseMotion->get_relative();
         // Godot mouse position is in floats apparently. Error is probably minimal.
-        m_pUserInput->mouse_delta({ static_cast<int>(mdelta.x), static_cast<int>(mdelta.y) });
+        rUserInput.mouse_delta({ static_cast<int>(mdelta.x), static_cast<int>(mdelta.y) });
         return;
     }
 };
 
 void FlyingScene::destroy_app()
 {
+    OSP_LOG_INFO("Destroy App");
 
-    *m_mainLoopCtrl = MainLoopControl{
-        .doUpdate = false,
-        .doSync   = false,
-        .doResync = false,
-        .doRender = false,
-    };
-
-    signal_all();
-
-    m_testApp.m_pExecutor->wait(m_testApp);
-
-    if ( m_testApp.m_pExecutor->is_running(m_testApp) )
+    // Stops the pipeline loop
+    drive_scene_cycle({.deltaTimeIn = 0.0f,
+                       .update      = false,
+                       .sceneUpdate = false,
+                       .resync      = false,
+                       .sync        = false,
+                       .render      = false });
+    if (m_executor.is_running(m_framework))
     {
-        // Main loop must have stopped, but didn't!
-        m_testApp.m_pExecutor->wait(m_testApp);
+        OSP_LOG_CRITICAL("Expected main loop to stop, but something is blocking it and cannot exit");
         std::abort();
     }
 
-    // Closing sessions will delete their associated TopData and Tags
-    m_testApp.m_pExecutor->run(m_testApp, m_testApp.m_windowApp.m_cleanup);
-    m_testApp.close_sessions(m_testApp.m_renderer.m_sessions);
-    m_testApp.m_renderer.m_sessions.clear();
-    m_testApp.m_renderer.m_edges.m_syncWith.clear();
+    auto const mainApp  = m_framework.get_interface<FIMainApp>(m_mainContext);
+    auto const appCtxs = m_framework.data_get<AppContexts>(mainApp.di.appContexts);
 
-    m_testApp.close_session(m_testApp.m_magnum);
-    m_testApp.close_session(m_testApp.m_windowApp);
+    run_context_cleanup(appCtxs.sceneRender);
+    run_context_cleanup(appCtxs.window);
+    run_context_cleanup(appCtxs.scene);
+    run_context_cleanup(appCtxs.main);
+
+    if (m_executor.is_running(m_framework))
+    {
+        OSP_LOG_CRITICAL("Expected main loop to stop, but something is blocking it and cannot exit");
+        std::abort();
+    }
+
+    m_framework.close_context(appCtxs.sceneRender);
+    m_framework.close_context(appCtxs.window);
+    m_framework.close_context(appCtxs.scene);
+    m_framework.close_context(appCtxs.main);
+
+
+    clear_resource_owners();
 
     // leak test app cause there is a free bug. FIXME of course.
-    auto leak_tp = new TestApp;
-    std::swap(*leak_tp, m_testApp);
+//    auto leak_tp = new TestApp;
+//    std::swap(*leak_tp, m_testApp);*/
 }
 
 void FlyingScene::set_scene(String const &scene)

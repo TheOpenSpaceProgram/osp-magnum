@@ -1,6 +1,6 @@
 /**
  * Open Space Program
- * Copyright © 2019-2021 Open Space Program Project
+ * Copyright © 2019-2024 Open Space Program Project
  *
  * MIT License
  *
@@ -24,25 +24,64 @@
  */
 #pragma once
 
-#define SPDLOG_ACTIVE_LEVEL SPDLOG_LEVEL_INFO
-#include <spdlog/spdlog.h>
+#include <adera_app/feature_interfaces.h>
 
-namespace osp
+namespace ftr_inter
 {
-using Logger_t = std::shared_ptr<spdlog::logger>;
 
-inline thread_local Logger_t t_logger; // Unique logger per thread
+struct FIGodot {
+    struct DataIds {
+        DataId app;
+        DataId render;
+    };
 
-inline void set_thread_logger(Logger_t logger)
-{
-    t_logger = std::move(logger);
-}
+    struct Pipelines {
+        PipelineDef<EStgCont> mesh            {"mesh"};
+        PipelineDef<EStgCont> texture         {"texture"};
 
-} // namespace osp
+        PipelineDef<EStgCont> entMesh         {"entMesh"};
+        PipelineDef<EStgCont> entTexture      {"entTexture"};
+    };
+};
 
-#define OSP_LOG_TRACE(...) SPDLOG_LOGGER_TRACE(osp::t_logger, __VA_ARGS__)
-#define OSP_LOG_DEBUG(...) SPDLOG_LOGGER_DEBUG(osp::t_logger, __VA_ARGS__)
-#define OSP_LOG_INFO(...) SPDLOG_LOGGER_INFO(osp::t_logger, __VA_ARGS__)
-#define OSP_LOG_WARN(...) SPDLOG_LOGGER_TRACE(osp::t_logger, __VA_ARGS__)
-#define OSP_LOG_ERROR(...) SPDLOG_LOGGER_ERROR(osp::t_logger, __VA_ARGS__)
-#define OSP_LOG_CRITICAL(...) SPDLOG_LOGGER_CRITICAL(osp::t_logger, __VA_ARGS__)
+
+struct FIGodotScene {
+    struct DataIds {
+        DataId scnRenderGl;
+        DataId groupFwd;
+        DataId camera;
+    };
+
+    struct Pipelines {
+        PipelineDef<EStgFBO>  fbo               {"fboRender"};
+        PipelineDef<EStgCont> camera            {"camera"};
+    };
+};
+
+
+struct FIShaderVisualizerGD {
+    struct DataIds {
+        DataId shader;
+    };
+
+    struct Pipelines { };
+};
+
+struct FIShaderFlatGD {
+    struct DataIds {
+        DataId shader;
+    };
+
+    struct Pipelines { };
+};
+
+struct FIShaderPhongGD {
+    struct DataIds {
+        DataId shader;
+    };
+
+    struct Pipelines { };
+};
+
+
+} // namespace ftr_inter

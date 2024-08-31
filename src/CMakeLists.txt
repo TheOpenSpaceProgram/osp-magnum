@@ -39,16 +39,14 @@ add_subdirectory(adera_app)
 add_subdirectory(osp)
 add_subdirectory(planet-a)
 add_subdirectory(ospjolt)
-add_subdirectory(testapp)
-
-if(OSP_BUILD_GDEXTENSION)
-
-add_subdirectory(gdextension)
-
-else()
-
 add_subdirectory(osp_drawing_gl)
 add_subdirectory(adera_drawing_gl)
 
+if(OSP_BUILD_TESTAPP)
+    add_subdirectory(testapp)
+endif()
+
+if(OSP_BUILD_GDEXTENSION)
+    add_subdirectory(gdextension)
 endif()
 

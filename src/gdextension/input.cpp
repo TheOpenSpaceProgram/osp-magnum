@@ -29,7 +29,7 @@
 #include <toml.hpp>
 
 
-using namespace testapp;
+using namespace ospgdext;
 
 using Key_t = godot::Key;
 using Mouse_t = godot::MouseButton;
@@ -81,7 +81,7 @@ using osp::input::EVarOperator;
 //     m_rUserInput.scroll_delta(static_cast<osp::Vector2i>(event.offset()));
 // }
 
-void testapp::config_controls(UserInputHandler& rUserInput)
+void ospgdext::config_controls(UserInputHandler& rUserInput)
 {
     // Configure Controls
     //Load toml

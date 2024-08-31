@@ -107,3 +107,6 @@ set_target_properties(osp-magnum PROPERTIES
 add_custom_target(run-osp-magnum
                   COMMAND $<TARGET_FILE:osp-magnum>
                   WORKING_DIRECTORY ${CMAKE_BINARY_DIR}/$<CONFIG>)
+
+set_property(TARGET osp-magnum PROPERTY VS_DEBUGGER_WORKING_DIRECTORY "${CMAKE_SOURCE_DIR}/bin")
+

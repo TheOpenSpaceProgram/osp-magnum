@@ -26,27 +26,32 @@
 
 #include "flying_scene.h"
 #include "input.h"
-#include "osp/core/math_types.h"
-#include "osp/tasks/top_utils.h"
 #include "render.h"
-#include "testapp/identifiers.h"
+
+#include "../feature_interfaces.h"
 
 #include <Magnum/Magnum.h>
-#include <adera/drawing/CameraController.h>
-#include <adera/machines/links.h>
-#include <entt/core/fwd.hpp>
+
 #include <godot_cpp/classes/rendering_server.hpp>
 #include <godot_cpp/variant/basis.hpp>
 #include <godot_cpp/variant/quaternion.hpp>
 #include <godot_cpp/variant/transform3d.hpp>
 #include <godot_cpp/variant/utility_functions.hpp>
 #include <godot_cpp/variant/vector3.hpp>
-#include <longeron/id_management/null.hpp>
+
+#include <adera/drawing/CameraController.h>
+#include <adera/machines/links.h>
+
 #include <osp/activescene/basic_fn.h>
+#include <osp/core/math_types.h>
 #include <osp/drawing/drawing.h>
 #include <osp/universe/coordinates.h>
 #include <osp/universe/universe.h>
-#include <testapp/sessions/common.h>
+
+#include <entt/core/fwd.hpp>
+
+#include <longeron/id_management/null.hpp>
+
 
 // for the 0xrrggbb_rgbf and angle literals
 using namespace Magnum::Math::Literals;
@@ -55,101 +60,88 @@ using namespace adera;
 using namespace osp::active;
 using namespace osp::draw;
 using namespace osp::universe;
+using namespace osp::fw;
+using namespace ftr_inter;
+using namespace ftr_inter::stages;
+
 using namespace osp;
 
 using osp::input::UserInputHandler;
 
-namespace testapp::scenes
+namespace ospgdext
 {
 
-Session setup_godot(godot::FlyingScene        *pMainApp,
-                    TopTaskBuilder            &rBuilder,
-                    ArrayView<entt::any> const topData,
-                    Session const             &application,
-                    Session const             &windowApp)
-{
-    OSP_DECLARE_GET_DATA_IDS(application, TESTAPP_DATA_APPLICATION);
-    OSP_DECLARE_GET_DATA_IDS(windowApp, TESTAPP_DATA_WINDOW_APP);
-    auto const tgWin      = windowApp.get_pipelines<PlWindowApp>();
 
-    auto      &rUserInput = top_get<UserInputHandler>(topData, idUserInput);
+osp::fw::FeatureDef const ftrGodot = feature_def("Godot", [] (
+        FeatureBuilder              &rFB,
+        Implement<FIGodot>          godot,
+        DependOn<FICleanupContext>  cleanup,
+        DependOn<FIMainApp>         mainApp,
+        DependOn<FIWindowApp>       windowApp,
+        entt::any                   userData)
+{
+    auto pMainApp    = entt::any_cast<godot::FlyingScene*>(userData);
+    auto &rUserInput = rFB.data_get<UserInputHandler>(windowApp.di.userInput);
+
     config_controls(rUserInput);
-    pMainApp->set_user_input(&rUserInput);
+    //pMainApp->set_user_input(&rUserInput);
 
-    Session out;
-    OSP_DECLARE_CREATE_DATA_IDS(out, topData, TESTAPP_DATA_MAGNUM);
-    osp::top_emplace<godot::FlyingScene *>(topData, idActiveApp, pMainApp);
-    auto const tgMgn = out.create_pipelines<PlMagnum>(rBuilder);
+    rFB.data_emplace<godot::FlyingScene *>(godot.di.app, pMainApp);
 
-    rBuilder.pipeline(tgMgn.meshGL).parent(tgWin.sync);
-    rBuilder.pipeline(tgMgn.textureGL).parent(tgWin.sync);
-    rBuilder.pipeline(tgMgn.entMeshGL).parent(tgWin.sync);
-    rBuilder.pipeline(tgMgn.entTextureGL).parent(tgWin.sync);
-
+    rFB.pipeline(godot.pl.mesh).parent(windowApp.pl.sync);
+    rFB.pipeline(godot.pl.texture).parent(windowApp.pl.sync);
+    rFB.pipeline(godot.pl.entMesh).parent(windowApp.pl.sync);
+    rFB.pipeline(godot.pl.entTexture).parent(windowApp.pl.sync);
     // Order-dependent; MagnumApplication construction starts OpenGL context, needed by RenderGL
-    /* unused */ // top_emplace<MagnumApplication>(topData, idActiveApp, args, rUserInput);
-    auto &rRenderGd    = top_emplace<RenderGd>(topData, idRenderGl);
+    /* unused */ // rFB.data_emplace<MagnumApplication>(idActiveApp, args, rUserInput);
+    auto &rRenderGd    = rFB.data_emplace<RenderGd>(godot.di.render);
 
     rRenderGd.scenario = pMainApp->get_main_scenario();
     rRenderGd.viewport = pMainApp->get_main_viewport();
-
-    rBuilder.task()
+    rFB.task()
         .name("Clean up renderer")
-        .run_on({ tgWin.cleanup(Run_) })
-        .push_to(out.m_tasks)
-        .args({ idResources, idRenderGl })
+        .run_on({ cleanup.pl.cleanup(Run_) })
+        .args({ mainApp.di.resources, godot.di.render })
         .func([](Resources &rResources, RenderGd &rRenderGd) noexcept {
             SysRenderGd::clear_resource_owners(rRenderGd, rResources);
             rRenderGd = {}; // Needs the OpenGL thread for destruction
         });
+}); // ftrGodot
 
-    return out;
-} // setup_magnum
 
-Session setup_godot_scene(TopTaskBuilder            &rBuilder,
-                          ArrayView<entt::any> const topData,
-                          Session const             &application,
-                          Session const             &windowApp,
-                          Session const             &sceneRenderer,
-                          Session const             &magnum,
-                          Session const             &scene,
-                          Session const             &commonScene)
+
+/**
+ * @brief stuff needed to render a scene using Magnum
+ */
+osp::fw::FeatureDef const ftrGodotScene = feature_def("GodotScene", [] (
+        FeatureBuilder              &rFB,
+        Implement<FIGodotScene>     gdScn,
+        DependOn<FIGodot>           godot,
+        DependOn<FIMainApp>         mainApp,
+        DependOn<FIWindowApp>       windowApp,
+        DependOn<FISceneRenderer>   scnRender,
+        DependOn<FIScene>           scn,
+        DependOn<FICommonScene>     comScn)
 {
-    OSP_DECLARE_GET_DATA_IDS(application, TESTAPP_DATA_APPLICATION);
-    OSP_DECLARE_GET_DATA_IDS(commonScene, TESTAPP_DATA_COMMON_SCENE);
-    OSP_DECLARE_GET_DATA_IDS(windowApp, TESTAPP_DATA_WINDOW_APP);
-    OSP_DECLARE_GET_DATA_IDS(sceneRenderer, TESTAPP_DATA_SCENE_RENDERER);
-    OSP_DECLARE_GET_DATA_IDS(magnum, TESTAPP_DATA_MAGNUM);
 
     auto       rs       = godot::RenderingServer::get_singleton();
 
-    auto const tgWin    = windowApp.get_pipelines<PlWindowApp>();
-    auto const tgMgn    = magnum.get_pipelines<PlMagnum>();
-    auto const tgScnRdr = sceneRenderer.get_pipelines<PlSceneRenderer>();
+    rFB.pipeline(gdScn.pl.fbo).parent(scnRender.pl.render);
+    rFB.pipeline(gdScn.pl.camera).parent(scnRender.pl.render);
 
-    Session    out;
-    OSP_DECLARE_CREATE_DATA_IDS(out, topData, TESTAPP_DATA_MAGNUM_SCENE);
-    auto const tgMgnScn = out.create_pipelines<PlMagnumScene>(rBuilder);
-
-    rBuilder.pipeline(tgMgnScn.fbo).parent(tgScnRdr.render);
-    rBuilder.pipeline(tgMgnScn.camera).parent(tgScnRdr.render);
-
-    top_emplace<draw::ACtxSceneRenderGd>(topData, idScnRenderGl);
-    top_emplace<osp::draw::RenderGroup>(topData, idGroupFwd);
-
-    godot::RID &rCamera = top_emplace<godot::RID>(topData, idCamera);
+    rFB.data_emplace<draw::ACtxSceneRenderGd>(gdScn.di.scnRenderGl);
+    rFB.data_emplace<osp::draw::RenderGroup>(gdScn.di.groupFwd);
+    godot::RID &rCamera = rFB.data_emplace<godot::RID>(gdScn.di.camera);
     rCamera             = rs->camera_create();
 
-    RenderGd &rRenderGd = top_get<RenderGd>(topData, idRenderGl);
+    RenderGd &rRenderGd = rFB.data_get<RenderGd>(godot.di.render);
     rs->viewport_attach_camera(rRenderGd.viewport, rCamera);
-
     // rs->camera_set_perspective(rCamera, 45., 1.0f, 1u << 24);
-    rBuilder.task()
+    rFB.task()
         .name("Resize ACtxSceneRenderGd to fit all DrawEnts")
-        .run_on({ tgScnRdr.drawEntResized(scenes::Run) })
+        .run_on({ scnRender.pl.drawEntResized(Run) })
         .sync_with({})
-        .push_to(out.m_tasks)
-        .args({ idScnRender, idScnRenderGl })
+        .args({ scnRender.di.scnRender, gdScn.di.scnRenderGl })
         .func([](osp::draw::ACtxSceneRender const &rScnRender,
                  draw::ACtxSceneRenderGd          &rScnRenderGl) noexcept {
             std::size_t const capacity = rScnRender.m_drawIds.capacity();
@@ -158,42 +150,39 @@ Session setup_godot_scene(TopTaskBuilder            &rBuilder,
             rScnRenderGl.m_instanceId.resize(capacity);
         });
 
-    rBuilder.task()
+    rFB.task()
         .name("Compile Resource Meshes to GL")
-        .run_on({ tgScnRdr.meshResDirty(scenes::UseOrRun) })
-        .sync_with({ tgScnRdr.mesh(scenes::Ready),
-                     tgMgn.meshGL(scenes::New),
-                     tgScnRdr.entMeshDirty(scenes::UseOrRun) })
-        .push_to(out.m_tasks)
-        .args({ idDrawingRes, idResources, idRenderGl })
+        .run_on({ scnRender.pl.meshResDirty(UseOrRun) })
+        .sync_with({ scnRender.pl.mesh(Ready),
+                     godot.pl.mesh(New),
+                     scnRender.pl.entMeshDirty(UseOrRun) })
+        .args({ comScn.di.drawingRes, mainApp.di.resources, godot.di.render })
         .func([](osp::draw::ACtxDrawingRes const &rDrawingRes,
                  osp::Resources                  &rResources,
                  osp::draw::RenderGd             &rRenderGd) noexcept {
             draw::SysRenderGd::compile_resource_meshes(rDrawingRes, rResources, rRenderGd);
         });
 
-    rBuilder.task()
+    rFB.task()
         .name("Compile Resource Textures to GL")
-        .run_on({ tgScnRdr.textureResDirty(scenes::UseOrRun) })
-        .sync_with({ tgScnRdr.texture(scenes::Ready), tgMgn.textureGL(scenes::New) })
-        .push_to(out.m_tasks)
-        .args({ idDrawingRes, idResources, idRenderGl })
+        .run_on({ scnRender.pl.textureResDirty(UseOrRun) })
+        .sync_with({ scnRender.pl.texture(Ready), godot.pl.texture(New) })
+        .args({ comScn.di.drawingRes, mainApp.di.resources, godot.di.render })
         .func([](draw::ACtxDrawingRes const &rDrawingRes,
                  osp::Resources             &rResources,
                  draw::RenderGd             &rRenderGd) noexcept {
             draw::SysRenderGd::compile_resource_textures(rDrawingRes, rResources, rRenderGd);
         });
 
-    rBuilder.task()
+    rFB.task()
         .name("Sync GL textures to entities with scene textures")
-        .run_on({ tgScnRdr.entTextureDirty(scenes::UseOrRun) })
-        .sync_with({ tgScnRdr.texture(scenes::Ready),
-                     tgScnRdr.entTexture(scenes::Ready),
-                     tgMgn.textureGL(scenes::Ready),
-                     tgMgn.entTextureGL(scenes::Modify),
-                     tgScnRdr.drawEntResized(scenes::Done) })
-        .push_to(out.m_tasks)
-        .args({ idDrawing, idDrawingRes, idScnRender, idScnRenderGl, idRenderGl })
+        .run_on({ scnRender.pl.entTextureDirty(UseOrRun) })
+        .sync_with({ scnRender.pl.texture(Ready),
+                     scnRender.pl.entTexture(Ready),
+                     godot.pl.texture(Ready),
+                     godot.pl.entTexture(Modify),
+                     scnRender.pl.drawEntResized(Done) })
+        .args({ comScn.di.drawing, comScn.di.drawingRes, scnRender.di.scnRender, gdScn.di.scnRenderGl, godot.di.render })
         .func([](draw::ACtxDrawing       &rDrawing,
                  draw::ACtxDrawingRes    &rDrawingRes,
                  draw::ACtxSceneRender   &rScnRender,
@@ -207,15 +196,14 @@ Session setup_godot_scene(TopTaskBuilder            &rBuilder,
                                                     rRenderGl);
         });
 
-    rBuilder.task()
+    rFB.task()
         .name("Resync GL textures")
-        .run_on({ tgWin.resync(scenes::Run) })
-        .sync_with({ tgScnRdr.texture(scenes::Ready),
-                     tgMgn.textureGL(scenes::Ready),
-                     tgMgn.entTextureGL(scenes::Modify),
-                     tgScnRdr.drawEntResized(scenes::Done) })
-        .push_to(out.m_tasks)
-        .args({ idDrawingRes, idScnRender, idScnRenderGl, idRenderGl })
+        .run_on({ windowApp.pl.resync(Run) })
+        .sync_with({ scnRender.pl.texture(Ready),
+                     godot.pl.texture(Ready),
+                     godot.pl.entTexture(Modify),
+                     scnRender.pl.drawEntResized(Done) })
+        .args({ comScn.di.drawingRes, scnRender.di.scnRender, gdScn.di.scnRenderGl, godot.di.render })
         .func([](draw::ACtxDrawingRes    &rDrawingRes,
                  draw::ACtxSceneRender   &rScnRender,
                  draw::ACtxSceneRenderGd &rScnRenderGl,
@@ -230,16 +218,15 @@ Session setup_godot_scene(TopTaskBuilder            &rBuilder,
             }
         });
 
-    rBuilder.task()
+    rFB.task()
         .name("Sync GL meshes to entities with scene meshes")
-        .run_on({ tgScnRdr.entMeshDirty(scenes::UseOrRun) })
-        .sync_with({ tgScnRdr.mesh(scenes::Ready),
-                     tgScnRdr.entMesh(scenes::Ready),
-                     tgMgn.meshGL(scenes::Ready),
-                     tgMgn.entMeshGL(scenes::Modify),
-                     tgScnRdr.drawEntResized(scenes::Done) })
-        .push_to(out.m_tasks)
-        .args({ idDrawingRes, idScnRender, idScnRenderGl, idRenderGl })
+        .run_on({ scnRender.pl.entMeshDirty(UseOrRun) })
+        .sync_with({ scnRender.pl.mesh(Ready),
+                     scnRender.pl.entMesh(Ready),
+                     godot.pl.mesh(Ready),
+                     godot.pl.entMesh(Modify),
+                     scnRender.pl.drawEntResized(Done) })
+        .args({ comScn.di.drawingRes, scnRender.di.scnRender, gdScn.di.scnRenderGl, godot.di.render })
         .func([](draw::ACtxDrawingRes    &rDrawingRes,
                  draw::ACtxSceneRender   &rScnRender,
                  draw::ACtxSceneRenderGd &rScnRenderGl,
@@ -253,15 +240,14 @@ Session setup_godot_scene(TopTaskBuilder            &rBuilder,
                                                  rRenderGl);
         });
 
-    rBuilder.task()
+    rFB.task()
         .name("Resync GL meshes")
-        .run_on({ tgWin.resync(scenes::Run) })
-        .sync_with({ tgScnRdr.mesh(scenes::Ready),
-                     tgMgn.meshGL(scenes::Ready),
-                     tgMgn.entMeshGL(scenes::Modify),
-                     tgScnRdr.drawEntResized(scenes::Done) })
-        .push_to(out.m_tasks)
-        .args({ idDrawingRes, idScnRender, idScnRenderGl, idRenderGl })
+        .run_on({ windowApp.pl.resync(Run) })
+        .sync_with({ scnRender.pl.mesh(Ready),
+                     godot.pl.mesh(Ready),
+                     godot.pl.entMesh(Modify),
+                     scnRender.pl.drawEntResized(Done) })
+        .args({ comScn.di.drawingRes, scnRender.di.scnRender, gdScn.di.scnRenderGl, godot.di.render })
         .func([](draw::ACtxDrawingRes    &rDrawingRes,
                  draw::ACtxSceneRender   &rScnRender,
                  draw::ACtxSceneRenderGd &rScnRenderGl,
@@ -277,25 +263,23 @@ Session setup_godot_scene(TopTaskBuilder            &rBuilder,
             }
         });
 
-    rBuilder.task()
+    rFB.task()
         .name("Render Entities")
-        .run_on({ tgScnRdr.render(scenes::Run) })
-        .sync_with({ tgScnRdr.group(scenes::Ready),
-                     tgScnRdr.groupEnts(scenes::Ready),
-                     tgMgnScn.camera(scenes::Ready),
-                     tgScnRdr.drawTransforms(scenes::UseOrRun),
-                     tgScnRdr.entMesh(scenes::Ready),
-                     tgScnRdr.entTexture(scenes::Ready),
-                     tgMgn.entMeshGL(scenes::Ready),
-                     tgMgn.entTextureGL(scenes::Ready),
-                     tgScnRdr.drawEnt(scenes::Ready) })
-        .push_to(out.m_tasks)
-        .args({ idScnRender, idRenderGl, idGroupFwd, idCamera })
+        .run_on({ scnRender.pl.render(Run) })
+        .sync_with({ scnRender.pl.group(Ready),
+                     scnRender.pl.groupEnts(Ready),
+                     gdScn.pl.camera(Ready),
+                     scnRender.pl.drawTransforms(UseOrRun),
+                     scnRender.pl.entMesh(Ready),
+                     scnRender.pl.entTexture(Ready),
+                     godot.pl.entMesh(Ready),
+                     godot.pl.entTexture(Ready),
+                     scnRender.pl.drawEnt(Ready) })
+        .args({ scnRender.di.scnRender, godot.di.render, gdScn.di.groupFwd, gdScn.di.camera })
         .func([](draw::ACtxSceneRender   &rScnRender,
                  draw::RenderGd          &rRenderGl,
                  draw::RenderGroup const &rGroupFwd,
-                 godot::RID const        &rCamera,
-                 WorkerContext            ctx) noexcept {
+                 godot::RID const        &rCamera) noexcept {
             // FIXME
             osp::draw::ViewProjMatrix viewProj{ Matrix4(), Matrix4() };
 
@@ -303,12 +287,11 @@ Session setup_godot_scene(TopTaskBuilder            &rBuilder,
             draw::SysRenderGd::render_opaque(rGroupFwd, rScnRender.m_visible, viewProj);
         });
 
-    rBuilder.task()
+    rFB.task()
         .name("Delete entities from render groups")
-        .run_on({ tgScnRdr.drawEntDelete(scenes::UseOrRun) })
-        .sync_with({ tgScnRdr.groupEnts(scenes::Delete) })
-        .push_to(out.m_tasks)
-        .args({ idDrawing, idGroupFwd, idDrawEntDel })
+        .run_on({ scnRender.pl.drawEntDelete(UseOrRun) })
+        .sync_with({ scnRender.pl.groupEnts(Delete) })
+        .args({ comScn.di.drawing, gdScn.di.groupFwd, comScn.di.drawEntDel })
         .func([](draw::ACtxDrawing const  &rDrawing,
                  draw::RenderGroup        &rGroup,
                  draw::DrawEntVec_t const &rDrawEntDel) noexcept {
@@ -318,11 +301,10 @@ Session setup_godot_scene(TopTaskBuilder            &rBuilder,
             }
         });
 
-    rBuilder.task()
+    rFB.task()
         .name("Delete entities instance from scene")
-        .run_on({ tgScnRdr.drawEntDelete(scenes::UseOrRun) })
-        .push_to(out.m_tasks)
-        .args({ idDrawing, idDrawEntDel, idScnRenderGl })
+        .run_on({ scnRender.pl.drawEntDelete(UseOrRun) })
+        .args({ comScn.di.drawing, comScn.di.drawEntDel, gdScn.di.scnRenderGl })
         .func([](draw::ACtxDrawing const  &rDrawing,
                  draw::DrawEntVec_t const &rDrawEntDel,
                  draw::ACtxSceneRenderGd  &rScnRenderGl) noexcept {
@@ -334,9 +316,7 @@ Session setup_godot_scene(TopTaskBuilder            &rBuilder,
                 rInstance = {};
             }
         });
-
-    return out;
-} // setup_magnum_scene
+}); // ftrGodotScene
 
 void draw_ent_flat(
     DrawEnt ent, ViewProjMatrix const &viewProj, EntityToDraw::UserData_t userData) noexcept
@@ -395,45 +375,39 @@ void draw_ent_flat(
     rs->instance_set_transform(rInstance, tf);
 }
 
-Session setup_flat_draw(TopTaskBuilder            &rBuilder,
-                        ArrayView<entt::any> const topData,
-                        Session const             &windowApp,
-                        Session const             &sceneRenderer,
-                        Session const             &godot,
-                        Session const             &godotScene,
-                        MaterialId const           materialId)
+osp::fw::FeatureDef const ftrFlatMaterial = feature_def("GodotFlatMaterial", [] (
+        FeatureBuilder              &rFB,
+        Implement<FIShaderFlatGD>   shFlat,
+        DependOn<FIGodot>           godot,
+        DependOn<FIGodotScene>      gdScn,
+        DependOn<FIWindowApp>       windowApp,
+        DependOn<FISceneRenderer>   scnRender,
+        entt::any                   userData)
 {
-    OSP_DECLARE_GET_DATA_IDS(sceneRenderer, TESTAPP_DATA_SCENE_RENDERER);
-    OSP_DECLARE_GET_DATA_IDS(godotScene, TESTAPP_DATA_MAGNUM_SCENE);
-    OSP_DECLARE_GET_DATA_IDS(godot, TESTAPP_DATA_MAGNUM);
-    auto const tgWin        = windowApp.get_pipelines<PlWindowApp>();
-    auto const tgScnRdr     = sceneRenderer.get_pipelines<PlSceneRenderer>();
-    auto const tgMgn        = godot.get_pipelines<PlMagnum>();
+    auto const materialId = userData /* if not null */ ? entt::any_cast<MaterialId>(userData)
+                                                       : MaterialId{};
 
-    auto      &rScnRender   = top_get<ACtxSceneRender>(topData, idScnRender);
-    auto      &rScnRenderGl = top_get<ACtxSceneRenderGd>(topData, idScnRenderGl);
-    auto      &rRenderGl    = top_get<RenderGd>(topData, idRenderGl);
+    auto      &rScnRender   = rFB.data_get<ACtxSceneRender>(scnRender.di.scnRender);
+    auto      &rScnRenderGl = rFB.data_get<ACtxSceneRenderGd>(gdScn.di.scnRenderGl);
+    auto      &rRenderGl    = rFB.data_get<RenderGd>(godot.di.render);
 
-    Session    out;
-    OSP_DECLARE_CREATE_DATA_IDS(out, topData, TESTAPP_DATA_SHADER_FLAT)
-    auto &rDrawFlat      = top_emplace<ACtxDrawFlat>(topData, idDrawShFlat);
+    auto &rDrawFlat      = rFB.data_emplace<ACtxDrawFlat>(shFlat.di.shader);
 
     rDrawFlat.materialId = materialId;
     rDrawFlat.assign_pointers(rScnRender, rScnRenderGl, rRenderGl);
 
     if ( materialId == lgrn::id_null<MaterialId>() )
     {
-        return out;
+        return;
     }
 
-    rBuilder.task()
+    rFB.task()
         .name("Sync Flat shader DrawEnts")
-        .run_on({ tgWin.sync(Run) })
-        .sync_with({ tgScnRdr.groupEnts(Modify),
-                     tgScnRdr.group(Modify),
-                     tgScnRdr.materialDirty(UseOrRun) })
-        .push_to(out.m_tasks)
-        .args({ idScnRender, idGroupFwd, idScnRenderGl, idDrawShFlat })
+        .run_on({ windowApp.pl.sync(Run) })
+        .sync_with({ scnRender.pl.groupEnts(Modify),
+                     scnRender.pl.group(Modify),
+                     scnRender.pl.materialDirty(UseOrRun) })
+        .args({ scnRender.di.scnRender, gdScn.di.groupFwd, gdScn.di.scnRenderGl, shFlat.di.shader })
         .func([](ACtxSceneRender         &rScnRender,
                  RenderGroup             &rGroupFwd,
                  ACtxSceneRenderGd const &rScnRenderGd,
@@ -450,15 +424,14 @@ Session setup_flat_draw(TopTaskBuilder            &rBuilder,
                                 .rData          = rDrawShFlat });
         });
 
-    rBuilder.task()
+    rFB.task()
         .name("Resync Flat shader DrawEnts")
-        .run_on({ tgWin.resync(Run) })
-        .sync_with({ tgScnRdr.materialDirty(UseOrRun),
-                     tgMgn.textureGL(Ready),
-                     tgScnRdr.groupEnts(Modify),
-                     tgScnRdr.group(Modify) })
-        .push_to(out.m_tasks)
-        .args({ idScnRender, idGroupFwd, idScnRenderGl, idDrawShFlat })
+        .run_on({ windowApp.pl.resync(Run) })
+        .sync_with({ scnRender.pl.materialDirty(UseOrRun),
+                     godot.pl.texture(Ready),
+                     scnRender.pl.groupEnts(Modify),
+                     scnRender.pl.group(Modify) })
+        .args({ scnRender.di.scnRender, gdScn.di.groupFwd, gdScn.di.scnRenderGl, shFlat.di.shader })
         .func([](ACtxSceneRender         &rScnRender,
                  RenderGroup             &rGroupFwd,
                  ACtxSceneRenderGd const &rScnRenderGl,
@@ -476,38 +449,28 @@ Session setup_flat_draw(TopTaskBuilder            &rBuilder,
                                     .rData          = rDrawShFlat });
             }
         });
+});
 
-    return out;
-}
 
-Session setup_camera_ctrl_godot(TopTaskBuilder            &rBuilder,
-                                ArrayView<entt::any> const topData,
-                                Session const             &windowApp,
-                                Session const             &sceneRenderer,
-                                Session const             &magnumScene)
+osp::fw::FeatureDef const ftrCameraControlGD = feature_def("CameraControlGodot", [] (
+        FeatureBuilder              &rFB,
+        Implement<FICameraControl>  camCtrl,
+        DependOn<FIGodot>           godot,
+        DependOn<FIGodotScene>      gdScn,
+        DependOn<FIWindowApp>       windowApp,
+        DependOn<FISceneRenderer>   scnRender)
 {
-    OSP_DECLARE_GET_DATA_IDS(windowApp, TESTAPP_DATA_WINDOW_APP);
-    OSP_DECLARE_GET_DATA_IDS(magnumScene, TESTAPP_DATA_MAGNUM_SCENE);
-    auto const tgScnRdr   = sceneRenderer.get_pipelines<PlSceneRenderer>();
-    auto const tgSR       = magnumScene.get_pipelines<PlMagnumScene>();
-    auto const tgWin      = windowApp.get_pipelines<PlWindowApp>();
+    auto      &rUserInput = rFB.data_get<osp::input::UserInputHandler>(windowApp.di.userInput);
 
-    auto      &rUserInput = top_get<osp::input::UserInputHandler>(topData, idUserInput);
+    rFB.data_emplace<ACtxCameraController>(camCtrl.di.camCtrl, rUserInput);
 
-    Session    out;
-    OSP_DECLARE_CREATE_DATA_IDS(out, topData, TESTAPP_DATA_CAMERA_CTRL);
-    auto const tgCmCt = out.create_pipelines<PlCameraCtrl>(rBuilder);
+    rFB.pipeline(camCtrl.pl.camCtrl).parent(windowApp.pl.sync);
 
-    top_emplace<ACtxCameraController>(topData, idCamCtrl, rUserInput);
-
-    rBuilder.pipeline(tgCmCt.camCtrl).parent(tgWin.sync);
-
-    rBuilder.task()
+    rFB.task()
         .name("Position Rendering Camera according to Camera Controller")
-        .run_on({ tgScnRdr.render(Run) })
-        .sync_with({ tgCmCt.camCtrl(Ready), tgSR.camera(Modify) })
-        .push_to(out.m_tasks)
-        .args({ idCamCtrl, idCamera })
+        .run_on({ scnRender.pl.render(Run) })
+        .sync_with({ camCtrl.pl.camCtrl(Ready), gdScn.pl.camera(Modify) })
+        .args({ camCtrl.di.camCtrl, gdScn.di.camera })
         .func([](ACtxCameraController const &rCamCtrl, godot::RID &rCamera) noexcept {
             godot::RenderingServer *rs     = godot::RenderingServer::get_singleton();
             Vector3                 mTrans = rCamCtrl.m_transform.translation();
@@ -519,8 +482,6 @@ Session setup_camera_ctrl_godot(TopTaskBuilder            &rBuilder,
 
             rs->camera_set_transform(rCamera, godot::Transform3D(gBasis, gTrans));
         });
+}); // ftrCameraControlGD
 
-    return out;
-} // setup_camera_ctrl
-
-} // namespace testapp::scenes
+} // namespace ospgdext

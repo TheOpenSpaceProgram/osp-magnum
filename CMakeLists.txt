@@ -82,7 +82,9 @@ OPTION(OSP_ENABLE_COMPILER_WARNINGS "Build with the majority of compiler warning
 OPTION(OSP_ENABLE_IWYU              "Build with warnings from IWYU turned on" OFF)
 OPTION(OSP_ENABLE_CLANG_TIDY        "Build with warnings from clang-tidy turned on" OFF)
 OPTION(OSP_USE_SYSTEM_SDL           "Build with SDL that you provide if turned on, compiles SDL if turned off. Off by default" OFF)
-OPTION(OSP_BUILD_GDEXTENSION        "Build the GDExtension for osp instead of the standalone binary" OFF)
+OPTION(OSP_BUILD_TESTAPP            "Build OSP TestApp with Magnum, OpenGL, and SDL2" ON)
+OPTION(OSP_BUILD_GDEXTENSION        "Build OSP GDExtension" OFF)
+
 # If the environment has these set, pull them into proper variables.
 SET(CLANG_COMPILE_FLAGS ${CLANG_COMPILE_FLAGS})
 SET(GCC_COMPILE_FLAGS   ${GCC_COMPILE_FLAGS})
@@ -184,12 +186,8 @@ ADD_SUBDIRECTORY(3rdparty)
 ADD_SUBDIRECTORY(src)
 
 # Unit Tests
-IF (NOT OSP_BUILD_GDEXTENSION)
-    ADD_SUBDIRECTORY(test)
-ENDIF()
+ADD_SUBDIRECTORY(test)
+
 # Set OSP as default startup project in Visual Studio
 set_property(DIRECTORY ${CMAKE_SOURCE_DIR} PROPERTY VS_STARTUP_PROJECT osp-magnum)
 # Set execution directory of osp-magnum so that we don't have to copy the files
-if (NOT OSP_BUILD_GDEXTENSION)
-    set_property(TARGET osp-magnum PROPERTY VS_DEBUGGER_WORKING_DIRECTORY "${CMAKE_SOURCE_DIR}/bin")
-endif()

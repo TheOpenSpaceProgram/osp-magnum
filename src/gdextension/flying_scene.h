@@ -1,34 +1,44 @@
 #pragma once
 
-#include "osp/util/UserInputHandler.h"
-
 #include <godot_cpp/classes/class_db_singleton.hpp>
 #include <godot_cpp/classes/input_event.hpp>
 #include <godot_cpp/classes/node3d.hpp>
 #include <godot_cpp/classes/thread.hpp>
 #include <sstream>
-#include <testapp/scenarios.h>
-#include <testapp/testapp.h>
+
+#include <adera_app/application.h>
+#include <osp/core/resourcetypes.h>
+#include <osp/framework/executor.h>
+#include <osp/framework/framework.h>
+#include <osp/util/UserInputHandler.h>
 
 namespace godot
 {
-using namespace testapp;
 using namespace osp::input;
 class FlyingScene : public Node3D
 {
     GDCLASS(FlyingScene, Node3D)
 
 private:
-    using ExecutorType = SingleThreadedExecutor;
+    using ExecutorType = osp::fw::SingleThreadedExecutor;
+
+    struct UpdateParams {
+        float deltaTimeIn;
+        bool update;
+        bool sceneUpdate;
+        bool resync;
+        bool sync;
+        bool render;
+    };
 
     RID               m_scenario;
     RID               m_viewport;
     RID               m_lightInstance;
 
-    TestApp           m_testApp;
-    MainLoopControl  *m_mainLoopCtrl;
+    //TestApp           m_testApp;
+    //adera::MainLoopControl  *m_mainLoopCtrl;
 
-    MainLoopSignals   m_signals;
+    //MainLoopSignals   m_signals;
 
     std::stringstream m_dbgStream;
     std::stringstream m_errStream;
@@ -37,22 +47,25 @@ private:
     String            m_scene;
 
     ExecutorType      m_executor;
-    UserInputHandler *m_pUserInput;
+    //UserInputHandler  m_userInput;
+
+    osp::fw::Framework m_framework;
+    osp::fw::ContextId m_mainContext;
+    //osp::fw::IExecutor *m_pExecutor  { nullptr };
+    osp::PkgId         m_defaultPkg  { lgrn::id_null<osp::PkgId>() };
+
+    void              clear_resource_owners();
+
+    // testapp has drive_default_main_loop(), but this is mostly for driving the CLI, but there's
+    // no equivalent here
+
+    void drive_scene_cycle(UpdateParams p);
+    void run_context_cleanup(osp::fw::ContextId);
 
     void              load_a_bunch_of_stuff();
     void              setup_app();
     void              draw_event();
     void              destroy_app();
-
-    void              signal_all()
-    {
-        m_testApp.m_pExecutor->signal(m_testApp, m_signals.mainLoop);
-        m_testApp.m_pExecutor->signal(m_testApp, m_signals.inputs);
-        m_testApp.m_pExecutor->signal(m_testApp, m_signals.renderSync);
-        m_testApp.m_pExecutor->signal(m_testApp, m_signals.renderResync);
-        m_testApp.m_pExecutor->signal(m_testApp, m_signals.sceneUpdate);
-        m_testApp.m_pExecutor->signal(m_testApp, m_signals.sceneRender);
-    }
 
 protected:
     static void _bind_methods();
@@ -81,15 +94,15 @@ public:
         return m_viewport;
     };
 
-    inline void set_user_input(UserInputHandler *pUserInput)
-    {
-        m_pUserInput = pUserInput;
-    }
-    inline void set_ctrl(MainLoopControl *mainLoopCtrl, MainLoopSignals const &signals)
-    {
-        m_mainLoopCtrl = mainLoopCtrl;
-        m_signals      = signals;
-    }
+//    inline void set_user_input(UserInputHandler *pUserInput)
+//    {
+//        m_pUserInput = pUserInput;
+//    }
+//    inline void set_ctrl(adera::MainLoopControl *mainLoopCtrl)
+//    {
+//        m_mainLoopCtrl = mainLoopCtrl;
+//        //m_signals      = signals;
+//    }
 };
 
 } // namespace godot

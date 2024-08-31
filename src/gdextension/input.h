@@ -24,13 +24,9 @@
  */
 #pragma once
 
-#include "scenarios.h"
-
 #include <osp/util/UserInputHandler.h>
 
-#include <memory>
-
-namespace testapp
+namespace ospgdext
 {
     
 void config_controls(osp::input::UserInputHandler& rUserInput);

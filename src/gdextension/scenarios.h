@@ -1,6 +1,6 @@
 /**
  * Open Space Program
- * Copyright © 2019-2021 Open Space Program Project
+ * Copyright © 2019-2024 Open Space Program Project
  *
  * MIT License
  *
@@ -24,28 +24,28 @@
  */
 #pragma once
 
-#include <testapp/identifiers.h>
-#include <testapp/scenarios.h>
-#include <testapp/testapp.h>
-
-// IWYU pragma: begin_exports
-#include <osp/tasks/top_utils.h>
-// IWYU pragma: end_exports
+#include <osp/core/resourcetypes.h>
+#include <adera_app/feature_interfaces.h>
 
 #include <string_view>
 #include <unordered_map>
 
-namespace testapp
+namespace ospgdext
 {
 
 struct ScenarioOption
 {
-    std::string_view m_description;
-    SceneSetupFunc_t m_setup;
+    using Func_t = void(*)(osp::fw::Framework&, osp::fw::ContextId, osp::PkgId);
+
+    std::string_view    name;
+    std::string_view    brief;
+    std::string_view    description;
+    Func_t              loadFunc;
 };
+
 
 using ScenarioMap_t = std::unordered_map<std::string_view, ScenarioOption>;
 
 ScenarioMap_t const &scenarios();
 
-} // namespace testapp
+} // namespace ospgdext
