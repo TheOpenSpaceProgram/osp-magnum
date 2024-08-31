@@ -621,10 +621,9 @@ void FlyingScene::destroy_app()
     m_framework.close_context(appCtxs.sceneRender);
     m_framework.close_context(appCtxs.window);
     m_framework.close_context(appCtxs.scene);
-    m_framework.close_context(appCtxs.main);
-
 
     clear_resource_owners();
+    m_framework.close_context(appCtxs.main);
 
     // leak test app cause there is a free bug. FIXME of course.
 //    auto leak_tp = new TestApp;

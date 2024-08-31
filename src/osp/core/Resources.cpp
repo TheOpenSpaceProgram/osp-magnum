@@ -26,6 +26,24 @@
 
 using namespace osp;
 
+Resources::PerResType::~PerResType()
+{
+    for (ResId const resId : m_resIds)
+    {
+        std::size_t const refCount = m_resRefs[std::size_t(resId)];
+        if (refCount != 0)
+        {
+            std::string types;
+            for (DataType const& dataType : m_resDataTypes)
+            {
+                types.append( dataType.info.name() );
+                types.append(", ");
+            }
+            LGRN_ASSERTMV(0, "Destructing resource with non-zero refcount", std::size_t(resId), refCount, types );
+        }
+    }
+}
+
 ResId Resources::create(ResTypeId const typeId, PkgId const pkgId, SharedString name)
 {
     // Create ResId associated to specified ResTypeId
@@ -102,6 +120,8 @@ void Resources::owner_destroy(ResTypeId const typeId, ResIdOwner_t&& rOwner) noe
     }
     PerResType &rPerResType = get_type(typeId);
     int &rCount = rPerResType.m_resRefs[std::size_t(rOwner.m_id)];
+    LGRN_ASSERTMV(rCount != 0, "Attempting to decrement resource refcount below zero",
+                  std::size_t(rOwner.m_id), std::size_t(typeId));
     -- rCount;
     rOwner.m_id = ResIdOwner_t{};
 }
