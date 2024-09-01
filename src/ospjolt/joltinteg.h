@@ -261,7 +261,7 @@ public:
                     uint numBodyMutexes = 0, 
                     uint maxBodyPairs = 65536, 
                     uint maxContactConstraints = 10240
-                ) : m_pPhysicsSystem(std::make_unique<PhysicsSystem>()), 
+                ) : m_pPhysicsSystem(std::make_unique<PhysicsSystem>()),
                     m_temp_allocator(10 * 1024 * 1024),
                     m_joltJobSystem(std::make_unique<JobSystemThreadPool>(cMaxPhysicsJobs, cMaxPhysicsBarriers, threadCount))
     {
