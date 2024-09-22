@@ -376,10 +376,7 @@ void UserInputHandler::scroll_delta(Vector2i offset)
 
 ControlSubscriber::~ControlSubscriber()
 {
-    for (EButtonControlIndex const index : m_subscribedButtons)
-    {
-        m_pInputHandler->button_unsubscribe(index);
-    }
+    unsubscribe();
 }
 
 EButtonControlIndex ControlSubscriber::button_subscribe(std::string_view name)
@@ -392,5 +389,13 @@ EButtonControlIndex ControlSubscriber::button_subscribe(std::string_view name)
     return index;
 }
 
-
+void ControlSubscriber::unsubscribe()
+{
+    for (EButtonControlIndex const index : m_subscribedButtons)
+    {
+        m_pInputHandler->button_unsubscribe(index);
+    }
+    m_subscribedButtons.clear();
 }
+
+} // namespace osp::input

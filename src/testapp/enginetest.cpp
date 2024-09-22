@@ -22,17 +22,17 @@
  * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
  * SOFTWARE.
  */
-#include "MagnumApplication.h"
+#include "MagnumWindowApp.h"
 
 #include <osp/activescene/basic.h>
 #include <osp/activescene/basic_fn.h>
 #include <osp/core/Resources.h>
 #include <osp/drawing/drawing.h>
 #include <osp/drawing/own_restypes.h>
-#include <osp/drawing_gl/rendergl.h>
+#include <osp_drawing_gl/rendergl.h>
 
 #include <adera/drawing/CameraController.h>
-#include <adera/drawing_gl/phong_shader.h>
+#include <adera_drawing_gl/phong_shader.h>
 
 #include <Magnum/Trade/MeshData.h>
 #include <Magnum/Trade/ImageData.h>
@@ -117,7 +117,7 @@ EngineTestScene::~EngineTestScene()
     osp::draw::SysRender::clear_resource_owners(m_drawingRes, *m_pResources);
 }
 
-entt::any setup_scene(osp::Resources& rResources, osp::PkgId const pkg)
+entt::any make_scene(osp::Resources& rResources, osp::PkgId const pkg)
 {
     using namespace osp::active;
     using namespace osp::draw;
@@ -327,52 +327,15 @@ void render_test_scene(
     SysRenderGL::display_texture(rRenderGl, rFboColor);
 }
 
-class EngineTestApp : public IOspApplication
-{
-public:
-    EngineTestApp(EngineTestRenderer renderer, EngineTestScene& rScene, RenderGL& rRenderGl)
-     : m_renderer   {std::move(renderer)}
-     , m_rScene     {rScene}
-     , m_rRenderGl  {rRenderGl}
-    { }
-
-    void run(MagnumApplication& rApp) override
-    { }
-
-    void draw(MagnumApplication& rApp, float delta) override
-    {
-        update_test_scene(m_rScene, delta);
-
-        // Rotate and move the camera based on user inputs
-        SysCameraController::update_view(m_renderer.m_camCtrl, delta);
-        SysCameraController::update_move(m_renderer.m_camCtrl, delta, true);
-        m_renderer.m_cam.m_transform = m_renderer.m_camCtrl.m_transform;
-
-        sync_test_scene  (m_rRenderGl, m_rScene, m_renderer);
-        render_test_scene(m_rRenderGl, m_rScene, m_renderer);
-    }
-
-    void exit(MagnumApplication& rApp) override
-    {
-        osp::draw::SysRenderGL::clear_resource_owners(m_rRenderGl, *m_rScene.m_pResources);
-        m_rRenderGl = {}; // clear all GPU resources
-    }
-
-    EngineTestRenderer  m_renderer;
-
-    EngineTestScene     &m_rScene;
-    RenderGL            &m_rRenderGl;
-};
-
-MagnumApplication::AppPtr_t generate_osp_magnum_app(EngineTestScene& rScene, MagnumApplication &rApp, RenderGL& rRenderGl, UserInputHandler& rUserInput)
+entt::any make_renderer(EngineTestScene& rScene, MagnumWindowApp &rApp, RenderGL& rRenderGl, UserInputHandler& rUserInput)
 {
     using namespace osp::active;
     using namespace osp::draw;
     using namespace adera::shader;
 
-    auto pApp = std::make_unique<EngineTestApp>(EngineTestRenderer{rUserInput}, rScene, rRenderGl);
+    entt::any rendererAny = entt::make_any<EngineTestRenderer>(rUserInput);
 
-    EngineTestRenderer &rRenderer = pApp->m_renderer;
+    EngineTestRenderer &rRenderer = entt::any_cast<EngineTestRenderer&>(rendererAny);
 
     // Create Phong shaders
     auto const texturedFlags
@@ -418,7 +381,21 @@ MagnumApplication::AppPtr_t generate_osp_magnum_app(EngineTestScene& rScene, Mag
 
     sync_test_scene(rRenderGl, rScene, rRenderer);
 
-    return pApp;
+    return rendererAny;
 }
+
+void draw(EngineTestScene &rScene, EngineTestRenderer &rRenderer, RenderGL &rRenderGl, MagnumWindowApp &rApp, float delta)
+{
+    update_test_scene(rScene, delta);
+
+    // Rotate and move the camera based on user inputs
+    SysCameraController::update_view(rRenderer.m_camCtrl, delta);
+    SysCameraController::update_move(rRenderer.m_camCtrl, delta, true);
+    rRenderer.m_cam.m_transform = rRenderer.m_camCtrl.m_transform;
+
+    sync_test_scene  (rRenderGl, rScene, rRenderer);
+    render_test_scene(rRenderGl, rScene, rRenderer);
+}
+
 
 } // namespace testapp::enginetest

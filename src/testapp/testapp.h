@@ -26,91 +26,65 @@
 
 #include <osp/core/keyed_vector.h>
 #include <osp/core/resourcetypes.h>
-#include <osp/tasks/tasks.h>
-#include <osp/tasks/top_execute.h>
-#include <osp/tasks/top_session.h>
+#include <osp/framework/builder.h>
+#include <osp/framework/framework.h>
 #include <osp/util/logging.h>
 
 #include <entt/core/any.hpp>
 
-#include <optional>
+#include <vector>
 
 namespace testapp
 {
 
-struct TestApp;
-class IExecutor;
+using MainLoopFunc_t = std::function<bool()>;
 
-using RendererSetupFunc_t   = void(*)(TestApp&);
-using SceneSetupFunc_t      = RendererSetupFunc_t(*)(TestApp&);
-
-struct TestAppTasks
+inline std::vector<MainLoopFunc_t>& main_loop_stack()
 {
-    std::vector<entt::any>          m_topData;
-    osp::Tasks                      m_tasks;
-    osp::TopTaskDataVec_t           m_taskData;
-    osp::TaskGraph                  m_graph;
-};
+    static std::vector<MainLoopFunc_t> instance;
+    return instance;
+}
 
-struct TestApp : TestAppTasks
+struct TestApp
 {
-    void close_sessions(osp::ArrayView<osp::Session> sessions);
-
-    void close_session(osp::Session &rSession);
+    struct UpdateParams {
+        float deltaTimeIn;
+        bool update;
+        bool sceneUpdate;
+        bool resync;
+        bool sync;
+        bool render;
+    };
 
     /**
      * @brief Deal with resource reference counts for a clean termination
      */
     void clear_resource_owners();
 
-    osp::SessionGroup               m_applicationGroup;
-    osp::Session                    m_application;
+    void drive_default_main_loop();
 
-    osp::SessionGroup               m_scene;
+    void drive_scene_cycle(UpdateParams p);
 
-    osp::Session                    m_windowApp;
-    osp::Session                    m_magnum;
-    osp::SessionGroup               m_renderer;
+    void run_context_cleanup(osp::fw::ContextId);
 
-    RendererSetupFunc_t             m_rendererSetup { nullptr };
+    void init();
 
-    IExecutor                       *m_pExecutor { nullptr };
+    osp::fw::Framework m_framework;
+    osp::fw::ContextId m_mainContext;
+    osp::fw::IExecutor *m_pExecutor  { nullptr };
+    osp::PkgId         m_defaultPkg  { lgrn::id_null<osp::PkgId>() };
 
-    osp::PkgId                      m_defaultPkg    { lgrn::id_null<osp::PkgId>() };
-};
+    int m_argc;
+    char** m_argv;
 
-class IExecutor
-{
-public:
+private:
 
-    virtual void load(TestAppTasks& rAppTasks) = 0;
-
-    virtual void run(TestAppTasks& rAppTasks, osp::PipelineId pipeline) = 0;
-
-    virtual void signal(TestAppTasks& rAppTasks, osp::PipelineId pipeline) = 0;
-
-    virtual void wait(TestAppTasks& rAppTasks) = 0;
-
-    virtual bool is_running(TestAppTasks const& rAppTasks) = 0;
-};
-
-//-----------------------------------------------------------------------------
-
-class SingleThreadedExecutor final : public IExecutor
-{
-public:
-    void load(TestAppTasks& rAppTasks) override;
-
-    void run(TestAppTasks& rAppTasks, osp::PipelineId pipeline) override;
-
-    void signal(TestAppTasks& rAppTasks, osp::PipelineId pipeline) override;
-
-    void wait(TestAppTasks& rAppTasks) override;
-
-    bool is_running(TestAppTasks const& rAppTasks) override;
-
-    osp::ExecContext                m_execContext;
-    std::shared_ptr<spdlog::logger> m_log;
+    /**
+     * @brief As the name implies
+     *
+     * prefer not to use names like this outside of testapp
+     */
+    void load_a_bunch_of_stuff();
 };
 
 } // namespace testapp

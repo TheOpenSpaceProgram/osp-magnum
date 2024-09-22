@@ -55,7 +55,7 @@ struct PipelineCounts
 };
 
 
-TaskGraph make_exec_graph(Tasks const& tasks, ArrayView<TaskEdges const* const> const data)
+TaskGraph make_exec_graph(Tasks const& tasks)
 {
     TaskGraph out;
 
@@ -102,12 +102,9 @@ TaskGraph make_exec_graph(Tasks const& tasks, ArrayView<TaskEdges const* const> 
     }
 
     // Count stages from syncs
-    for (TaskEdges const* pEdges : data)
+    for (auto const [task, pipeline, stage] : tasks.m_syncWith)
     {
-        for (auto const [task, pipeline, stage] : pEdges->m_syncWith)
-        {
-            count_stage(pipeline, stage);
-        }
+        count_stage(pipeline, stage);
     }
 
     for (PipelineId const plId : tasks.m_pipelineIds)
@@ -117,26 +114,23 @@ TaskGraph make_exec_graph(Tasks const& tasks, ArrayView<TaskEdges const* const> 
 
     // 2. Count TaskRequiresStages and StageRequiresTasks
 
-    for (TaskEdges const* pEdges : data)
+    for (auto const [task, pipeline, stage] : tasks.m_syncWith)
     {
-        for (auto const [task, pipeline, stage] : pEdges->m_syncWith)
-        {
-            StageCounts &rStageCounts = plCounts[pipeline].stageCounts[std::size_t(stage)];
-            TaskCounts  &rTaskCounts  = taskCounts[task];
+        StageCounts &rStageCounts = plCounts[pipeline].stageCounts[std::size_t(stage)];
+        TaskCounts  &rTaskCounts  = taskCounts[task];
 
-            // TaskRequiresStage makes task require pipeline to be on stage to be allowed to run
-            ++ rTaskCounts .requiresStages;
-            ++ rStageCounts.requiredByTasks;
+        // TaskRequiresStage makes task require pipeline to be on stage to be allowed to run
+        ++ rTaskCounts .requiresStages;
+        ++ rStageCounts.requiredByTasks;
 
 
-            // StageRequiresTask for stage to wait for task to complete
-            ++ rStageCounts.requiresTasks;
-            ++ rTaskCounts .requiredByStages;
+        // StageRequiresTask for stage to wait for task to complete
+        ++ rStageCounts.requiresTasks;
+        ++ rTaskCounts .requiredByStages;
 
-        }
-        totalTasksReqStage += pEdges->m_syncWith.size();
-        totalStageReqTasks += pEdges->m_syncWith.size();
     }
+    totalTasksReqStage += tasks.m_syncWith.size();
+    totalStageReqTasks += tasks.m_syncWith.size();
 
     // 3. Map out children and siblings in tree
 
@@ -256,48 +250,46 @@ TaskGraph make_exec_graph(Tasks const& tasks, ArrayView<TaskEdges const* const> 
         -- rStageCounts.runTasks;
     }
 
-    for (TaskEdges const* pEdges : data)
+    for (auto const [task, pipeline, stage] : tasks.m_syncWith)
     {
-        for (auto const [task, pipeline, stage] : pEdges->m_syncWith)
-        {
-            AnyStageId const            anystg          = anystg_from(out, pipeline, stage);
-            StageCounts                 &rStageCounts   = plCounts[pipeline].stageCounts[std::size_t(stage)];
-            TaskCounts                  &rTaskCounts    = taskCounts[task];
+        AnyStageId const            anystg          = anystg_from(out, pipeline, stage);
+        StageCounts                 &rStageCounts   = plCounts[pipeline].stageCounts[std::size_t(stage)];
+        TaskCounts                  &rTaskCounts    = taskCounts[task];
 
-            auto const [taskPipeline, taskStage] = tasks.m_taskRunOn[task];
+        auto const [taskPipeline, taskStage] = tasks.m_taskRunOn[task];
 
-            // Add StageReqTask (pipeline, stage) requires task
-            StageReqTaskId const        stgReqTaskId    = id_from_count(out.anystgToFirstStgreqtask, anystg, rStageCounts.requiresTasks);
-            ReverseStageReqTaskId const revStgReqTaskId = id_from_count(out.taskToFirstRevStgreqtask, task, rTaskCounts.requiredByStages);
+        // Add StageReqTask (pipeline, stage) requires task
+        StageReqTaskId const        stgReqTaskId    = id_from_count(out.anystgToFirstStgreqtask, anystg, rStageCounts.requiresTasks);
+        ReverseStageReqTaskId const revStgReqTaskId = id_from_count(out.taskToFirstRevStgreqtask, task, rTaskCounts.requiredByStages);
 
-            StageRequiresTask &rStgReqTask = out.stgreqtaskData[stgReqTaskId];
+        StageRequiresTask &rStgReqTask = out.stgreqtaskData[stgReqTaskId];
 
-            // rTaskReqStage.ownStage set previously
-            rStgReqTask.reqTask     = task;
-            rStgReqTask.reqPipeline = taskPipeline;
-            rStgReqTask.reqStage    = taskStage;
-            out.revStgreqtaskToStage[revStgReqTaskId] = anystg;
+        // rTaskReqStage.ownStage set previously
+        rStgReqTask.reqTask     = task;
+        rStgReqTask.reqPipeline = taskPipeline;
+        rStgReqTask.reqStage    = taskStage;
+        out.revStgreqtaskToStage[revStgReqTaskId] = anystg;
 
-            -- rStageCounts.requiresTasks;
-            -- rTaskCounts.requiredByStages;
-            -- totalStageReqTasks;
+        -- rStageCounts.requiresTasks;
+        -- rTaskCounts.requiredByStages;
+        -- totalStageReqTasks;
 
-            // Add TaskReqStage task requires (pipeline, stage)
-            TaskReqStageId const        taskReqStgId    = id_from_count(out.taskToFirstTaskreqstg, task, rTaskCounts.requiresStages);
-            ReverseTaskReqStageId const revTaskReqStgId = id_from_count(out.anystgToFirstRevTaskreqstg, anystg, rStageCounts.requiredByTasks);
+        // Add TaskReqStage task requires (pipeline, stage)
+        TaskReqStageId const        taskReqStgId    = id_from_count(out.taskToFirstTaskreqstg, task, rTaskCounts.requiresStages);
+        ReverseTaskReqStageId const revTaskReqStgId = id_from_count(out.anystgToFirstRevTaskreqstg, anystg, rStageCounts.requiredByTasks);
 
-            TaskRequiresStage &rTaskReqStage = out.taskreqstgData[taskReqStgId];
+        TaskRequiresStage &rTaskReqStage = out.taskreqstgData[taskReqStgId];
 
-            // rTaskReqStage.ownTask set previously
-            rTaskReqStage.reqStage      = stage;
-            rTaskReqStage.reqPipeline   = pipeline;
-            out.revTaskreqstgToTask[revTaskReqStgId] = task;
+        // rTaskReqStage.ownTask set previously
+        rTaskReqStage.reqStage      = stage;
+        rTaskReqStage.reqPipeline   = pipeline;
+        out.revTaskreqstgToTask[revTaskReqStgId] = task;
 
-            -- rTaskCounts.requiresStages;
-            -- rStageCounts.requiredByTasks;
-            -- totalTasksReqStage;
-        }
+        -- rTaskCounts.requiresStages;
+        -- rStageCounts.requiredByTasks;
+        -- totalTasksReqStage;
     }
+
 
     // NOLINTBEGIN(readability-use-anyofallof)
     [[maybe_unused]] auto const all_counts_zero = [&] ()

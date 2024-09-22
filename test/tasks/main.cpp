@@ -22,13 +22,13 @@
  * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
  * SOFTWARE.
  */
+#include "task_builder.h"
+
 #include <osp/tasks/tasks.h>
-#include <osp/tasks/builder.h>
 #include <osp/tasks/execute.h>
 
 #include <gtest/gtest.h>
 
-#include <functional>
 #include <numeric>
 #include <random>
 #include <set>
@@ -98,9 +98,8 @@ TEST(Tasks, BasicSingleThreadedParallelTasks)
     // well-suited for this problem, as these per-thread vectors can all be represented with the
     // same TargetId.
 
-    using BasicTraits_t     = BasicBuilderTraits<TaskActions(*)(int const, std::vector<int>&, int&)>;
-    using Builder_t         = BasicTraits_t::Builder;
-    using TaskFuncVec_t     = BasicTraits_t::FuncVec_t;
+    using Builder_t         = TaskBuilder<TaskActions(*)(int const, std::vector<int>&, int&)>;
+    using TaskFuncVec_t     = Builder_t::FuncVec_t;
 
     constexpr int sc_repetitions     = 32;
     constexpr int sc_pusherTaskCount = 24;
@@ -110,9 +109,8 @@ TEST(Tasks, BasicSingleThreadedParallelTasks)
     // Step 1: Create tasks
 
     Tasks           tasks;
-    TaskEdges       edges;
     TaskFuncVec_t   functions;
-    Builder_t       builder{tasks, edges, functions};
+    Builder_t       builder{tasks, functions};
     auto pl = builder.create_pipelines<Pipelines>();
 
     // Multiple tasks push to the vector
@@ -149,7 +147,7 @@ TEST(Tasks, BasicSingleThreadedParallelTasks)
 
     // Step 2: Compile tasks into an execution graph
 
-    TaskGraph const graph = make_exec_graph(tasks, {&edges});
+    TaskGraph const graph = make_exec_graph(tasks);
 
     // Step 3: Run
 
@@ -209,17 +207,15 @@ TEST(Tasks, BasicSingleThreadedOptional)
     using namespace test_b;
     using enum Stages;
 
-    using BasicTraits_t     = BasicBuilderTraits<TaskActions(*)(TestState&, std::mt19937&)>;
-    using Builder_t         = BasicTraits_t::Builder;
-    using TaskFuncVec_t     = BasicTraits_t::FuncVec_t;
+    using Builder_t         = TaskBuilder<TaskActions(*)(TestState&, std::mt19937&)>;
+    using TaskFuncVec_t     = Builder_t::FuncVec_t;
 
     constexpr int sc_repetitions = 128;
     std::mt19937 randGen(69);
 
     Tasks           tasks;
-    TaskEdges       edges;
     TaskFuncVec_t   functions;
-    Builder_t       builder{tasks, edges, functions};
+    Builder_t       builder{tasks, functions};
 
     auto const pl = builder.create_pipelines<Pipelines>();
 
@@ -297,7 +293,7 @@ TEST(Tasks, BasicSingleThreadedOptional)
     });
 
 
-    TaskGraph const graph = make_exec_graph(tasks, {&edges});
+    TaskGraph const graph = make_exec_graph(tasks);
 
     // Execute
 
@@ -357,17 +353,15 @@ TEST(Tasks, BasicSingleThreadedLoop)
     using namespace test_c;
     using enum Stages;
 
-    using BasicTraits_t     = BasicBuilderTraits<TaskActions(*)(TestState&, std::mt19937 &)>;
-    using Builder_t         = BasicTraits_t::Builder;
-    using TaskFuncVec_t     = BasicTraits_t::FuncVec_t;
+    using Builder_t         = TaskBuilder<TaskActions(*)(TestState&, std::mt19937&)>;
+    using TaskFuncVec_t     = Builder_t::FuncVec_t;
 
     constexpr int sc_repetitions = 42;
     std::mt19937 randGen(69);
 
     Tasks           tasks;
-    TaskEdges       edges;
     TaskFuncVec_t   functions;
-    Builder_t       builder{tasks, edges, functions};
+    Builder_t       builder{tasks, functions};
 
     auto const pl = builder.create_pipelines<Pipelines>();
 
@@ -430,7 +424,7 @@ TEST(Tasks, BasicSingleThreadedLoop)
         return { };
     });
 
-    TaskGraph const graph = make_exec_graph(tasks, {&edges});
+    TaskGraph const graph = make_exec_graph(tasks);
 
     // Execute
 
@@ -500,17 +494,15 @@ TEST(Tasks, BasicSingleThreadedNestedLoop)
     using namespace test_d;
     using enum Stages;
 
-    using BasicTraits_t     = BasicBuilderTraits<TaskActions(*)(TestState&, std::mt19937 &)>;
-    using Builder_t         = BasicTraits_t::Builder;
-    using TaskFuncVec_t     = BasicTraits_t::FuncVec_t;
+    using Builder_t         = TaskBuilder<TaskActions(*)(TestState&, std::mt19937&)>;
+    using TaskFuncVec_t     = Builder_t::FuncVec_t;
 
     constexpr int sc_repetitions = 42;
     std::mt19937 randGen(69);
 
     Tasks           tasks;
-    TaskEdges       edges;
     TaskFuncVec_t   functions;
-    Builder_t       builder{tasks, edges, functions};
+    Builder_t       builder{tasks, functions};
 
     auto const pl = builder.create_pipelines<Pipelines>();
 
@@ -558,7 +550,7 @@ TEST(Tasks, BasicSingleThreadedNestedLoop)
     });
 
 
-    TaskGraph const graph = make_exec_graph(tasks, {&edges});
+    TaskGraph const graph = make_exec_graph(tasks);
 
     // Execute
 
@@ -625,17 +617,16 @@ TEST(Tasks, BasicSingleThreadedGameWorld)
     using enum StgSimple;
     using enum StgRender;
 
-    using BasicTraits_t     = BasicBuilderTraits<TaskActions(*)(World&)>;
-    using Builder_t         = BasicTraits_t::Builder;
-    using TaskFuncVec_t     = BasicTraits_t::FuncVec_t;
+
+    using Builder_t         = TaskBuilder<TaskActions(*)(World&)>;
+    using TaskFuncVec_t     = Builder_t::FuncVec_t;
 
     constexpr int sc_repetitions = 128;
     std::mt19937 randGen(69);
 
     Tasks           tasks;
-    TaskEdges       edges;
     TaskFuncVec_t   functions;
-    Builder_t       builder{tasks, edges, functions};
+    Builder_t       builder{tasks, functions};
 
     auto const pl = builder.create_pipelines<Pipelines>();
 
@@ -693,7 +684,7 @@ TEST(Tasks, BasicSingleThreadedGameWorld)
         return {};
     });
 
-    TaskGraph const graph = make_exec_graph(tasks, {&edges});
+    TaskGraph const graph = make_exec_graph(tasks);
 
     // Execute
 

@@ -24,41 +24,23 @@
  */
 #pragma once
 
-#include "identifiers.h"
 #include "testapp.h"
 
-// IWYU pragma: begin_exports
-#include <osp/tasks/top_utils.h>
-// IWYU pragma: end_exports
+#include <osp/drawing/drawing.h>
 
 #include <unordered_map>
 
 namespace testapp
 {
 
-namespace scenes
-{
-    using enum EStgOptn;
-    using enum EStgCont;
-    using enum EStgIntr;
-    using enum EStgRevd;
-    using enum EStgEvnt;
-    using enum EStgFBO;
-    using enum EStgLink;
-}
-
-struct MainLoopControl
-{
-    bool doUpdate;
-    bool doSync;
-    bool doResync;
-    bool doRender;
-};
-
 struct ScenarioOption
 {
-    std::string_view m_description;
-    SceneSetupFunc_t m_setup;
+    using Func_t = void(*)(TestApp&);
+
+    std::string_view    name;
+    std::string_view    brief;
+    std::string_view    description;
+    Func_t              loadFunc;
 };
 
 using ScenarioMap_t = std::unordered_map<std::string_view, ScenarioOption>;

@@ -24,8 +24,7 @@
  */
 #pragma once
 
-#include <array>
-#include <cstdint>
+#include <bitset>
 
 namespace ospjolt
 {
@@ -34,6 +33,6 @@ namespace ospjolt
 // These determine which physics calculations are required for a certain
 // rigid body, such as gravity, thurst, or aerodynamics.
 // Forces are assignable at runtime in ACtxJoltWorld::m_factors
-using ForceFactors_t = std::array<uint64_t, 1u>;
+using ForceFactors_t = std::bitset<64>;
 
 }

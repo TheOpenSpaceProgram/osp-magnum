@@ -376,7 +376,10 @@ static void loop_done(Tasks const& tasks, TaskGraph const& graph, ExecContext &r
 
     if (scopePl != pipeline) // if not a loopscope itself
     {
-        LGRN_ASSERT(rScopeExecPl.loopChildrenLeft != 0);
+        LGRN_ASSERTM(rScopeExecPl.loopChildrenLeft != 0,
+                     "A pipeline called 'loop done' more than once. I'm not sure why, but if you "
+                     "hit this assert, then its likely that you're forgetting to fire all "
+                     "required pipeline signals.");
         -- rScopeExecPl.loopChildrenLeft;
     }
 
