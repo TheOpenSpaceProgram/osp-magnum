@@ -32,6 +32,7 @@
 #include "../core/keyed_vector.h"
 #include "../tasks/tasks.h"
 
+#include <cstring>
 #include <entt/core/any.hpp>
 
 #include <Corrade/Containers/ArrayViewStl.h>
@@ -336,13 +337,17 @@ struct Framework
             // Access struct members of out.pl and out.di as if they're arrays, in order to write
             // DataIds and PipelineIds to them.
 
+            //Using this reference to avoid strict aliasing UB : https://gist.github.com/shafik/848ae25ee209f698763cffee272a58f8
+            //Apparently the memcpy calls get optimized away. 
+
             FeatureInterface const &rInterface = m_fiinstData[fiId];
+
             if constexpr ( ! std::is_empty_v<typename FI_T::Pipelines> )
             {
                 auto const plMembers = arrayCast<PipelineDefBlank_t>(  arrayCast<std::byte>( arrayView(&out.pl, 1) )  );
                 for (std::size_t i = 0; i < plMembers.size(); ++i)
                 {
-                    plMembers[i].m_value = rInterface.pipelines[i];
+                    std::memcpy(&plMembers[i].m_value,  &rInterface.pipelines[i], sizeof(PipelineId));
                 }
             }
 
@@ -351,7 +356,7 @@ struct Framework
                 auto const diMembers = arrayCast<DataId>(  arrayCast<std::byte>( arrayView(&out.di, 1) )  );
                 for (std::size_t i = 0; i < diMembers.size(); ++i)
                 {
-                    diMembers[i] = rInterface.data[i];
+                    std::memcpy(&diMembers[i], &rInterface.data[i], sizeof(DataId));
                 }
             }
         }
