@@ -399,14 +399,12 @@ ContextId make_scene_renderer(Framework &rFW, ContextId mainCtx, ContextId scene
 
         auto scnRender      = rFW.get_interface<FISceneRenderer>        (scnRdrCtx);
         auto &rScnRender    = rFW.data_get<draw::ACtxSceneRender>       (scnRender.di.scnRender);
-        //auto &rCamera       = rFW.data_get<draw::Camera>                (gdScn.di.camera);
 
         MaterialId const matFlat  = rScnRender.m_materialIds.create();
         rScnRender.m_materials.resize(rScnRender.m_materialIds.size());
 
         scnRdrCB.add_feature(ftrCameraControlGD);
 
-        scnRdrCB.add_feature(ftrFlatMaterial, matFlat);
         scnRdrCB.add_feature(ftrThrower);
         scnRdrCB.add_feature(ftrPhysicsShapesDraw, matFlat);
         scnRdrCB.add_feature(ftrCursor, TplPkgIdMaterialId{defaultPkg, matFlat});

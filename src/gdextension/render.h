@@ -24,6 +24,7 @@
  */
 #pragma once
 
+#include "osp/drawing/drawing.h"
 #include <Magnum/Trade/ImageData.h>
 #include <Magnum/Trade/MeshData.h>
 #include <godot_cpp/variant/rid.hpp>
@@ -105,6 +106,7 @@ struct ACtxSceneRenderGd
     MeshGdEntStorage_t     m_meshId;
     TexGdEntStorage_t      m_diffuseTexId;
     InstanceGdEntStorage_t m_instanceId;
+    DrawEntSet_t           m_render;
     godot::RID             m_scenario;
 };
 

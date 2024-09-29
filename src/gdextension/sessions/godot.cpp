@@ -130,7 +130,6 @@ osp::fw::FeatureDef const ftrGodotScene = feature_def("GodotScene", [] (
     rFB.pipeline(gdScn.pl.camera).parent(scnRender.pl.render);
 
     rFB.data_emplace<draw::ACtxSceneRenderGd>(gdScn.di.scnRenderGl);
-    rFB.data_emplace<osp::draw::RenderGroup>(gdScn.di.groupFwd);
     godot::RID &rCamera = rFB.data_emplace<godot::RID>(gdScn.di.camera);
     rCamera             = rs->camera_create();
 
@@ -143,15 +142,16 @@ osp::fw::FeatureDef const ftrGodotScene = feature_def("GodotScene", [] (
         .sync_with({})
         .args({ scnRender.di.scnRender, gdScn.di.scnRenderGl })
         .func([](osp::draw::ACtxSceneRender const &rScnRender,
-                 draw::ACtxSceneRenderGd          &rScnRenderGl) noexcept {
+                 draw::ACtxSceneRenderGd          &rScnRenderGd) noexcept {
             std::size_t const capacity = rScnRender.m_drawIds.capacity();
-            rScnRenderGl.m_diffuseTexId.resize(capacity);
-            rScnRenderGl.m_meshId.resize(capacity);
-            rScnRenderGl.m_instanceId.resize(capacity);
+            rScnRenderGd.m_diffuseTexId.resize(capacity);
+            rScnRenderGd.m_meshId.resize(capacity);
+            rScnRenderGd.m_instanceId.resize(capacity);
+            rScnRenderGd.m_render.resize(capacity);
         });
 
     rFB.task()
-        .name("Compile Resource Meshes to GL")
+        .name("Compile Resource Meshes to Gd")
         .run_on({ scnRender.pl.meshResDirty(UseOrRun) })
         .sync_with({ scnRender.pl.mesh(Ready),
                      godot.pl.mesh(New),
@@ -164,7 +164,7 @@ osp::fw::FeatureDef const ftrGodotScene = feature_def("GodotScene", [] (
         });
 
     rFB.task()
-        .name("Compile Resource Textures to GL")
+        .name("Compile Resource Textures to Gd")
         .run_on({ scnRender.pl.textureResDirty(UseOrRun) })
         .sync_with({ scnRender.pl.texture(Ready), godot.pl.texture(New) })
         .args({ comScn.di.drawingRes, mainApp.di.resources, godot.di.render })
@@ -186,14 +186,14 @@ osp::fw::FeatureDef const ftrGodotScene = feature_def("GodotScene", [] (
         .func([](draw::ACtxDrawing       &rDrawing,
                  draw::ACtxDrawingRes    &rDrawingRes,
                  draw::ACtxSceneRender   &rScnRender,
-                 draw::ACtxSceneRenderGd &rScnRenderGl,
-                 draw::RenderGd          &rRenderGl) noexcept {
+                 draw::ACtxSceneRenderGd &rScnRenderGd,
+                 draw::RenderGd          &rRenderGd) noexcept {
             draw::SysRenderGd::sync_drawent_texture(rScnRender.m_diffuseDirty.begin(),
                                                     rScnRender.m_diffuseDirty.end(),
                                                     rScnRender.m_diffuseTex,
                                                     rDrawingRes.m_texToRes,
-                                                    rScnRenderGl.m_diffuseTexId,
-                                                    rRenderGl);
+                                                    rScnRenderGd.m_diffuseTexId,
+                                                    rRenderGd);
         });
 
     rFB.task()
@@ -264,7 +264,7 @@ osp::fw::FeatureDef const ftrGodotScene = feature_def("GodotScene", [] (
         });
 
     rFB.task()
-        .name("Render Entities")
+        .name("Sync entity parameters")
         .run_on({ scnRender.pl.render(Run) })
         .sync_with({ scnRender.pl.group(Ready),
                      scnRender.pl.groupEnts(Ready),
@@ -275,30 +275,27 @@ osp::fw::FeatureDef const ftrGodotScene = feature_def("GodotScene", [] (
                      godot.pl.entMesh(Ready),
                      godot.pl.entTexture(Ready),
                      scnRender.pl.drawEnt(Ready) })
-        .args({ scnRender.di.scnRender, godot.di.render, gdScn.di.groupFwd, gdScn.di.camera })
+        .args({ scnRender.di.scnRender, godot.di.render, gdScn.di.scnRenderGl })
         .func([](draw::ACtxSceneRender   &rScnRender,
-                 draw::RenderGd          &rRenderGl,
-                 draw::RenderGroup const &rGroupFwd,
-                 godot::RID const        &rCamera) noexcept {
-            // FIXME
-            osp::draw::ViewProjMatrix viewProj{ Matrix4(), Matrix4() };
-
-            // Forward Render fwd_opaque group to FBO
-            draw::SysRenderGd::render_opaque(rGroupFwd, rScnRender.m_visible, viewProj);
+                 draw::RenderGd          &rRenderGd,
+                 draw::ACtxSceneRenderGd &rScnRenderGd) noexcept {
+            for (DrawEnt const& ent : rScnRenderGd.m_render) 
+            {
+                if ( rScnRender.m_visible.contains(ent) )
+                {
+                    sync_godot_ent(ent, rScnRender, rScnRenderGd, rRenderGd);
+                }
+            }
         });
 
     rFB.task()
         .name("Delete entities from render groups")
         .run_on({ scnRender.pl.drawEntDelete(UseOrRun) })
         .sync_with({ scnRender.pl.groupEnts(Delete) })
-        .args({ comScn.di.drawing, gdScn.di.groupFwd, comScn.di.drawEntDel })
-        .func([](draw::ACtxDrawing const  &rDrawing,
-                 draw::RenderGroup        &rGroup,
-                 draw::DrawEntVec_t const &rDrawEntDel) noexcept {
-            for ( draw::DrawEnt const drawEnt : rDrawEntDel )
-            {
-                rGroup.entities.remove(drawEnt);
-            }
+        .args({ comScn.di.drawEntDel, gdScn.di.scnRenderGl})
+        .func([](draw::DrawEntVec_t const &rDrawEntDel, 
+                    draw::ACtxSceneRenderGd  &rScnRenderGl) noexcept {
+            rScnRenderGl.m_render.erase(rDrawEntDel.begin(), rDrawEntDel.end());
         });
 
     rFB.task()
@@ -316,52 +313,79 @@ osp::fw::FeatureDef const ftrGodotScene = feature_def("GodotScene", [] (
                 rInstance = {};
             }
         });
+    
+    rFB.task()
+        .name("Sync Flat shader DrawEnts")
+        .run_on({ windowApp.pl.sync(Run) })
+        .sync_with({ scnRender.pl.groupEnts(Modify),
+                     scnRender.pl.group(Modify),
+                     scnRender.pl.materialDirty(UseOrRun) })
+        .args({ scnRender.di.scnRender, gdScn.di.scnRenderGl, godot.di.render})
+        .func([](ACtxSceneRender         &rScnRender,
+                 ACtxSceneRenderGd &rScnRenderGd, 
+                 RenderGd          &rRenderGd) noexcept {
+                
+            for (Material const &rMat : rScnRender.m_materials) 
+            {
+                rScnRenderGd.m_render.insert(rMat.m_dirty.begin(), rMat.m_dirty.end());
+            }
+        });
+
+    rFB.task()
+        .name("Resync Flat shader DrawEnts")
+        .run_on({ windowApp.pl.resync(Run) })
+        .sync_with({ scnRender.pl.materialDirty(UseOrRun),
+                     godot.pl.texture(Ready),
+                     scnRender.pl.groupEnts(Modify),
+                     scnRender.pl.group(Modify) })
+        .args({ scnRender.di.scnRender, gdScn.di.scnRenderGl, godot.di.render})
+        .func([](ACtxSceneRender         &rScnRender,
+                 ACtxSceneRenderGd  &rScnRenderGd, 
+                 RenderGd           &rRenderGd) noexcept {
+            for (Material const &rMat : rScnRender.m_materials) 
+            {
+                rScnRenderGd.m_render.insert(rMat.m_ents.begin(), rMat.m_ents.end());
+            }
+        });
 }); // ftrGodotScene
 
-void draw_ent_flat(
-    DrawEnt ent, ViewProjMatrix const &viewProj, EntityToDraw::UserData_t userData) noexcept
+void sync_godot_ent(DrawEnt ent, ACtxSceneRender &rScnRender, ACtxSceneRenderGd &rScnRenderGd, RenderGd &rRenderGd) noexcept
 {
-    void * const pData = std::get<0>(userData);
-    assert(pData != nullptr);
-
-    auto &rData              = *reinterpret_cast<ACtxDrawFlat *>(pData);
-
     // Collect uniform information
-    Matrix4 const &drawTf    = (*rData.pDrawTf)[ent];
-    godot::RID    &rInstance = (*rData.pInstanceId)[ent];
+    Matrix4 const &drawTf    = rScnRender.m_drawTransform[ent];
+    godot::RID    &rInstance = rScnRenderGd.m_instanceId[ent];
 
     auto           rs        = godot::RenderingServer::get_singleton();
 
-    MeshGdId const meshId    = (*rData.pMeshId)[ent].m_glId;
-    godot::RID     rMesh     = rData.pMeshGl->get(meshId);
+    MeshGdId const meshId    = rScnRenderGd.m_meshId[ent].m_glId;
+    if ( meshId == lgrn::id_null<MeshGdId>())
+    {
+        return;
+    }
+    godot::RID     rMesh     = rRenderGd.m_meshGd.get(meshId);
     godot::RID     material  = rs->mesh_surface_get_material(rMesh, 0);
     // create the material if it does not already exists
     if ( ! material.is_valid() )
     {
         material = rs->material_create();
-        // rs->mesh_surface_set_material(rMesh, 0, material);
     }
     // test if the mesh is textured or not.
-    // TODO find a better way to do this.
-    if ( rData.pDiffuseTexId != nullptr
-         && (*rData.pDiffuseTexId)[ent].m_gdId != lgrn::id_null<TexGdId>() )
+    if ( rScnRenderGd.m_diffuseTexId[ent].m_gdId != lgrn::id_null<TexGdId>() )
     {
-        TexGdId const texGdId = (*rData.pDiffuseTexId)[ent].m_gdId;
-        godot::RID    rTex    = rData.pTexGl->get(texGdId);
+        TexGdId const texGdId = rScnRenderGd.m_diffuseTexId[ent].m_gdId;
+        godot::RID    rTex    = rRenderGd.m_texGd.get(texGdId);
         rs->material_set_param(material, "albedo_texture", rTex);
     }
 
-    if ( rData.pColor != nullptr )
-    {
-        auto color = (*rData.pColor)[ent];
-        rs->material_set_param(
-            material, "albedo_color", godot::Color(color.r(), color.g(), color.b(), color.a()));
-    }
+    // Set albdedo color
+    auto color = rScnRender.m_color[ent];
+    rs->material_set_param(
+        material, "albedo_color", godot::Color(color.r(), color.g(), color.b(), color.a()));
 
     // Create instance if it does not exist
     if ( ! rInstance.is_valid() )
     {
-        rInstance = rs->instance_create2(rMesh, *rData.scenario);
+        rInstance = rs->instance_create2(rMesh, rRenderGd.scenario);
     }
 
     auto         rot   = Magnum::Quaternion::fromMatrix(drawTf.rotation()).data();
@@ -374,83 +398,6 @@ void draw_ent_flat(
     auto         tf     = godot::Transform3D(basis, origin);
     rs->instance_set_transform(rInstance, tf);
 }
-
-osp::fw::FeatureDef const ftrFlatMaterial = feature_def("GodotFlatMaterial", [] (
-        FeatureBuilder              &rFB,
-        Implement<FIShaderFlatGD>   shFlat,
-        DependOn<FIGodot>           godot,
-        DependOn<FIGodotScene>      gdScn,
-        DependOn<FIWindowApp>       windowApp,
-        DependOn<FISceneRenderer>   scnRender,
-        entt::any                   userData)
-{
-    auto const materialId = userData /* if not null */ ? entt::any_cast<MaterialId>(userData)
-                                                       : MaterialId{};
-
-    auto      &rScnRender   = rFB.data_get<ACtxSceneRender>(scnRender.di.scnRender);
-    auto      &rScnRenderGl = rFB.data_get<ACtxSceneRenderGd>(gdScn.di.scnRenderGl);
-    auto      &rRenderGl    = rFB.data_get<RenderGd>(godot.di.render);
-
-    auto &rDrawFlat      = rFB.data_emplace<ACtxDrawFlat>(shFlat.di.shader);
-
-    rDrawFlat.materialId = materialId;
-    rDrawFlat.assign_pointers(rScnRender, rScnRenderGl, rRenderGl);
-
-    if ( materialId == lgrn::id_null<MaterialId>() )
-    {
-        return;
-    }
-
-    rFB.task()
-        .name("Sync Flat shader DrawEnts")
-        .run_on({ windowApp.pl.sync(Run) })
-        .sync_with({ scnRender.pl.groupEnts(Modify),
-                     scnRender.pl.group(Modify),
-                     scnRender.pl.materialDirty(UseOrRun) })
-        .args({ scnRender.di.scnRender, gdScn.di.groupFwd, gdScn.di.scnRenderGl, shFlat.di.shader })
-        .func([](ACtxSceneRender         &rScnRender,
-                 RenderGroup             &rGroupFwd,
-                 ACtxSceneRenderGd const &rScnRenderGd,
-                 ACtxDrawFlat            &rDrawShFlat) noexcept {
-            Material const &rMat = rScnRender.m_materials[rDrawShFlat.materialId];
-            sync_drawent_flat(rMat.m_dirty.begin(),
-                              rMat.m_dirty.end(),
-                              { .hasMaterial    = rMat.m_ents,
-                                .pStorageOpaque = &rGroupFwd.entities,
-                                /* TODO: set .pStorageTransparent */
-                                .opaque         = rScnRender.m_opaque,
-                                .transparent    = rScnRender.m_transparent,
-                                .diffuse        = rScnRenderGd.m_diffuseTexId,
-                                .rData          = rDrawShFlat });
-        });
-
-    rFB.task()
-        .name("Resync Flat shader DrawEnts")
-        .run_on({ windowApp.pl.resync(Run) })
-        .sync_with({ scnRender.pl.materialDirty(UseOrRun),
-                     godot.pl.texture(Ready),
-                     scnRender.pl.groupEnts(Modify),
-                     scnRender.pl.group(Modify) })
-        .args({ scnRender.di.scnRender, gdScn.di.groupFwd, gdScn.di.scnRenderGl, shFlat.di.shader })
-        .func([](ACtxSceneRender         &rScnRender,
-                 RenderGroup             &rGroupFwd,
-                 ACtxSceneRenderGd const &rScnRenderGl,
-                 ACtxDrawFlat            &rDrawShFlat) noexcept {
-            Material const &rMat = rScnRender.m_materials[rDrawShFlat.materialId];
-            for ( DrawEnt const drawEnt : rMat.m_ents )
-            {
-                sync_drawent_flat(drawEnt,
-                                  { .hasMaterial    = rMat.m_ents,
-                                    .pStorageOpaque = &rGroupFwd.entities,
-                                    /* TODO: set .pStorageTransparent */
-                                    .opaque         = rScnRender.m_opaque,
-                                    .transparent    = rScnRender.m_transparent,
-                                    .diffuse        = rScnRenderGl.m_diffuseTexId,
-                                    .rData          = rDrawShFlat });
-            }
-        });
-});
-
 
 osp::fw::FeatureDef const ftrCameraControlGD = feature_def("CameraControlGodot", [] (
         FeatureBuilder              &rFB,
