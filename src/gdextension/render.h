@@ -108,6 +108,8 @@ struct ACtxSceneRenderGd
     InstanceGdEntStorage_t m_instanceId;
     DrawEntSet_t           m_render;
     godot::RID             m_scenario;
+
+    void clear_resource_owners();
 };
 
 /**

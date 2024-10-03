@@ -47,7 +47,7 @@ struct FIGodot {
 
 struct FIGodotScene {
     struct DataIds {
-        DataId scnRenderGl;
+        DataId scnRenderGd;
         DataId camera;
     };
 

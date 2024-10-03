@@ -52,6 +52,7 @@
 #include <osp/core/Resources.h>
 #include <osp/drawing/own_restypes.h>
 #include <osp/util/logging.h>
+#include <utility>
 
 using Magnum::Trade::ImageData2D;
 using Magnum::Trade::MeshData;
@@ -159,12 +160,16 @@ void SysRenderGd::compile_resource_textures(
             continue;
         }
         godot::RenderingServer  *rs = godot::RenderingServer::get_singleton();
+        godot::PackedByteArray pba;
+        pba.resize( static_cast<size_t>(( imgData.data().size())));
+        std::memcpy(pba.ptrw(), imgData.data(), imgData.data().size());
+
         godot::Ref<godot::Image> img =
             godot::Image::create_from_data(imgData.size().x(),
                                            imgData.size().y(),
-                                           true,
+                                           false,
                                            formatMToGd(imgData.format()),
-                                           godot::Variant(imgData.data()));
+                                           pba);
         godot::RID rid = rs->texture_2d_create(img);
         rRenderGd.m_texGd.emplace(newId, rid);
     }
@@ -340,6 +345,17 @@ void SysRenderGd::sync_drawent_texture(DrawEnt const                          en
     }
 }
 
+void osp::draw::ACtxSceneRenderGd::clear_resource_owners() 
+{
+    godot::RenderingServer* rs = godot::RenderingServer::get_singleton();
+    for ([[maybe_unused]] godot::RID &rOwner : std::exchange(m_instanceId, {})) 
+    {
+        rs->free_rid(rOwner);
+        rOwner = {};
+    }
+    m_scenario = {};
+}
+
 void SysRenderGd::clear_resource_owners(RenderGd &rRenderGd, Resources &rResources)
 {
     for ( [[maybe_unused]] auto &&[_, rOwner] : std::exchange(rRenderGd.m_texToRes, {}) )
@@ -353,28 +369,21 @@ void SysRenderGd::clear_resource_owners(RenderGd &rRenderGd, Resources &rResourc
         rResources.owner_destroy(restypes::gc_mesh, std::move(rOwner));
     }
     rRenderGd.m_resToMesh.clear();
-}
-// FIXME
-void SysRenderGd::render_opaque(
-    RenderGroup const &group, DrawEntSet_t const &visible, ViewProjMatrix const &viewProj)
-{
-    draw_group(group, visible, viewProj);
-}
-// FIXME
-void SysRenderGd::render_transparent(
-    RenderGroup const &group, DrawEntSet_t const &visible, ViewProjMatrix const &viewProj)
-{
-    draw_group(group, visible, viewProj);
-}
 
-void SysRenderGd::draw_group(
-    RenderGroup const &group, DrawEntSet_t const &visible, ViewProjMatrix const &viewProj)
-{
-    for ( auto const &[ent, toDraw] : entt::basic_view{ group.entities }.each() )
+    godot::RenderingServer* rs = godot::RenderingServer::get_singleton();
+    for ([[maybe_unused]] godot::RID rOwner : std::exchange(rRenderGd.m_meshGd, {})) 
     {
-        if ( visible.contains(ent) )
-        {
-            toDraw.draw(ent, viewProj, toDraw.data);
-        }
+        godot::RID material = rs->mesh_surface_get_material(rOwner, 0);
+        rs->free_rid(rOwner);
+        rs->free_rid(material);
+        rOwner = {};
     }
+    for ([[maybe_unused]] godot::RID rOwner : std::exchange(rRenderGd.m_texGd, {})) 
+    {
+        rs->free_rid(rOwner);
+        rOwner = {};
+    }
+    
+    rRenderGd.scenario = {};
+    rRenderGd.viewport = {};
 }

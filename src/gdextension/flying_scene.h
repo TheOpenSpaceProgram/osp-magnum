@@ -34,6 +34,7 @@ private:
     RID               m_scenario;
     RID               m_viewport;
     RID               m_lightInstance;
+    RID               m_light;
 
     //TestApp           m_testApp;
     //adera::MainLoopControl  *m_mainLoopCtrl;

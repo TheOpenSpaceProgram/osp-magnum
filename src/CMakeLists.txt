@@ -32,7 +32,7 @@ if(NOT Threads_FOUND)
 endif()
 
 #compile as position-independant to avoid link errors on static link
-add_compile_options("-fPIC")
+set(CMAKE_POSITION_INDEPENDENT_CODE ON)
 
 add_subdirectory(adera)
 add_subdirectory(adera_app)

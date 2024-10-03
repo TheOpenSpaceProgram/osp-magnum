@@ -118,6 +118,7 @@ osp::fw::FeatureDef const ftrGodotScene = feature_def("GodotScene", [] (
         Implement<FIGodotScene>     gdScn,
         DependOn<FIGodot>           godot,
         DependOn<FIMainApp>         mainApp,
+        DependOn<FICleanupContext>  cleanup,
         DependOn<FIWindowApp>       windowApp,
         DependOn<FISceneRenderer>   scnRender,
         DependOn<FIScene>           scn,
@@ -129,7 +130,7 @@ osp::fw::FeatureDef const ftrGodotScene = feature_def("GodotScene", [] (
     rFB.pipeline(gdScn.pl.fbo).parent(scnRender.pl.render);
     rFB.pipeline(gdScn.pl.camera).parent(scnRender.pl.render);
 
-    rFB.data_emplace<draw::ACtxSceneRenderGd>(gdScn.di.scnRenderGl);
+    rFB.data_emplace<draw::ACtxSceneRenderGd>(gdScn.di.scnRenderGd);
     godot::RID &rCamera = rFB.data_emplace<godot::RID>(gdScn.di.camera);
     rCamera             = rs->camera_create();
 
@@ -140,7 +141,7 @@ osp::fw::FeatureDef const ftrGodotScene = feature_def("GodotScene", [] (
         .name("Resize ACtxSceneRenderGd to fit all DrawEnts")
         .run_on({ scnRender.pl.drawEntResized(Run) })
         .sync_with({})
-        .args({ scnRender.di.scnRender, gdScn.di.scnRenderGl })
+        .args({ scnRender.di.scnRender, gdScn.di.scnRenderGd })
         .func([](osp::draw::ACtxSceneRender const &rScnRender,
                  draw::ACtxSceneRenderGd          &rScnRenderGd) noexcept {
             std::size_t const capacity = rScnRender.m_drawIds.capacity();
@@ -182,7 +183,7 @@ osp::fw::FeatureDef const ftrGodotScene = feature_def("GodotScene", [] (
                      godot.pl.texture(Ready),
                      godot.pl.entTexture(Modify),
                      scnRender.pl.drawEntResized(Done) })
-        .args({ comScn.di.drawing, comScn.di.drawingRes, scnRender.di.scnRender, gdScn.di.scnRenderGl, godot.di.render })
+        .args({ comScn.di.drawing, comScn.di.drawingRes, scnRender.di.scnRender, gdScn.di.scnRenderGd, godot.di.render })
         .func([](draw::ACtxDrawing       &rDrawing,
                  draw::ACtxDrawingRes    &rDrawingRes,
                  draw::ACtxSceneRender   &rScnRender,
@@ -203,7 +204,7 @@ osp::fw::FeatureDef const ftrGodotScene = feature_def("GodotScene", [] (
                      godot.pl.texture(Ready),
                      godot.pl.entTexture(Modify),
                      scnRender.pl.drawEntResized(Done) })
-        .args({ comScn.di.drawingRes, scnRender.di.scnRender, gdScn.di.scnRenderGl, godot.di.render })
+        .args({ comScn.di.drawingRes, scnRender.di.scnRender, gdScn.di.scnRenderGd, godot.di.render })
         .func([](draw::ACtxDrawingRes    &rDrawingRes,
                  draw::ACtxSceneRender   &rScnRender,
                  draw::ACtxSceneRenderGd &rScnRenderGl,
@@ -226,7 +227,7 @@ osp::fw::FeatureDef const ftrGodotScene = feature_def("GodotScene", [] (
                      godot.pl.mesh(Ready),
                      godot.pl.entMesh(Modify),
                      scnRender.pl.drawEntResized(Done) })
-        .args({ comScn.di.drawingRes, scnRender.di.scnRender, gdScn.di.scnRenderGl, godot.di.render })
+        .args({ comScn.di.drawingRes, scnRender.di.scnRender, gdScn.di.scnRenderGd, godot.di.render })
         .func([](draw::ACtxDrawingRes    &rDrawingRes,
                  draw::ACtxSceneRender   &rScnRender,
                  draw::ACtxSceneRenderGd &rScnRenderGl,
@@ -247,7 +248,7 @@ osp::fw::FeatureDef const ftrGodotScene = feature_def("GodotScene", [] (
                      godot.pl.mesh(Ready),
                      godot.pl.entMesh(Modify),
                      scnRender.pl.drawEntResized(Done) })
-        .args({ comScn.di.drawingRes, scnRender.di.scnRender, gdScn.di.scnRenderGl, godot.di.render })
+        .args({ comScn.di.drawingRes, scnRender.di.scnRender, gdScn.di.scnRenderGd, godot.di.render })
         .func([](draw::ACtxDrawingRes    &rDrawingRes,
                  draw::ACtxSceneRender   &rScnRender,
                  draw::ACtxSceneRenderGd &rScnRenderGl,
@@ -275,16 +276,13 @@ osp::fw::FeatureDef const ftrGodotScene = feature_def("GodotScene", [] (
                      godot.pl.entMesh(Ready),
                      godot.pl.entTexture(Ready),
                      scnRender.pl.drawEnt(Ready) })
-        .args({ scnRender.di.scnRender, godot.di.render, gdScn.di.scnRenderGl })
+        .args({ scnRender.di.scnRender, godot.di.render, gdScn.di.scnRenderGd })
         .func([](draw::ACtxSceneRender   &rScnRender,
                  draw::RenderGd          &rRenderGd,
                  draw::ACtxSceneRenderGd &rScnRenderGd) noexcept {
             for (DrawEnt const& ent : rScnRenderGd.m_render) 
             {
-                if ( rScnRender.m_visible.contains(ent) )
-                {
-                    sync_godot_ent(ent, rScnRender, rScnRenderGd, rRenderGd);
-                }
+                sync_godot_ent(ent, rScnRender, rScnRenderGd, rRenderGd);
             }
         });
 
@@ -292,7 +290,7 @@ osp::fw::FeatureDef const ftrGodotScene = feature_def("GodotScene", [] (
         .name("Delete entities from render groups")
         .run_on({ scnRender.pl.drawEntDelete(UseOrRun) })
         .sync_with({ scnRender.pl.groupEnts(Delete) })
-        .args({ comScn.di.drawEntDel, gdScn.di.scnRenderGl})
+        .args({ comScn.di.drawEntDel, gdScn.di.scnRenderGd})
         .func([](draw::DrawEntVec_t const &rDrawEntDel, 
                     draw::ACtxSceneRenderGd  &rScnRenderGl) noexcept {
             rScnRenderGl.m_render.erase(rDrawEntDel.begin(), rDrawEntDel.end());
@@ -301,7 +299,7 @@ osp::fw::FeatureDef const ftrGodotScene = feature_def("GodotScene", [] (
     rFB.task()
         .name("Delete entities instance from scene")
         .run_on({ scnRender.pl.drawEntDelete(UseOrRun) })
-        .args({ comScn.di.drawing, comScn.di.drawEntDel, gdScn.di.scnRenderGl })
+        .args({ comScn.di.drawing, comScn.di.drawEntDel, gdScn.di.scnRenderGd })
         .func([](draw::ACtxDrawing const  &rDrawing,
                  draw::DrawEntVec_t const &rDrawEntDel,
                  draw::ACtxSceneRenderGd  &rScnRenderGl) noexcept {
@@ -320,7 +318,7 @@ osp::fw::FeatureDef const ftrGodotScene = feature_def("GodotScene", [] (
         .sync_with({ scnRender.pl.groupEnts(Modify),
                      scnRender.pl.group(Modify),
                      scnRender.pl.materialDirty(UseOrRun) })
-        .args({ scnRender.di.scnRender, gdScn.di.scnRenderGl, godot.di.render})
+        .args({ scnRender.di.scnRender, gdScn.di.scnRenderGd, godot.di.render})
         .func([](ACtxSceneRender         &rScnRender,
                  ACtxSceneRenderGd &rScnRenderGd, 
                  RenderGd          &rRenderGd) noexcept {
@@ -338,7 +336,7 @@ osp::fw::FeatureDef const ftrGodotScene = feature_def("GodotScene", [] (
                      godot.pl.texture(Ready),
                      scnRender.pl.groupEnts(Modify),
                      scnRender.pl.group(Modify) })
-        .args({ scnRender.di.scnRender, gdScn.di.scnRenderGl, godot.di.render})
+        .args({ scnRender.di.scnRender, gdScn.di.scnRenderGd, godot.di.render})
         .func([](ACtxSceneRender         &rScnRender,
                  ACtxSceneRenderGd  &rScnRenderGd, 
                  RenderGd           &rRenderGd) noexcept {
@@ -346,6 +344,16 @@ osp::fw::FeatureDef const ftrGodotScene = feature_def("GodotScene", [] (
             {
                 rScnRenderGd.m_render.insert(rMat.m_ents.begin(), rMat.m_ents.end());
             }
+        });
+    rFB.task()
+        .name("Clean up scene")
+        .run_on({ cleanup.pl.cleanup(Run_) })
+        .args({ gdScn.di.scnRenderGd , gdScn.di.camera})
+        .func([](ACtxSceneRenderGd &rScnRenderGd, godot::RID& rCamera) noexcept {
+            godot::RenderingServer *rs = godot::RenderingServer::get_singleton();
+            rs->free_rid(rCamera);
+            rScnRenderGd.clear_resource_owners();
+            rScnRenderGd = {}; // Needs the OpenGL thread for destruction
         });
 }); // ftrGodotScene
 
@@ -356,6 +364,23 @@ void sync_godot_ent(DrawEnt ent, ACtxSceneRender &rScnRender, ACtxSceneRenderGd 
     godot::RID    &rInstance = rScnRenderGd.m_instanceId[ent];
 
     auto           rs        = godot::RenderingServer::get_singleton();
+
+    // Create instance if it does not exist
+    if ( ! rInstance.is_valid() )
+    {
+        rInstance = rs->instance_create();
+        rs->instance_set_scenario(rInstance, rRenderGd.scenario);
+    }
+
+    // set visibility
+    if (rScnRender.m_visible.contains(ent)) {
+        rs->instance_set_visible(rInstance, true);
+    }
+    else
+    {
+        rs->instance_set_visible(rInstance, false);
+        return;
+    }
 
     MeshGdId const meshId    = rScnRenderGd.m_meshId[ent].m_glId;
     if ( meshId == lgrn::id_null<MeshGdId>())
@@ -368,6 +393,7 @@ void sync_godot_ent(DrawEnt ent, ACtxSceneRender &rScnRender, ACtxSceneRenderGd 
     if ( ! material.is_valid() )
     {
         material = rs->material_create();
+        rs->mesh_surface_set_material(rMesh, 0, material);
     }
     // test if the mesh is textured or not.
     if ( rScnRenderGd.m_diffuseTexId[ent].m_gdId != lgrn::id_null<TexGdId>() )
@@ -380,13 +406,10 @@ void sync_godot_ent(DrawEnt ent, ACtxSceneRender &rScnRender, ACtxSceneRenderGd 
     // Set albdedo color
     auto color = rScnRender.m_color[ent];
     rs->material_set_param(
-        material, "albedo_color", godot::Color(color.r(), color.g(), color.b(), color.a()));
+        material, "albedo_color", godot::Color(1., 0., 0., 0.5));
 
-    // Create instance if it does not exist
-    if ( ! rInstance.is_valid() )
-    {
-        rInstance = rs->instance_create2(rMesh, rRenderGd.scenario);
-    }
+    rs->mesh_surface_set_material(rMesh, 0, material);
+    rs->instance_set_base(rInstance, rMesh);
 
     auto         rot   = Magnum::Quaternion::fromMatrix(drawTf.rotation()).data();
     auto         scale = drawTf.scaling();
@@ -397,6 +420,7 @@ void sync_godot_ent(DrawEnt ent, ACtxSceneRender &rScnRender, ACtxSceneRenderGd 
     auto         origin = godot::Vector3(pos.x(), pos.y(), pos.z());
     auto         tf     = godot::Transform3D(basis, origin);
     rs->instance_set_transform(rInstance, tf);
+
 }
 
 osp::fw::FeatureDef const ftrCameraControlGD = feature_def("CameraControlGodot", [] (
