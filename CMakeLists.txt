@@ -166,6 +166,7 @@ IF(MSVC)
   add_compile_options($<$<CXX_COMPILER_ID:MSVC>:/MP>)
   # Force dynamic runtime library to be in debug mode in debug mode.
   add_compile_options($<$<CONFIG:Debug>:$<$<CXX_COMPILER_ID:MSVC>:/MDd>>)
+  add_compile_options($<$<CONFIG:Release>:$<$<CXX_COMPILER_ID:MSVC>:/MD>>)
   # Don't generate a blah.manifest file for each build target.
   add_link_options(LINKER:/MANIFEST:NO)
 ELSEIF(UNIX)
