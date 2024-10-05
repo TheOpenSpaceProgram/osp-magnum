@@ -24,7 +24,9 @@
  */
 
 #include "render.h"
+#include "osp/core/math_types.h"
 
+#include <Corrade/Containers/Array.h>
 #include <Corrade/Containers/ArrayViewStl.h>
 #include <Magnum/GL/Buffer.h>
 #include <Magnum/GL/DefaultFramebuffer.h>
@@ -32,11 +34,13 @@
 #include <Magnum/GL/Renderer.h>
 #include <Magnum/GL/TextureFormat.h>
 #include <Magnum/ImageView.h>
+#include <Magnum/Magnum.h>
 #include <Magnum/Mesh.h>
 #include <Magnum/PixelFormat.h>
 #include <Magnum/Trade/ImageData.h>
 #include <Magnum/Trade/MeshData.h>
 #include <Magnum/Trade/TextureData.h>
+#include <algorithm>
 #include <cstdint>
 #include <godot_cpp/classes/image.hpp>
 #include <godot_cpp/classes/input_map.hpp>
@@ -215,27 +219,33 @@ void SysRenderGd::compile_resource_meshes(
         st.begin(static_cast<godot::Mesh::PrimitiveType>(primitive));
 
         godot::RID mesh = rs->mesh_create();
+
         auto pos = meshData.positions3DAsArray();
-        // TODO copy other attributes as well maybe
+
+        bool has_normals = meshData.hasAttribute(Magnum::Trade::MeshAttribute::Normal);
+        auto normals = has_normals ? meshData.normalsAsArray() : Corrade::Containers::Array<Magnum::Vector3>();
+        
         auto indices = meshData.indicesAsArray();
-        //TODO do that using an iterator I guess.
-        uint32_t sg = 0;
-        for ( auto i = indices.end(); i >= indices.begin() + 1;)
+
+        for (size_t i = 0; i < pos.size(); i++) 
         {
-            st.set_smooth_group(sg++);
-            auto v = pos[*(--i)];
-            st.add_vertex(godot::Vector3(v.x(), v.y(), v.z()));
-            v = pos[*(--i)];
-            st.add_vertex(godot::Vector3(v.x(), v.y(), v.z()));
-            v = pos[*(--i)];
+            if (has_normals) 
+            {
+                auto n = normals[i];
+                st.set_normal(godot::Vector3(n.x(), n.y(), n.z()));
+            }
+            auto v = pos[i];
             st.add_vertex(godot::Vector3(v.x(), v.y(), v.z()));
         }
-        if ( primitive == godot::RenderingServer::PRIMITIVE_TRIANGLES )
+
+        for (auto i = indices.end() - 1; i >= indices.begin(); --i) 
         {
-            //st.deindex();
-            st.generate_normals();
-            //st.generate_tangents();
-            
+            st.add_index(static_cast<int32_t>(*i));
+        }
+
+        if ( primitive == godot::RenderingServer::PRIMITIVE_TRIANGLES && !has_normals )
+        {
+            st.generate_normals();    
         }
 
         godot::Array meshArray = st.commit_to_arrays();
