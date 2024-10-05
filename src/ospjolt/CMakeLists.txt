@@ -23,30 +23,32 @@
 # SOFTWARE.
 ##
 
-# TODO put that in the right place. 
+find_package(Magnum REQUIRED
+    Trade
+    )
 
-set(THREADS_PREFER_PTHREAD_FLAG TRUE)
-find_package(Threads)
-if(NOT Threads_FOUND)
-    message(FATAL_ERROR "Can't find a thread library to use!")
-endif()
+SET(DEPS_LIBS
+            EnTT::EnTT
+            Corrade::Main
+            Magnum::Magnum
+            Magnum::Trade
+            longeron
+            spdlog
+            OpenSpaceProgram
+            Jolt)
 
-#compile as position-independant to avoid link errors on static link
-set(CMAKE_POSITION_INDEPENDENT_CODE ON)
+add_library(OspJolt STATIC)
 
-add_subdirectory(adera)
-add_subdirectory(adera_app)
-add_subdirectory(osp)
-add_subdirectory(planet-a)
-add_subdirectory(ospjolt)
-add_subdirectory(osp_drawing_gl)
-add_subdirectory(adera_drawing_gl)
 
-if(OSP_BUILD_TESTAPP)
-    add_subdirectory(testapp)
-endif()
+target_compile_features(OspJolt PUBLIC cxx_std_20)
 
-if(OSP_BUILD_GDEXTENSION)
-    add_subdirectory(gdextension)
-endif()
+# Link it to the interface library that describes the dependencies
+target_link_libraries(OspJolt PUBLIC ${DEPS_LIBS})
 
+# Gather paths to OSP headers and sources
+file(GLOB_RECURSE CPP_FILES CONFIGURE_DEPENDS *.cpp)
+file(GLOB_RECURSE H_FILES CONFIGURE_DEPENDS *.h)
+target_sources(OspJolt PRIVATE "${CPP_FILES}" "${H_FILES}")
+
+# Enforce conformance mode for OspJolt
+target_compile_options(OspJolt PRIVATE $<$<CXX_COMPILER_ID:MSVC>:/permissive->)

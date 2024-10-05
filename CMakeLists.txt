@@ -43,6 +43,11 @@ IF(CMAKE_HOST_SYSTEM_NAME STREQUAL "Windows" AND NOT CMAKE_SYSTEM_VERSION)
     SET(CMAKE_SYSTEM_VERSION "10.0.18362.0" CACHE INTERNAL "" FORCE)
 ENDIF()
 
+#build universally on macOS
+if ( APPLE )
+    set( CMAKE_OSX_ARCHITECTURES "x86_64;arm64" CACHE STRING "" )
+endif()
+
 # Set project name
 PROJECT(OSP-MAGNUM CXX)
 
@@ -56,6 +61,8 @@ OPTION(OSP_ENABLE_COMPILER_WARNINGS "Build with the majority of compiler warning
 OPTION(OSP_ENABLE_IWYU              "Build with warnings from IWYU turned on" OFF)
 OPTION(OSP_ENABLE_CLANG_TIDY        "Build with warnings from clang-tidy turned on" OFF)
 OPTION(OSP_USE_SYSTEM_SDL           "Build with SDL that you provide if turned on, compiles SDL if turned off. Off by default" OFF)
+OPTION(OSP_BUILD_TESTAPP            "Build OSP TestApp with Magnum, OpenGL, and SDL2" ON)
+OPTION(OSP_BUILD_GDEXTENSION        "Build OSP GDExtension" OFF)
 
 # If the environment has these set, pull them into proper variables.
 SET(CLANG_COMPILE_FLAGS ${CLANG_COMPILE_FLAGS})
@@ -138,6 +145,7 @@ IF(MSVC)
   add_compile_options($<$<CXX_COMPILER_ID:MSVC>:/MP>)
   # Force dynamic runtime library to be in debug mode in debug mode.
   add_compile_options($<$<CONFIG:Debug>:$<$<CXX_COMPILER_ID:MSVC>:/MDd>>)
+  add_compile_options($<$<CONFIG:Release>:$<$<CXX_COMPILER_ID:MSVC>:/MD>>)
   # Don't generate a blah.manifest file for each build target.
   add_link_options(LINKER:/MANIFEST:NO)
 ELSEIF(UNIX)
@@ -163,4 +171,3 @@ ADD_SUBDIRECTORY(test)
 # Set OSP as default startup project in Visual Studio
 set_property(DIRECTORY ${CMAKE_SOURCE_DIR} PROPERTY VS_STARTUP_PROJECT osp-magnum)
 # Set execution directory of osp-magnum so that we don't have to copy the files
-set_property(TARGET osp-magnum PROPERTY VS_DEBUGGER_WORKING_DIRECTORY "${CMAKE_SOURCE_DIR}/bin")

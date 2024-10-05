@@ -37,7 +37,7 @@
 
 #include <adera/machines/links.h>
 
-#include <ospjolt/activescene/joltinteg_fn.h>
+#include <ospjolt/joltinteg_fn.h>
 
 using namespace ftr_inter::stages;
 using namespace ftr_inter;
@@ -621,16 +621,21 @@ static void rocket_thrust_force(BodyId const bodyId, ACtxJoltWorld const& rJolt,
         return;
     }
 
+
     JPH::BodyID joltBodyId = BToJolt(bodyId);
     Quaternion const rot = QuatJoltToMagnum(bodyInterface.GetRotation(joltBodyId));
-    RVec3 joltCOM = bodyInterface.GetCenterOfMassPosition(joltBodyId) - bodyInterface.GetPosition(joltBodyId);
-    Vector3 com = Vec3JoltToMagnum(joltCOM);
+    Shape const* shape = bodyInterface.GetShape(joltBodyId).GetPtr();
+
+    if (shape == nullptr)
+    {
+        return;
+    }
+    Vector3 com = Vec3JoltToMagnum(shape->GetCenterOfMass());
 
     for (BodyRocket const& bodyRocket : rBodyRockets)
     {
         float const throttle = std::clamp(rSigValFloat[bodyRocket.m_throttleIn], 0.0f, 1.0f);
         float const multiplier = rSigValFloat[bodyRocket.m_multiplierIn];
-
         float const thrustMag = throttle * multiplier;
 
         if (thrustMag == 0.0f)

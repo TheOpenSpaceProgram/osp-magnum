@@ -31,6 +31,7 @@
 #include <osp/core/Resources.h>
 
 using namespace Magnum::Math::Literals;
+
 using namespace adera;
 using namespace ftr_inter::stages;
 using namespace ftr_inter;

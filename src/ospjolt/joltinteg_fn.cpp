@@ -134,8 +134,8 @@ Ref<Shape> SysJolt::create_primitive(ACtxJoltWorld &rCtxWorld, osp::EShape shape
         //cylinder needs to be internally rotated 90° to match with graphics
         return  RotatedTranslatedShapeSettings(
                     Vec3Arg::sZero(), 
-                    Quat::sRotation(Vec3::sAxisX(), JPH_PI/2), 
-                    new CylinderShapeSettings(scale.GetZ(), 2.0f * scale.GetX())
+                    Quat::sRotation(Vec3::sAxisX(), JPH_PI/2),
+                    new CylinderShapeSettings(scale.GetZ(), 1.0f * scale.GetX())
                 ).Create().Get();
         
     default:

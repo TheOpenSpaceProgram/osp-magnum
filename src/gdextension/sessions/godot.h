@@ -1,6 +1,6 @@
 /**
  * Open Space Program
- * Copyright © 2019-2024 Open Space Program Project
+ * Copyright © 2019-2022 Open Space Program Project
  *
  * MIT License
  *
@@ -24,31 +24,33 @@
  */
 #pragma once
 
+#include "render.h"
+
 #include <osp/framework/builder.h>
 
-#include <adera/activescene/VehicleBuilder.h>
+#include <osp/activescene/basic.h>
+#include <osp/drawing/drawing.h>
 
-#include <osp/core/copymove_macros.h>
-#include <osp/core/global_id.h>
-#include <osp/core/strong_id.h>
-
-#include <memory>
-
-namespace adera
+namespace godot
 {
+class FlyingScene;
+}
 
-using PrebuiltVhId          = osp::StrongId<uint32_t, struct DummyForPBV>;
-using PrebuiltVhIdReg_t     = osp::GlobalIdReg<PrebuiltVhId>;
-
-struct PrebuiltVehicles : osp::KeyedVec< PrebuiltVhId, std::unique_ptr<adera::VehicleData> >
+namespace ospgdext
 {
-    PrebuiltVehicles() = default;
-    OSP_MOVE_ONLY_CTOR_ASSIGN(PrebuiltVehicles);
-};
+using namespace osp;
 
-inline PrebuiltVhId const gc_pbvSimpleCommandServiceModule = PrebuiltVhIdReg_t::create();
 
-extern osp::fw::FeatureDef const ftrPrebuiltVehicles;
+extern osp::fw::FeatureDef const ftrGodot;
 
-} // namespace adera
+/**
+ * @brief stuff needed to render a scene using Magnum
+ */
+extern osp::fw::FeatureDef const ftrGodotScene;
+
+extern osp::fw::FeatureDef const ftrCameraControlGD;
+
+void sync_godot_ent(draw::DrawEnt ent, draw::ACtxSceneRender &rScnRender, draw::ACtxSceneRenderGd &rScnRenderGd, draw::RenderGd &rRenderGd) noexcept;
+
+} // namespace ospgdext
 

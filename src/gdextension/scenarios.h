@@ -1,6 +1,6 @@
 /**
  * Open Space Program
- * Copyright © 2019-2022 Open Space Program Project
+ * Copyright © 2019-2024 Open Space Program Project
  *
  * MIT License
  *
@@ -24,16 +24,28 @@
  */
 #pragma once
 
-#include <array>
-#include <cstdint>
+#include <osp/core/resourcetypes.h>
+#include <adera_app/feature_interfaces.h>
 
-namespace ospnewton
+#include <string_view>
+#include <unordered_map>
+
+namespace ospgdext
 {
 
-// Each rigid body is given 64 bits to enable/disable forces
-// These determine which physics calculations are required for a certain
-// rigid body, such as gravity, thurst, or aerodynamics.
-// Forces are assignable at runtime in ACtxNwtWorld::m_factors
-using ForceFactors_t = std::array<uint64_t, 1u>;
+struct ScenarioOption
+{
+    using Func_t = void(*)(osp::fw::Framework&, osp::fw::ContextId, osp::PkgId);
 
-}
+    std::string_view    name;
+    std::string_view    brief;
+    std::string_view    description;
+    Func_t              loadFunc;
+};
+
+
+using ScenarioMap_t = std::unordered_map<std::string_view, ScenarioOption>;
+
+ScenarioMap_t const &scenarios();
+
+} // namespace ospgdext

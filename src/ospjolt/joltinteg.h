@@ -104,7 +104,7 @@ inline osp::Quaternion QuatJoltToMagnum(Quat in)
 static bool AssertFailedImpl(const char *inExpression, const char *inMessage, const char *inFile, uint inLine)
 {
     // Print to the TTY
-    std::cout << inFile << ":" << inLine << ": (" << inExpression << ") " << (inMessage != nullptr? inMessage : "") << std::endl;
+    //std::cout << inFile << ":" << inLine << ": (" << inExpression << ") " << (inMessage != nullptr? inMessage : "") << std::endl;
 
     // Breakpoint
     return true;
@@ -261,7 +261,7 @@ public:
                     uint numBodyMutexes = 0, 
                     uint maxBodyPairs = 65536, 
                     uint maxContactConstraints = 10240
-                ) : m_pPhysicsSystem(std::make_unique<PhysicsSystem>()), 
+                ) : m_pPhysicsSystem(std::make_unique<PhysicsSystem>()),
                     m_temp_allocator(10 * 1024 * 1024),
                     m_joltJobSystem(std::make_unique<JobSystemThreadPool>(cMaxPhysicsJobs, cMaxPhysicsBarriers, threadCount))
     {
@@ -282,7 +282,7 @@ public:
     //Should this be called on world creation ? not ideal in case of multiple worlds.
     static void initJoltGlobal()
     {
-        std::call_once(ACtxJoltWorld::initFlag, ACtxJoltWorld::initJoltGlobalInternal);
+        ACtxJoltWorld::initJoltGlobalInternal();
     }
 
     
@@ -313,7 +313,6 @@ private:
 
     static void initJoltGlobalInternal() 
     {
-        
         RegisterDefaultAllocator();
 
         // Install trace and assert callbacks
