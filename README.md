@@ -5,59 +5,52 @@
 
 ![screenshot](screenshot0.png?raw=true "A Debug-rendered vehicle composed of parts flying over a planet.")
 
-***This project is still deep in the pre-release development phase***
+OpenSpaceProgram is an open source initiative with the goal of creating a realistic spacecraft building game inspired by Kerbal Space Program.
 
-OpenSpaceProgram is an open source initiative with the goal of creating a space flight simulator inspired by Kerbal Space Program. This project also works as a general-purpose library for space games and simulations with very large universes and multiple planetary systems.
+[[Website](https://openspaceprogram.org/)]  [[Discord Server](https://discord.gg/7xFsKRg)]
 
-Written in modern C++17, this project mainly features a custom game engine and a universe/orbit simulator, both relying on [EnTT](https://github.com/skypjack/entt/) and [Magnum](https://github.com/mosra/magnum). The universe and game engine are synchronized for a seamless spaceflight experience from a planet's surface to deep space.
+Putting gameplay details aside (art, story, progression, etc...), a game of this nature requires a massive and complicated universe simulation with intricate vehicles, rigid-body physics, orbits, and literally rocket science. To avoid inevitably creating an unmaintainable buggy mess, we need a strong foundation built with considerable amounts of engineering and passion.
 
-By taking advantage of Entity Component System (ECS) architectures and Data-Oriented Design, this project achieves simplicity, flexibility, low coupling, and excellent performance. With these techniques in action, we can easily avoid spaghetti code and optimize for a high part count.
+***Introducing OSP-Magnum***
+
+Goals:
+
+* Fast, multi-threaded, and runs on everything
+* Powerful API with mods / plugins
+* Components reusable in other similar projects
+
+After heavy iteration, it became apparent that it's impractical to build over an off-the-shelf game engine. Major components of OSP-Magnum (vehicles, planet terrain, code utilities, etc...) are designed as separate libraries that are usable on their own, independent of any game engine.
 
 ## Features
 
-### Core
-
-* Universe
-  * Support for Universes that use a hierarchical coordinate system, allowing sizes that can be described as:
-    * Big. Really big. You just won't believe how vastly, hugely, mindbogglingly big it is. I mean, you may think it's a long way down the road to the chemist's, but that's just peanuts.
-  * Arbitrary sized integers for coordinates within a particular layer of the hierarchy
-    * We use 64-bit integrer coordinates by default, but we're interested to see what people try out!
-  * Optimal data layout to support pluggable oribial mechanics algorithms, which includes
-    * Patched conics simulations -- like Kerbal Space Program's gameplay
-    * N-Body simulations -- like the KSP mod 'Principia'
-    * Build your own simulation logic!
-* "ActiveScene" Game Engine
-  * Scene Graph
-  * Configurable multipass Renderer
-  * Straightforward interface for integrating any physics engine
-    * Out of the box we integrate with Newton Dynamics 3.14c.
-    * PRs to support other physics engines welcome!!!
-  * Wiring/Connection System
-    * Resource flow between ship components
-      * Fuel
-      * Cargo
-      * Life support
-      * Tell us about your ideas!
-    * Virtual control systems for vehicles
-      * routable user inputs
-      * PID
-      * auto-landing
-      * Write your own!
-* Asset management
-  * Comes out of the box with glTF as a part model format
-  * Plugin-able ship part loader allowing arbitrary format support
-* Extendable Bulleted List system to briefly present implemented features
-
-### Extra
-
-* *Newton Dynamics* Physics Engine integration
-* Rockets, RCS, and Fuel tanks
-* Rocket exhaust plume effects 
+* C++20
+* Data-oriented design
+  * This basically means common data for multiple 'things' are often represented as big arrays instead of individual classes/objects
+  * Best utilizes the CPU you paid for, instead of being wasted by memory bottlenecks
+  * Simpler code, easier to multithread, and no overcomplicated inheritance hierarchy spaghetti
+  * Might be Entity-component-system???
+* Scene Graph
+* Jolt Physics integration
+* Vehicles
+  * Part model format uses Standard glTF
+  * 'Link System' - Parts communicate like components in a logic circuit simulator. (PID control anything, differential thrust, auto-landing... Too many possibilities!)
 * Planet terrain, Icosahedron-based tessellation
+* Tasks and Framework utilities
+* Runnable Test application demo
+  * OpenGL renderer using Magnum
+  
 
-### Test Application
+Upcoming major features
 
-To act as a temporary menu and scenario loader, a console-based test application is implemented. It is **written in simple C++**, making it an excellent start to understanding the rest of the codebase.
+* See https://github.com/TheOpenSpaceProgram/osp-magnum/issues?q=is%3Aissue+is%3Aopen+label%3Aplanned
+
+
+Notes:
+
+* No multi-threading is implemented yet
+  * Code is structured in a way that is easy to *efficiently* multithread in the future 
+  * Don't underestimate how fast a single thread can be. This won't be a problem for a while
+
 
 ## Building
 
@@ -82,77 +75,31 @@ cmake --build build-osp-magnum --parallel --config Release --target compile-test
 ctest --schedule-random --progress --output-on-failure --parallel --no-tests error --build-config Release --test-dir build-osp-magnum/test
 ```
 
-Run the game!
+Run the testapp!
 
 ```bash
 cd build-osp-magnum/Release
 ./osp-magnum
 ```
 
-If you just want to test out the project so far, then see the [Actions](https://github.com/TheOpenSpaceProgram/osp-magnum/actions) tab on GitHub to obtain automated builds for Linux or Windows.
+This will bring up the "OSP-Magnum Temporary Debug CLI." From here you can enter commands to run a scenario, like `vehicles`.
 
-## Controls
-These controls will seem familiar if you have played Kerbal Space Program!
-
-#### Navigating
-```bash
-V - Switch game mode
-
-ArrowUp    - Camera look up
-ArrowDown  - Camera look down
-ArrowLeft  - Camera look left
-ArrowRight - Camera look right
-
-RightMouse - Camera orbit
-
-W - Camera forward
-S - Camera backwards
-A - Camera left
-D - Camera right
-
-Q - Camera up
-E - Camera down
-```
-
-#### Flight
-```bash
-S - Vehicle pitch up
-W - Vehicle pitch down
-
-A - Vehicle yaw left
-D - Vehicle yaw right
-
-Q - Vehicle roll left
-E - Vehicle roll right
-
-Z - Vehicle thrust max
-X - Vehicle thrust min
-LShift - Vehicle thrust increment
-LCtrl  - Vehicle thrust decrement
-
-LCtrl+C | LShift+A - Vehicle self destruct
-```
-
-#### Misc
-```bash
-Space - Debug Throw
-LCtrl+1 - Debug Planet Update
-```
+If you just want to try the demo without building, then see the [Actions](https://github.com/TheOpenSpaceProgram/osp-magnum/actions) tab on GitHub to obtain automated builds for Linux or Windows.
 
 ## Contributing
 
 Our development team is very small right now. We need more crew to help to launch this project to its first release.
 
-Join our [Discord Server](https://discord.gg/7xFsKRg) for the latest discussions. You *don't* need to be a professional C++ developer to be involved or help! Graphics, sounds, game design, and scientific accuracy are important to this project too.
+You *don't* need to be a professional C++ developer to be involved or help! Graphics, sounds, game design, and scientific accuracy are important to this project too.
 
-Checkout [Architecture.md](docs/architecture.md) to get started with learning the codebase. Feel free to ask questions (even, and especially, the stupid ones); this will greatly help with documentation.
+### Resources
 
-## Simplified development roadmap
+* [Architecture.md](docs/architecture.md)
+* [Framework Unit test / Tutorial](test/framework/main.cpp)
+* [1 hour 30 minute long technical introduction video](https://www.youtube.com/watch?v=vdUllp9-E6k)
+* [Informal project history from BDFL's perspective](https://gist.github.com/Capital-Asterisk/a22c81ffff1bf20d5023bdd40909d31d)
 
-* Step 1: Make a space flight simulator
-* Step 2: Bloat it with features
-* Step 3: ???
-* Step 4: Fun!
+Feel free to ask questions on Github or Discord (even, and especially, the stupid ones); this will greatly help with documentation.
 
 ## Random Notes
 * This project might be codenamed 'adera'. the name of the street the 49 UBC bus was at while the project files were first created.
