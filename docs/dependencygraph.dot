@@ -2,56 +2,65 @@
 // $ dot -Tpng docs/dependencygraph.dot -o docs/dependencygraph.png
 digraph {
 
-    rankdir="BT"
+    rankdir="TB"
+    TBbalance="max"
+    bgcolor="#181122"
+    //bgcolor=transparent
+    node [color=transparent,  fontcolor=white, fontname="Nimbus Sans bold"]
+    edge [color=white]
 
-    node [shape=rectangle, style=filled, fillcolor=palevioletred2]
+    node [shape=rectangle, style=filled, fillcolor=darkorchid4]
     "EnTT"
-    "Longeron++"
     "Magnum & Corrade"
     "Magnum/GL";
-    "Newton Dynamics";
+    "Jolt Physics";
+    "Longeron++" [fillcolor="#003758"];
 
-    node [shape=rectangle, style=filled, fillcolor=white]
+
+    node [shape=rectangle, style=filled, fillcolor="#0276bc"]
     "osp/core"          -> "Magnum & Corrade";
     "osp/core"          -> "Longeron++";
     "osp/core"          -> "EnTT";
     "osp/activescene"   -> "osp/vehicles";
     "osp/activescene"   -> "osp/link";
     "osp/drawing"       -> "osp/activescene";
-    "osp/drawing_gl"    -> "osp/drawing";
-    "osp/drawing_gl"    -> "osp/util";
-    "osp/drawing_gl"    -> "Magnum/GL";
     "osp/link"          -> "osp/core";
     "osp/scientific"    -> "osp/core";
     "osp/tasks"         -> "osp/core";
     "osp/vehicles"      -> "osp/scientific";
     "osp/universe"      -> "osp/core";
     "osp/util"          -> "osp/core";
+    "osp/framework"     -> "osp/tasks";
+    "osp/framework"     -> "osp/util";
 
-    node [shape=rectangle, style=filled, fillcolor=lightblue1]
+    node [shape=rectangle, style=filled, fillcolor="#003758"]
+    
     "adera/activescene" -> "osp/activescene";
     "adera/drawing"     -> "osp/activescene";
-    "adera/drawing_gl"  -> "osp/drawing_gl";
-    "adera/drawing_gl"  -> "osp/util";
+    "adera_drawing_gl"  -> "osp_drawing_gl";
+    "osp_drawing_gl"    -> "osp/drawing";
+    "osp_drawing_gl"    -> "osp/util";
+    "osp_drawing_gl"    -> "Magnum/GL";
     "adera/machines"    -> "osp/link";
+    "adera_app"         -> "osp/framework";
+    "adera_app"         -> "osp/universe";
+    "adera_app"         -> "osp/tasks";
+    "adera_app"         -> "adera/machines";
+    "adera_app"         -> "adera/drawing";
+    "adera_app"         -> "ospjolt";
+    "adera_app"         -> "planet-a";
+    "adera_app"         -> "adera/activescene";
 
     node [shape=rectangle, style=filled, fillcolor=lightslateblue]
-    "ospnewton/activescene" -> "osp/activescene";
-    "ospnewton/activescene" -> "Newton Dynamics";
+    "ospjolt"           -> "osp/activescene";
+    "ospjolt"           -> "Jolt Physics";
 
     node [shape=rectangle, style=filled, fillcolor=palegreen1]
     "planet-a"          -> "osp/core";
 
-    node [shape=rectangle, style=filled, fillcolor=orange1]
-    "testapp/sessions"  -> "osp/universe";
-    "testapp/sessions"  -> "osp/tasks";
-    "testapp/sessions"  -> "adera/machines";
-    "testapp/sessions"  -> "adera/drawing_gl";
-    "testapp/sessions"  -> "adera/drawing";
-    "testapp/sessions"  -> "ospnewton/activescene";
-    "testapp/sessions"  -> "planet-a";
-    "testapp/sessions"  -> "adera/activescene";
-    "testapp"           -> "testapp/sessions";
+    node [shape=rectangle, style=filled, fillcolor="#fe9800"]
+    "testapp"           -> "adera_app";
+    "testapp"           -> "adera_drawing_gl";
 
 
 

@@ -18,15 +18,28 @@ Welcome aboard! This document presents a high level overview of the project, aim
 ## Directories
 
 ![Dependency graph](dependencygraph.png)
-*osp-magnum ./src folder dependency graph. This visualizes how major components (each with their own directory) depend on each other. Some external dependencies are also shown (in pink)*
+*osp-magnum ./src folder dependency graph between major components. Components depend on each other by `#include`-ing header files of another component.*
 
-* `src/osp` - Core components for a spaceflight simulator.
-* `src/adera` - Fun stuff. More gameplay and visual-effects focused.
-* `src/planet-a` - Planet terrain subdivision code.
-* `src/ospnewton` - Newton Dynamics physics engine integration
-* `src/testapp` - Runnable application. Assembles everything to make test scenarios.
+Legend:
 
-Most components are separate building blocks (with intended uses). The 'game engine' only comes into existence within `testapp`.
+* Light Blue - `src/osp` subdirectory. 'Main fundemental core stuff' library
+* Dark Blue - Other subdirectories / libraries that are ours.
+* Purple - External Libraries. Not our code.
+
+Important notes:
+
+* `osp/core` contains basic C++ stuff: containers, math, and utilities. Nothing space-related.
+* [Magnum](https://github.com/mosra/magnum) (and its utility library Corrade) is used for their math and containers (i.e.: `Vector3` and `ArrayView`). Its OpenGL features are used only by `*_drawing_gl` and `testapp`.
+* [EnTT](https://github.com/skypjack/entt/) is used for metaprogramming and containers. Its Entity-Component-System features (specifically entt::registry) are not used; they were used in OSP in the past, but the codebase has moved on since then.
+* [Longeron++](https://github.com/Capital-Asterisk/longeronpp) Core components of OSP, but the BDFL decided to move them into a separate library.
+* `osp/util` contains bigger (mostly self-contained) components that are intended for an application (not a library). So far this contains logging and user input processing.
+* `osp/activescene` is your typical game engine 'scene graph'. This represents a 3D world of entities (ActiveEnt) that can be parented to each other and have physical properties.
+* `osp/drawing` describes a set of entities (DrawEnt) that can be drawn; not specific to any rendering backend. (i.e.: A 'green cube' can be represented with DrawEnts, and it's up to whatever rendering backend we use to interpret that).
+* `planet-a` generates planet terrain meshs. This code creates plain arrays of vertices and indices that are *intended* to be loaded into the physics engine or GPU, but doesn't have any of its own code for that.
+* `ospjolt` integrates [Jolt Physics](https://github.com/jrouwe/JoltPhysics) to use as a rigid body physics engine for `osp/activescene`.
+* `adera` is for fun stuff. More gameplay and visual-effects focused.
+* `adera_app` gathers together many different components and uses `osp/framework` to package them into composable 'Features' to be used in an application.
+* `src/testapp` sits at the top as a runnable application. Assembles everything to make test scenarios.
 
 ## Philosophy
 
