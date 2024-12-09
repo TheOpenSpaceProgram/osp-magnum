@@ -106,6 +106,6 @@ Feel free to ask questions on Github or Discord (even, and especially, the stupi
 * If there are problems with DPI scaling, then run with command line arguments `--magnum-dpi-scaling 1.0`
 * As a general-purpose space flight simulator with no reliance on a heavy game engine, this project might have some real applications for aerospace simulation and visualization, such as:
   * Education
-  * Amature rocketry
+  * Amateur rocketry
   * Small aerospace companies
 * This project isn't intended to be much of a "clone" of Kerbal Space Program. As of now, it's mostly a game engine intended for space flight, with no real gameplay yet.
