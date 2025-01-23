@@ -334,7 +334,7 @@ static ScenarioMap_t make_scenarios()
         sceneCB.add_feature(ftrCommonScene, rTestApp.m_defaultPkg);
         sceneCB.add_feature(ftrPhysics);
         sceneCB.add_feature(ftrPhysicsShapes, osp::draw::MaterialId{0});
-        sceneCB.add_feature(ftrDroppers);
+        //sceneCB.add_feature(ftrDroppers);
         sceneCB.add_feature(ftrBounds);
 
         sceneCB.add_feature(ftrJolt);
@@ -350,7 +350,7 @@ static ScenarioMap_t make_scenarios()
 
         ospjolt::ForceFactors_t const gravity = add_constant_acceleration(sc_gravityForce, rFW, sceneCtx);
         set_phys_shape_factors(gravity, rFW, sceneCtx);
-        add_floor(rFW, sceneCtx, rTestApp.m_defaultPkg, 0);
+        //add_floor(rFW, sceneCtx, rTestApp.m_defaultPkg, 0);
     }});
 
 

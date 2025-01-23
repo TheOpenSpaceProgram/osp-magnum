@@ -515,19 +515,6 @@ struct FITerrainDbgDraw {
 
 // Universe sessions
 
-struct FIUniCore {
-    struct DataIds {
-        DataId universe;
-        DataId deltaTimeIn;
-    };
-
-    struct Pipelines {
-        PipelineDef<EStgOptn> update            {"update            - Universe update"};
-        PipelineDef<EStgIntr> transfer          {"transfer"};
-    };
-};
-
-
 struct FIUniSceneFrame {
     struct DataIds {
         DataId scnFrame;
@@ -548,13 +535,7 @@ struct FIUniPlanets {
     struct Pipelines { };
 };
 
-struct FIUniPlanetsDraw {
-    struct DataIds {
-        DataId planetDraw;
-    };
 
-    struct Pipelines { };
-};
 
 
 //-----------------------------------------------------------------------------
