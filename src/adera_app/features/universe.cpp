@@ -116,24 +116,23 @@ FeatureDef const ftrUniverseTestPlanets = feature_def("UniverseTestPlanets", [] 
     // rotations.
     // TODO: Alignment is needed for SIMD (not yet implemented). see Corrade alignedAlloc
 
-    std::size_t bytesUsed = 0;
-
     // Positions and velocities are arranged as XXXX... YYYY... ZZZZ...
-    partition(bytesUsed, planetCount, rMainSpaceCommon.m_satPositions[0]);
-    partition(bytesUsed, planetCount, rMainSpaceCommon.m_satPositions[1]);
-    partition(bytesUsed, planetCount, rMainSpaceCommon.m_satPositions[2]);
-    partition(bytesUsed, planetCount, rMainSpaceCommon.m_satVelocities[0]);
-    partition(bytesUsed, planetCount, rMainSpaceCommon.m_satVelocities[1]);
-    partition(bytesUsed, planetCount, rMainSpaceCommon.m_satVelocities[2]);
+    osp::BufferFormatBuilder fb;
+    rMainSpaceCommon.m_satPositions [0] = fb.insert_block<spaceint_t>(planetCount);
+    rMainSpaceCommon.m_satPositions [1] = fb.insert_block<spaceint_t>(planetCount);
+    rMainSpaceCommon.m_satPositions [2] = fb.insert_block<spaceint_t>(planetCount);
+    rMainSpaceCommon.m_satVelocities[0] = fb.insert_block<double>(planetCount);
+    rMainSpaceCommon.m_satVelocities[1] = fb.insert_block<double>(planetCount);
+    rMainSpaceCommon.m_satVelocities[2] = fb.insert_block<double>(planetCount);
 
     // Rotations use XYZWXYZWXYZWXYZW...
-    partition(bytesUsed, planetCount, rMainSpaceCommon.m_satRotations[0],
+    fb.insert_interleave(planetCount, rMainSpaceCommon.m_satRotations[0],
                                       rMainSpaceCommon.m_satRotations[1],
                                       rMainSpaceCommon.m_satRotations[2],
                                       rMainSpaceCommon.m_satRotations[3]);
 
     // Allocate data for all planets
-    rMainSpaceCommon.m_data = Array<unsigned char>{Corrade::NoInit, bytesUsed};
+    rMainSpaceCommon.m_data = Array<std::byte>{Corrade::NoInit, fb.total_size()};
 
     // Create easily accessible array views for each component
     auto const [x, y, z]        = sat_views(rMainSpaceCommon.m_satPositions,  rMainSpaceCommon.m_data, planetCount);
@@ -527,28 +526,27 @@ FeatureDef const ftrSolarSystem = feature_def("SolarSystem", [] (
     // rotations.
     // TODO: Alignment is needed for SIMD (not yet implemented). see Corrade alignedAlloc
 
-    std::size_t bytesUsed = 0;
-
     // Positions and velocities are arranged as XXXX... YYYY... ZZZZ...
-    partition(bytesUsed, c_planetCount, rMainSpaceCommon.m_satPositions[0]);
-    partition(bytesUsed, c_planetCount, rMainSpaceCommon.m_satPositions[1]);
-    partition(bytesUsed, c_planetCount, rMainSpaceCommon.m_satPositions[2]);
-    partition(bytesUsed, c_planetCount, rMainSpaceCommon.m_satVelocities[0]);
-    partition(bytesUsed, c_planetCount, rMainSpaceCommon.m_satVelocities[1]);
-    partition(bytesUsed, c_planetCount, rMainSpaceCommon.m_satVelocities[2]);
+    osp::BufferFormatBuilder fb;
+    rMainSpaceCommon.m_satPositions [0] = fb.insert_block<spaceint_t>(c_planetCount);
+    rMainSpaceCommon.m_satPositions [1] = fb.insert_block<spaceint_t>(c_planetCount);
+    rMainSpaceCommon.m_satPositions [2] = fb.insert_block<spaceint_t>(c_planetCount);
+    rMainSpaceCommon.m_satVelocities[0] = fb.insert_block<double>(c_planetCount);
+    rMainSpaceCommon.m_satVelocities[1] = fb.insert_block<double>(c_planetCount);
+    rMainSpaceCommon.m_satVelocities[2] = fb.insert_block<double>(c_planetCount);
 
     // Rotations use XYZWXYZWXYZWXYZW...
-    partition(bytesUsed, c_planetCount, rMainSpaceCommon.m_satRotations[0],
-        rMainSpaceCommon.m_satRotations[1],
-        rMainSpaceCommon.m_satRotations[2],
-        rMainSpaceCommon.m_satRotations[3]);
+    fb.insert_interleave(c_planetCount, rMainSpaceCommon.m_satRotations[0],
+                                        rMainSpaceCommon.m_satRotations[1],
+                                        rMainSpaceCommon.m_satRotations[2],
+                                        rMainSpaceCommon.m_satRotations[3]);
 
-    partition(bytesUsed, c_planetCount, rCoordNBody[mainSpace].mass);
-    partition(bytesUsed, c_planetCount, rCoordNBody[mainSpace].radius);
-    partition(bytesUsed, c_planetCount, rCoordNBody[mainSpace].color);
+    rCoordNBody[mainSpace].mass = fb.insert_block<float>(c_planetCount);
+    rCoordNBody[mainSpace].radius = fb.insert_block<float>(c_planetCount);
+    rCoordNBody[mainSpace].color = fb.insert_block<Magnum::Color3>(c_planetCount);
 
     // Allocate data for all planets
-    rMainSpaceCommon.m_data = Array<unsigned char>{ Corrade::NoInit, bytesUsed };
+    rMainSpaceCommon.m_data = Array<std::byte>{ Corrade::NoInit, fb.total_size() };
 
     std::size_t nextBody = 0;
     auto const add_body = [&rMainSpaceCommon, &nextBody, &rCoordNBody, &mainSpace] (

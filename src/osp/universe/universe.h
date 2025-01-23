@@ -25,6 +25,8 @@
 #pragma once
 
 #include "../core/math_types.h"
+#include "../core/buffer_format.h"
+
 #include "universetypes.h"
 
 #include <longeron/id_management/registry_stl.hpp>
@@ -38,38 +40,6 @@
 namespace osp::universe
 {
 
-struct StrideDesc
-{
-    constexpr bool not_used() const noexcept { return m_stride == 0; }
-
-    std::size_t     m_offset{0};
-    std::ptrdiff_t  m_stride{0};
-};
-
-/**
- * @brief Describes strided data within an externally stored buffer
- */
-template <typename T>
-struct TypedStrideDesc : StrideDesc
-{
-    using View_t        = Corrade::Containers::StridedArrayView1D<T>;
-    using ViewConst_t   = Corrade::Containers::StridedArrayView1D<T const>;
-    using Data_t        = Corrade::Containers::ArrayView<unsigned char>;
-    using DataConst_t   = Corrade::Containers::ArrayView<unsigned char const>;
-
-    constexpr View_t view(Data_t data, std::size_t count) const noexcept
-    {
-        return stridedArrayView<T>(data, reinterpret_cast<T*>(&data[m_offset]), count, m_stride);
-    }
-
-    constexpr ViewConst_t view(DataConst_t data, std::size_t count) const noexcept
-    {
-        return stridedArrayView<T>(data, reinterpret_cast<T const*>(&data[m_offset]), count, m_stride);
-    }
-};
-
-template <typename T, std::size_t N>
-using StrideDescArray_t = std::array<TypedStrideDesc<T>, N>;
 
 struct CoSpaceHierarchy
 {
@@ -87,17 +57,21 @@ struct CoSpaceTransform
     int             m_precision{10}; // 1 meter = 2^m_precision
 };
 
+template <typename T, std::size_t N>
+using BufferAttribArray_t = std::array<BufAttribFormat<T>, N>;
+
+
 struct CoSpaceSatData
 {
     uint32_t        m_satCount;
     uint32_t        m_satCapacity;
 
-    Corrade::Containers::Array<unsigned char>   m_data;
+    Corrade::Containers::Array<std::byte>   m_data;
 
     // Describes m_data
-    StrideDescArray_t<spaceint_t, 3>            m_satPositions;
-    StrideDescArray_t<double, 3>                m_satVelocities;
-    StrideDescArray_t<double, 4>                m_satRotations;
+    BufferAttribArray_t<spaceint_t, 3>      m_satPositions;
+    BufferAttribArray_t<double, 3>          m_satVelocities;
+    BufferAttribArray_t<double, 4>          m_satRotations;
 };
 
 
@@ -118,29 +92,6 @@ struct SceneFrame : CoSpaceTransform, CoSpaceHierarchy
 {
     Vector3g m_scenePosition;
 };
-
-template <typename FIRST_T, typename ... T>
-constexpr void aux_partition(std::size_t const pos, TypedStrideDesc<FIRST_T>& rInterleveFirst, TypedStrideDesc<T>& ... rInterleve)
-{
-    rInterleveFirst.m_offset = pos;
-
-    if constexpr (sizeof...(T) != 0)
-    {
-        aux_partition(pos + sizeof(FIRST_T), rInterleve ...);
-    }
-}
-
-template <typename ... T>
-constexpr void partition(std::size_t& rPos, std::size_t count, TypedStrideDesc<T>& ... rInterleve)
-{
-    constexpr std::size_t stride = (sizeof(T) + ...);
-
-    (rInterleve.m_stride = ... = stride);
-
-    aux_partition(rPos, rInterleve ...);
-
-    rPos += stride * count;
-}
 
 // INDEX_T is a template parameter to allow passing in "strong typedef" types,
 // like enum classes and having them converted without warning to size_t.
@@ -164,7 +115,7 @@ constexpr VEC_T to_vec(INDEX_T i, RANGE_T&& ... args) noexcept
  */
 template <typename T, std::size_t DIMENSIONS_T, typename DATA_T, std::size_t ... COUNT_T>
 constexpr auto sat_views(
-        StrideDescArray_t<T, DIMENSIONS_T> const& strideDescArray,
+        BufferAttribArray_t<T, DIMENSIONS_T> const& strideDescArray,
         DATA_T &rData,
         std::size_t satCount) noexcept
 {
