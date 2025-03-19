@@ -22,8 +22,8 @@
 # OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 # SOFTWARE.
 ##
-PROJECT(test_syncexec CXX)
+PROJECT(test_sync_graph CXX)
 ADD_TEST_DIRECTORY(${PROJECT_NAME})
 
-TARGET_LINK_LIBRARIES(test_syncexec PRIVATE longeron EnTT::EnTT Magnum::Magnum)
+TARGET_LINK_LIBRARIES(${PROJECT_NAME} PRIVATE longeron EnTT::EnTT Magnum::Magnum)
 #TARGET_SOURCES(test_syncexec PRIVATE "${CMAKE_SOURCE_DIR}/src/osp/tasks/tasks.cpp" "${CMAKE_SOURCE_DIR}/src/osp/tasks/execute.cpp")
