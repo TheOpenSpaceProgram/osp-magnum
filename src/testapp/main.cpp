@@ -34,7 +34,7 @@
 
 #include <osp/util/logging.h>
 #include <osp/framework/builder.h>
-#include <osp/framework/executor.h>
+#include <osp/executor/single_threaded.h>
 
 #include <Corrade/Utility/Arguments.h>
 
@@ -51,8 +51,8 @@ using namespace ftr_inter::stages;
 // called only from commands to display information
 void print_help();
 
-osp::fw::SingleThreadedExecutor g_executor;
-TestApp                         g_testApp;
+osp::exec::SingleThreadedExecutor g_executor;
+TestApp                           g_testApp;
 
 osp::Logger_t g_mainThreadLogger;
 osp::Logger_t g_logExecutor;

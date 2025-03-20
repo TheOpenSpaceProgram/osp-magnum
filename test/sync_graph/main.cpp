@@ -23,98 +23,27 @@
  * SOFTWARE.
  */
 
+#include "graph_builder.h"
+
 #include <gtest/gtest.h>
 
+#include <osp/sync_graph/graph.h>
 
-#include <osp/core/array_view.h>
-#include <osp/core/strong_id.h>
 #include <osp/core/keyed_vector.h>
 
-#include <longeron/id_management/registry_stl.hpp>
 #include <longeron/id_management/id_set_stl.hpp>
 
 #include <vector>
 #include <iostream>
 
-using SubgraphId        = osp::StrongId<std::uint32_t, struct DummyForSubgraphId>;
-using SubgraphTypeId    = osp::StrongId<std::uint32_t, struct DummyForSubgraphTypeId>;
-using LocalPointId      = osp::StrongId<std::uint8_t, struct DummyForLocalPointId>;
-using LocalCycleId      = osp::StrongId<std::uint8_t, struct DummyForLocalCycleId>;
-using SynchronizerId    = osp::StrongId<std::uint8_t, struct DummyForSynchronizerId>;
 
-struct SubgraphType
-{
-    struct Cycle
-    {
-        std::string debugName;
-        std::vector<LocalPointId> path;
-    };
-
-    struct Point
-    {
-        std::string debugName;
-    };
-
-    std::string debugName;
-
-    osp::KeyedVec<LocalCycleId, Cycle> cycles;
-
-    osp::KeyedVec<LocalPointId, Point> points;
-    std::uint8_t pointCount{0};
-
-    LocalCycleId initialCycle;
-    std::uint8_t initialPos;
-};
-
-struct Subgraph
-{
-    struct Point
-    {
-        std::vector<SynchronizerId> connectedSyncs;
-    };
-
-    SubgraphTypeId instanceOf; ///< This graph is an instance of which type?
-    osp::KeyedVec<LocalPointId, Point> points;
-    std::string debugName;
-};
-
-struct SubgraphPointAddr
-{
-    SubgraphId      subgraph;
-    LocalPointId    point;
-
-    constexpr auto operator<=>(SubgraphPointAddr const&) const = default;
-};
-
-struct Synchronizer
-{
-    std::string debugName;
-    std::vector<SubgraphPointAddr> connectedPoints;
-};
-
-/**
- *
- * invariants:
- * * Two-way connection between a synchronizer and connected points:
- *   * syncs[SYNC].connectedPoints                       must contain Addr(SUBGRAPH, POINT)
- *   * subgraphs[SUBGRAPH].points[POINT].connectedSyncs  must contain SYNC
- *
- */
-struct Graph
-{
-    lgrn::IdRegistryStl<SubgraphId>             subgraphIds;
-    osp::KeyedVec<SubgraphId, Subgraph>         subgraphs;
-
-    lgrn::IdRegistryStl<SubgraphTypeId>         sgtypeIds;
-    osp::KeyedVec<SubgraphTypeId, SubgraphType> sgtypes;
-
-    lgrn::IdRegistryStl<SynchronizerId>         syncIds;
-    osp::KeyedVec<SynchronizerId, Synchronizer> syncs;
-};
 
 // probably initialized with uninitialized memory
 template<typename ID_T, std::size_t SIZE>
 using StaticIdSet_t = lgrn::BitViewIdSet<lgrn::BitView<std::array<std::uint64_t, SIZE/64>>, ID_T>;
+
+
+using namespace test_graph;
 
 /**
  * data required to execute a Graph. Graph stays constant during execution.
@@ -356,218 +285,13 @@ struct Executor
         batch(action, osp::arrayView(syncs), graph);
     }
 
-    lgrn::IdSetStl<SubgraphId>     toCycle;
-    std::vector<SubgraphId>  toCyclcErase;
+    lgrn::IdSetStl<SubgraphId>              toCycle;
+    std::vector<SubgraphId>                 toCyclcErase;
 
     osp::KeyedVec<SubgraphId, PerSubgraph>  perSubgraph;
     osp::KeyedVec<SynchronizerId, PerSync>  perSync;
 };
 
-
-// Most of the main codebase uses strong ID types and variable names, which are fast and harder
-// to mess up, but string names are more 'stupid simple'. Great for a small unit test.
-
-struct ArgCycle
-{
-    std::string_view name;
-    std::initializer_list<std::string_view> path;
-};
-
-struct ArgInitialCycle
-{
-    std::string_view cycle;
-    std::uint8_t position;
-};
-
-struct ArgSubgraphType
-{
-    std::string_view name;
-    std::initializer_list<std::string_view> points;
-    std::initializer_list<ArgCycle> cycles;
-    ArgInitialCycle initialCycle;
-};
-
-struct ArgSubgraph
-{
-    std::string_view name;
-    std::string_view type;
-};
-
-struct ArgConnectToPoint
-{
-    std::string_view subgraph;
-    std::string_view point;
-
-};
-
-struct ArgSync
-{
-    std::string_view name;
-    std::initializer_list<ArgConnectToPoint> connections;
-};
-
-struct Args
-{
-    std::initializer_list<ArgSubgraphType> types;
-    std::initializer_list<ArgSubgraph> subgraphs;
-    std::initializer_list<ArgSync> syncs;
-};
-
-SubgraphId find_subgraph(std::string_view debugName, Graph const& graph)
-{
-    auto const &subgraphFirstIt = graph.subgraphs.begin();
-    auto const &subgraphLastIt  = graph.subgraphs.end();
-    auto const foundIt = std::find_if(
-            subgraphFirstIt, subgraphLastIt,
-            [debugName] (Subgraph const& subgraph)
-            { return subgraph.debugName == debugName; });
-    return foundIt == subgraphLastIt
-            ? SubgraphId{}
-            : SubgraphId::from_index(std::distance(subgraphFirstIt, foundIt));
-}
-
-LocalCycleId find_cycle(std::string_view debugName, SubgraphTypeId sgtypeId, Graph const& graph)
-{
-    SubgraphType const type       = graph.sgtypes[sgtypeId];
-    auto const &cyclesFirstIt = type.cycles.begin();
-    auto const &cyclesLastIt  = type.cycles.end();
-    auto const foundIt = std::find_if(
-            cyclesFirstIt, cyclesLastIt,
-            [debugName] (SubgraphType::Cycle const& cycle)
-            { return cycle.debugName == debugName; });
-    return foundIt == cyclesLastIt
-            ? LocalCycleId{}
-            : LocalCycleId::from_index(std::distance(cyclesFirstIt, foundIt));
-}
-
-SubgraphTypeId find_sgtype(std::string_view debugName, Graph const& graph)
-{
-    auto const &sgtypeFirstIt = graph.sgtypes.begin();
-    auto const &sgtypeLastIt = graph.sgtypes.end();
-    auto const foundIt = std::find_if(sgtypeFirstIt, sgtypeLastIt,
-            [debugName] (SubgraphType const& sgtype)
-            { return sgtype.debugName == debugName; });
-    return SubgraphTypeId::from_index(std::distance(sgtypeFirstIt, foundIt));
-}
-
-SynchronizerId find_sync(std::string_view debugName, Graph const& graph)
-{
-    auto const &syncFirstIt = graph.syncs.begin();
-    auto const &syncLastIt = graph.syncs.end();
-    auto const foundIt = std::find_if(syncFirstIt, syncLastIt,
-            [debugName] (Synchronizer const& sync)
-            { return sync.debugName == debugName; });
-    return SynchronizerId::from_index(std::distance(syncFirstIt, foundIt));
-}
-
-Graph make_test_graph(Args args)
-{
-    Graph out;
-
-    out.sgtypeIds.reserve(args.types.size());
-    out.sgtypes.resize(out.sgtypeIds.capacity());
-
-    out.subgraphIds.reserve(args.subgraphs.size());
-    out.subgraphs.resize(out.subgraphIds.capacity());
-
-    out.syncIds.reserve(args.syncs.size());
-    out.syncs.resize(out.syncIds.capacity());
-
-    // Make subgraph types
-    for (ArgSubgraphType const& argSgtype : args.types)
-    {
-        SubgraphTypeId const subgraphTypeId = out.sgtypeIds.create();
-        SubgraphType &rSgtype =  out.sgtypes[subgraphTypeId];
-
-        rSgtype.debugName = argSgtype.name;
-
-        // set point count and names
-        int const pointCount = argSgtype.points.size();
-        rSgtype.pointCount = std::uint8_t(pointCount);
-        rSgtype.points.resize(pointCount);
-        for (int i = 0; i < pointCount; ++i)
-        {
-            rSgtype.points[LocalPointId::from_index(i)].debugName = argSgtype.points.begin()[i];
-        }
-
-        auto const& pointsFirstIt = rSgtype.points.begin();
-        auto const& pointsLastIt = rSgtype.points.end();
-
-        // make cycles
-        rSgtype.cycles.resize(argSgtype.cycles.size());
-        for (int i = 0; i < argSgtype.cycles.size(); ++i)
-        {
-            auto const cycleId = LocalCycleId::from_index(i);
-            auto const& argCycle = argSgtype.cycles.begin()[i];
-            SubgraphType::Cycle &rCycle = rSgtype.cycles[cycleId];
-
-            rCycle.debugName = argCycle.name;
-            if (rCycle.debugName == argSgtype.initialCycle.cycle)
-            {
-                rSgtype.initialCycle = cycleId;
-                rSgtype.initialPos   = argSgtype.initialCycle.position;
-            }
-
-            for (std::string_view const pointName : argCycle.path)
-            {
-                auto foundIt = std::find_if(pointsFirstIt, pointsLastIt,
-                                            [pointName] (SubgraphType::Point const& point)
-                                            { return point.debugName == pointName; });
-
-                LGRN_ASSERTMV(foundIt != pointsLastIt, "No point with name found", pointName, rSgtype.debugName);
-                rCycle.path.push_back(LocalPointId::from_index(std::distance(pointsFirstIt, foundIt)));
-            }
-        }
-        LGRN_ASSERTM(rSgtype.initialCycle.has_value(), "Initial cycle is missing");
-    }
-
-    // Make Subgraphs
-    for (ArgSubgraph const& argSubgraph : args.subgraphs)
-    {
-        SubgraphId const subgraphId = out.subgraphIds.create();
-        Subgraph &rSubgraph = out.subgraphs[subgraphId];
-
-        rSubgraph.debugName = argSubgraph.name;
-
-        // Find SubgraphTypeId by name to set rSubgraph.instanceOf
-        rSubgraph.instanceOf = find_sgtype(argSubgraph.type, out);
-        LGRN_ASSERTMV(subgraphId.has_value(), "No SubgraphType with name found", argSubgraph.type);
-
-        rSubgraph.points.resize(out.sgtypes[rSubgraph.instanceOf].pointCount);
-    }
-
-    // Make synchronizers
-    for (ArgSync const& argSync : args.syncs)
-    {
-        SynchronizerId const syncId = out.syncIds.create();
-        Synchronizer &rSync = out.syncs[syncId];
-
-        rSync.debugName = argSync.name;
-
-        for (ArgConnectToPoint const& argConnect : argSync.connections)
-        {
-            SubgraphId const subgraphId = find_subgraph(argConnect.subgraph, out);
-            LGRN_ASSERTMV(subgraphId.has_value(), "No Subgraph with name found", argConnect.subgraph);
-            Subgraph &rSubgraph = out.subgraphs[subgraphId];
-
-            SubgraphType const& sgtype = out.sgtypes[rSubgraph.instanceOf];
-            auto const &pointsFirst = sgtype.points.begin();
-            auto const &pointsLast  = sgtype.points.end();
-
-            auto const foundPointIt = std::find_if(
-                    pointsFirst, pointsLast,
-                    [argConnect] (SubgraphType::Point const& point)
-                    { return point.debugName == argConnect.point; });
-            LGRN_ASSERTMV(foundPointIt != pointsLast, "No Point with name found", argConnect.subgraph, sgtype.debugName, argConnect.point);
-            auto const pointId = LocalPointId::from_index(std::distance(pointsFirst, foundPointIt));
-
-            rSubgraph.points[pointId].connectedSyncs.push_back(syncId);
-            rSync.connectedPoints.push_back({subgraphId, pointId});
-        }
-    }
-
-    return out;
-} // make_test_graph
 
 testing::AssertionResult is_locked(std::initializer_list<SynchronizerId> locked, Executor& rExec, std::vector<SynchronizerId> &rJustLocked, Graph const& graph)
 {
@@ -1142,7 +866,7 @@ TEST(SyncExec, NestedLoop)
         }
     });
 
-    SubgraphTypeId const blkCtrl            = find_sgtype("BlockController",                   graph);
+    SubgraphTypeId const blkCtrl            = find_sgtype("BlockController",                       graph);
     SubgraphTypeId const ospPipeline        = find_sgtype("OSP-Style Intermediate-Value Pipeline", graph);
 
     LocalCycleId   const blkCtrlControl     = find_cycle("Control",  ospPipeline, graph);
@@ -1153,10 +877,10 @@ TEST(SyncExec, NestedLoop)
     LocalCycleId   const ospPipelineRunning = find_cycle("Running",  ospPipeline, graph);
     LocalCycleId   const ospPipelineCancel  = find_cycle("Canceled", ospPipeline, graph);
 
-    SubgraphId     const outerBlkCtrl       = find_subgraph("OuterBlkCtrl",  graph);
+    SubgraphId     const outerBlkCtrl       = find_subgraph("OuterBlkCtrl",   graph);
     SubgraphId     const outerRequests      = find_subgraph("Outer-Request",  graph);
     SubgraphId     const outerResults       = find_subgraph("Outer-Results",  graph);
-    SubgraphId     const innerBlkCtrl       = find_subgraph("InnerBlkCtrl",  graph);
+    SubgraphId     const innerBlkCtrl       = find_subgraph("InnerBlkCtrl",   graph);
     SubgraphId     const innerProcess0      = find_subgraph("Inner-Process0", graph);
     SubgraphId     const innerProcess1      = find_subgraph("Inner-Process1", graph);
 
@@ -1173,8 +897,8 @@ TEST(SyncExec, NestedLoop)
     SynchronizerId const syInrLCRight       = find_sync("syInrLCRight",     graph);
     SynchronizerId const syInrLCSchInit     = find_sync("syInrLCSchInit",   graph);
     SynchronizerId const syTaskO0           = find_sync("syTaskO0",         graph);
-    SynchronizerId const syTaskP0S          = find_sync("syTaskP0S",         graph);
-    SynchronizerId const syTaskP1S          = find_sync("syTaskP1S",         graph);
+    SynchronizerId const syTaskP0S          = find_sync("syTaskP0S",        graph);
+    SynchronizerId const syTaskP1S          = find_sync("syTaskP1S",        graph);
 
     SynchronizerId const syTaskL0ext        = find_sync("syTaskL0ext",      graph);
     SynchronizerId const syTaskL0sus        = find_sync("syTaskL0sus",      graph);

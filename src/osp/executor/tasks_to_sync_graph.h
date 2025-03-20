@@ -1,6 +1,6 @@
 /**
  * Open Space Program
- * Copyright © 2019-2023 Open Space Program Project
+ * Copyright © 2019-2025 Open Space Program Project
  *
  * MIT License
  *
@@ -22,14 +22,10 @@
  * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
  * SOFTWARE.
  */
-#include "tasks.h"
+#pragma once
+/**
+ * @file
+ * @brief Utilities and types to build an `osp::sync::Graph` from an `osp::tasks::Task`
+ */
 
-#include <longeron/id_management/id_set_stl.hpp>
-
-#include <array>
-
-namespace osp
-{
-
-} // namespace osp
 

@@ -51,7 +51,7 @@
  *
  * This does it quite well so better be the correct API, or is at least close to the ideal solution.
  */
-#include <osp/framework/executor.h>
+#include <osp/executor/single_threaded.h>
 #include <osp/framework/builder.h>
 #include <osp/util/logging.h>
 
@@ -248,7 +248,7 @@ TEST(Tasks, Basics)
     auto       &rAquarium       = fw.data_get<Aquarium>(aquarium.di.aquariumDI);
     auto       &rAquariumFish   = fw.data_get<AquariumFish>(fish.di.fishDI);
 
-    SingleThreadedExecutor exec;
+    osp::exec::SingleThreadedExecutor exec;
     exec.load(fw);
 
     exec.run(fw, mainLoop.pl.mainLoopPL);
