@@ -26,4 +26,4 @@ PROJECT(test_sync_graph CXX)
 ADD_TEST_DIRECTORY(${PROJECT_NAME})
 
 TARGET_LINK_LIBRARIES(${PROJECT_NAME} PRIVATE longeron EnTT::EnTT Magnum::Magnum)
-#TARGET_SOURCES(test_syncexec PRIVATE "${CMAKE_SOURCE_DIR}/src/osp/tasks/tasks.cpp" "${CMAKE_SOURCE_DIR}/src/osp/tasks/execute.cpp")
+TARGET_SOURCES(${PROJECT_NAME} PRIVATE "${CMAKE_SOURCE_DIR}/src/osp/executor/sync_graph.cpp")

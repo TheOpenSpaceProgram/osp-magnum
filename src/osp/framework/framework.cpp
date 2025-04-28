@@ -52,10 +52,8 @@ void Framework::close_context(ContextId ctx)
 
         for (PipelineId const pipelineId : rFIInst.pipelines)
         {
-            m_tasks.m_pipelineIds.remove(pipelineId);
-            m_tasks.m_pipelineParents   [pipelineId] = lgrn::id_null<PipelineId>();
-            m_tasks.m_pipelineInfo      [pipelineId] = {};
-            m_tasks.m_pipelineControl   [pipelineId] = {};
+            m_tasks.pipelineIds.remove(pipelineId);
+            m_tasks.pipelineInst      [pipelineId] = {};
         }
         rFIInst.pipelines.clear();
 
@@ -67,7 +65,7 @@ void Framework::close_context(ContextId ctx)
     // no clear, set all to {}
 
     lgrn::IdSetStl<TaskId> deletedTasks;
-    deletedTasks.resize(m_tasks.m_taskIds.capacity());
+    deletedTasks.resize(m_tasks.taskIds.capacity());
 
     // Clear all sessions in the context
     for (FSessionId const sessionId : rFtrCtx.sessions)
@@ -76,7 +74,7 @@ void Framework::close_context(ContextId ctx)
 
         for (TaskId const taskId : rFSession.tasks)
         {
-            m_tasks.m_taskIds.remove(taskId);
+            m_tasks.taskIds.remove(taskId);
             deletedTasks.insert(taskId);
 
             TaskImpl &rTaskImpl = m_taskImpl[taskId];
@@ -86,12 +84,12 @@ void Framework::close_context(ContextId ctx)
         }
     }
 
-    auto newLast = std::remove_if(m_tasks.m_syncWith.begin(), m_tasks.m_syncWith.end(),
-                                  [&deletedTasks] (TplTaskPipelineStage const &tpl)
+    auto newLast = std::remove_if(m_tasks.syncs.begin(), m_tasks.syncs.end(),
+                                  [&deletedTasks] (TaskSyncToPipeline const &sync)
     {
-        return deletedTasks.contains(tpl.task);
+        return deletedTasks.contains(sync.task);
     });
-    m_tasks.m_syncWith.erase(newLast, m_tasks.m_syncWith.end());
+    m_tasks.syncs.erase(newLast, m_tasks.syncs.end());
 
     rFtrCtx.sessions.clear();
 }

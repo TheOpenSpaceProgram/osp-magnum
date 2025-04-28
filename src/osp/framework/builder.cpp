@@ -73,9 +73,9 @@ void ContextBuilder::add_feature(FeatureDef const &def, entt::any setupData) noe
         }
         else if (relation.type == FeatureDef::ERelationType::Implement)
         {
-            FIInstanceId &rFInter = rCtx.finterSlots[relation.subject];
+            FIInstanceId &rFInterId = rCtx.finterSlots[relation.subject];
 
-            if (rFInter.has_value())
+            if (rFInterId.has_value())
             {
                 // Already exists, error
                 m_errors.emplace_back(ErrAlreadyImplemented{
@@ -85,34 +85,34 @@ void ContextBuilder::add_feature(FeatureDef const &def, entt::any setupData) noe
             }
             else
             {
-                rFInter = m_rFW.m_fiinstIds.create();
+                rFInterId = m_rFW.m_fiinstIds.create();
+                rFSession.finterImplements.push_back(rFInterId);
                 m_rFW.m_fiinstData.resize(m_rFW.m_fiinstIds.capacity());
-                FeatureInterface &rFI = m_rFW.m_fiinstData[rFInter];
+                FeatureInterface &rFI = m_rFW.m_fiinstData[rFInterId];
 
                 rFI.context = m_ctx;
                 rFI.type    = relation.subject;
-                rFI.data     .resize(subjectInfo.dataCount);
-                rFI.pipelines.resize(subjectInfo.pipelines.size());
 
+                // Make LoopBlockIds
+                rFI.loopblks.resize(subjectInfo.loopblkCount);
+                m_rFW.m_tasks.loopblkIds.create(rFI.loopblks.begin(), rFI.loopblks.end());
+                m_rFW.m_tasks.loopblkInst.resize(m_rFW.m_tasks.loopblkIds.capacity());
+
+                // Make DataIds
+                rFI.data.resize(subjectInfo.dataCount);
                 m_rFW.m_dataIds.create(rFI.data.begin(), rFI.data.end());
-                auto const dataCapacity = m_rFW.m_dataIds.capacity();
-                m_rFW.m_data.resize(dataCapacity);
+                m_rFW.m_data.resize(m_rFW.m_dataIds.capacity());
 
-                m_rFW.m_tasks.m_pipelineIds.create(rFI.pipelines.begin(), rFI.pipelines.end());
-
-                auto const pipelineCapacity = m_rFW.m_tasks.m_pipelineIds.capacity();
-                m_rFW.m_tasks.m_pipelineInfo   .resize(pipelineCapacity);
-                m_rFW.m_tasks.m_pipelineControl.resize(pipelineCapacity);
-                m_rFW.m_tasks.m_pipelineParents.resize(pipelineCapacity, lgrn::id_null<PipelineId>());
-
+                // Make PipelineIds
+                rFI.pipelines.resize(subjectInfo.pipelines.size());
+                m_rFW.m_tasks.pipelineIds.create(rFI.pipelines.begin(), rFI.pipelines.end());
+                m_rFW.m_tasks.pipelineInst.resize(m_rFW.m_tasks.pipelineIds.capacity());
                 for (std::size_t i = 0; i < subjectInfo.pipelines.size(); ++i)
                 {
                     PipelineId const plId = rFI.pipelines[i];
-                    m_rFW.m_tasks.m_pipelineInfo[plId].stageType = subjectInfo.pipelines[i].type;
-                    m_rFW.m_tasks.m_pipelineInfo[plId].name      = subjectInfo.pipelines[i].name;
+                    m_rFW.m_tasks.pipelineInst[plId].type      = subjectInfo.pipelines[i].type;
+                    m_rFW.m_tasks.pipelineInst[plId].name      = subjectInfo.pipelines[i].name;
                 }
-
-                rFSession.finterImplements.push_back(rFInter);
             }
         }
     }
@@ -130,6 +130,21 @@ void ContextBuilder::add_feature(FeatureDef const &def, entt::any setupData) noe
         .ctxScope   = arrayView<ContextId const>(m_ctxScope) };
 
     def.func(fb, std::move(setupData));
+
+    for (FeatureDef::FIRelationship const& relation : def.relationships)
+    {
+        if (relation.type == FeatureDef::ERelationType::Implement)
+        {
+            FeatureInterface const &rFI = m_rFW.m_fiinstData[rCtx.finterSlots[relation.subject]];
+            for (PipelineId const pipeline : rFI.pipelines)
+            {
+                if ( ! m_rFW.m_tasks.pipelineInst[pipeline].block.has_value() )
+                {
+                    m_errors.emplace_back(ErrPipelineWithNoParentLoopBlock{.whileAdding = def.name, .pipeline = pipeline});
+                }
+            }
+        }
+    }
 }
 
 
@@ -142,7 +157,7 @@ bool ContextBuilder::finalize(ContextBuilder &&eat)
         // Log errors to the terminal
         std::ostringstream os;
 
-        auto const visitErr = [&os] (auto&& err)
+        auto const visitErr = [&os, &eat] (auto&& err)
         {
             using ERR_T = std::decay_t<decltype(err)>;
             if constexpr (std::is_same_v<ERR_T, ContextBuilder::ErrAlreadyImplemented>)
@@ -153,7 +168,14 @@ bool ContextBuilder::finalize(ContextBuilder &&eat)
             {
                 os << "* \"" << err.whileAdding << "\": " << "Feature Interface dependency \""<< err.requiredFI << "\" is not found\n";
             }
+            else if constexpr (std::is_same_v<ERR_T, ContextBuilder::ErrPipelineWithNoParentLoopBlock>)
+            {
+                os << "* \"" << err.whileAdding << "\": " << "No Parent LoopBlock assigned to pipeline \""
+                   << eat.m_rFW.m_tasks.pipelineInst[err.pipeline].name
+                   << "\" (" << err.pipeline.value << ")\n";
+            }
         };
+
 
         for (ContextBuilder::Error_t const& err : eat.m_errors)
         {

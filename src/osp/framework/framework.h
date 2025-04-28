@@ -129,6 +129,7 @@ using as_function_ptr_t = typename as_function_ptr<CALLABLE_T>::type;
 template<typename T>
 concept CStatelessLambda = requires () { typename as_function_ptr_t<T>; } && ! CFuncPtr<T>;
 
+
 //-----------------------------------------------------------------------------
 
 
@@ -154,17 +155,25 @@ using FSessionId        = StrongId<std::uint32_t, struct DummyForFSessionId>;
 
 struct FIEmpty
 {
-    struct DataIds { };
-    struct Pipelines { };
+    struct LoopBlockIds { };
+    struct DataIds      { };
+    struct Pipelines    { };
 };
 
 template<typename T>
 concept CFeatureInterfaceDef = requires{ typename T::DataIds; typename T::Pipelines; };
 
+template <CFeatureInterfaceDef FI_T>
+struct loopblkids_from_fi { using type = FIEmpty::LoopBlockIds; };
+
+template <CFeatureInterfaceDef FI_T> requires( requires{typename FI_T::LoopBlockIds;} )
+struct loopblkids_from_fi<FI_T> { using type = typename FI_T::LoopBlockIds; };
+
 
 struct FITypeInfo
 {
     std::string                  name;
+    std::size_t                  loopblkCount{};
     std::size_t                  dataCount{};
     std::vector<PipelineDefInfo> pipelines;
 };
@@ -225,19 +234,25 @@ private:
             typename FI_T::Pipelines const pl; // default-init sets names and stuff
             auto const members = arrayCast<PipelineDefBlank_t const>(  arrayCast<std::byte const>( arrayView(&pl, 1) )  );
 
+            auto &rPltypeReg = PipelineTypeIdReg::instance();
+
             info.reserve(members.size());
             for (PipelineDefBlank_t const& plDef : members)
             {
-                info.push_back(PipelineDefInfo{.name = plDef.m_name, .type = plDef.m_type});
+                info.push_back(PipelineDefInfo{
+                    .name = plDef.m_name,
+                    .type = rPltypeReg.get_or_register_pltype(plDef.m_type)
+                });
             }
         }
         // else, (typename FI_T::Pipelines) is an empty struct. sizeof(EmptyStruct) is one byte,
         // not zero, which confuses arrayCast.
 
         return instance().register_type({
-                .name      = std::string{entt::type_id<FI_T>().name()},
-                .dataCount = sizeof(typename FI_T::DataIds) / sizeof(DataId),
-                .pipelines = std::move(info) });
+                .name           = std::string{entt::type_id<FI_T>().name()},
+                .loopblkCount   = sizeof(typename loopblkids_from_fi<FI_T>::type) / sizeof(DataId),
+                .dataCount      = sizeof(typename FI_T::DataIds) / sizeof(DataId),
+                .pipelines      = std::move(info) });
     }
 
     FITypeInfoRegistry() = default;
@@ -248,6 +263,7 @@ private:
 struct FeatureInterface
 {
     std::vector<DataId>             data;
+    std::vector<LoopBlockId>        loopblks;
     std::vector<PipelineId>         pipelines;
 
     FITypeId                        type;
@@ -255,14 +271,26 @@ struct FeatureInterface
 };
 
 
+struct TagDependOn {};
+struct TagImplement {};
+
 template<CFeatureInterfaceDef FI_T, typename TAG_T = void>
 struct FInterfaceShorthand
 {
     FIInstanceId id;
     ContextId    ctx;
-    typename FI_T::DataIds   di;
-    typename FI_T::Pipelines pl;
+
+    typename loopblkids_from_fi<FI_T>::type loopblks;
+    typename FI_T::DataIds                  di;
+    typename FI_T::Pipelines                pl;
 };
+
+template<CFeatureInterfaceDef FI_T>
+using DependOn = FInterfaceShorthand<FI_T, TagDependOn>;
+
+template<CFeatureInterfaceDef FI_T>
+using Implement = FInterfaceShorthand<FI_T, TagImplement>;
+
 
 //-----------------------------------------------------------------------------
 
@@ -342,7 +370,16 @@ struct Framework
 
             FeatureInterface const &rInterface = m_fiinstData[fiId];
 
-            if constexpr ( ! std::is_empty_v<typename FI_T::Pipelines> )
+            if constexpr ( ! std::is_empty_v<decltype(out.loopblks)> )
+            {
+                auto const blkMembers = arrayCast<DataId>(  arrayCast<std::byte>( arrayView(&out.loopblks, 1) )  );
+                for (std::size_t i = 0; i < blkMembers.size(); ++i)
+                {
+                    std::memcpy(&blkMembers[i], &rInterface.loopblks[i], sizeof(LoopBlockId));
+                }
+            }
+
+            if constexpr ( ! std::is_empty_v<decltype(out.pl)> )
             {
                 auto const plMembers = arrayCast<PipelineDefBlank_t>(  arrayCast<std::byte>( arrayView(&out.pl, 1) )  );
                 for (std::size_t i = 0; i < plMembers.size(); ++i)
@@ -351,7 +388,7 @@ struct Framework
                 }
             }
 
-            if constexpr ( ! std::is_empty_v<typename FI_T::DataIds> )
+            if constexpr ( ! std::is_empty_v<decltype(out.di)> )
             {
                 auto const diMembers = arrayCast<DataId>(  arrayCast<std::byte>( arrayView(&out.di, 1) )  );
                 for (std::size_t i = 0; i < diMembers.size(); ++i)
@@ -404,6 +441,8 @@ public:
     virtual void load(Framework &rFW) = 0;
 
     virtual void run(Framework &rFW, osp::PipelineId pipeline) = 0;
+
+    virtual void signal(Framework &rFW, osp::LoopBlockId loopblk) = 0;
 
     virtual void signal(Framework &rFW, osp::PipelineId pipeline) = 0;
 

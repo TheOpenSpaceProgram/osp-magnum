@@ -34,14 +34,14 @@
 #include <vector>
 
 
-namespace osp::sync
+namespace osp::exec
 {
 
 using SubgraphId        = osp::StrongId<std::uint32_t, struct DummyForSubgraphId>;
 using SubgraphTypeId    = osp::StrongId<std::uint32_t, struct DummyForSubgraphTypeId>;
-using LocalPointId      = osp::StrongId<std::uint8_t, struct DummyForLocalPointId>;
-using LocalCycleId      = osp::StrongId<std::uint8_t, struct DummyForLocalCycleId>;
-using SynchronizerId    = osp::StrongId<std::uint8_t, struct DummyForSynchronizerId>;
+using LocalPointId      = osp::StrongId<std::uint8_t,  struct DummyForLocalPointId>;
+using LocalCycleId      = osp::StrongId<std::uint8_t,  struct DummyForLocalCycleId>;
+using SynchronizerId    = osp::StrongId<std::uint32_t, struct DummyForSynchronizerId>;
 
 struct SubgraphType
 {
@@ -61,7 +61,7 @@ struct SubgraphType
     osp::KeyedVec<LocalCycleId, Cycle> cycles;
 
     osp::KeyedVec<LocalPointId, Point> points;
-    std::uint8_t pointCount{0};
+    //std::uint8_t pointCount{0};
 
     LocalCycleId initialCycle;
     std::uint8_t initialPos;
@@ -90,6 +90,10 @@ struct SubgraphPointAddr
 struct Synchronizer
 {
     std::string debugName;
+    bool debugGraphStraight = false;
+    bool debugGraphLoose = false;
+    bool debugGraphLongAndUgly = false;
+
     std::vector<SubgraphPointAddr> connectedPoints;
 };
 
@@ -101,8 +105,20 @@ struct Synchronizer
  *   * subgraphs[SUBGRAPH].points[POINT].connectedSyncs  must contain SYNC
  *
  */
-struct Graph
+struct SyncGraph
 {
+    struct ConnectSubgraphPoint { SubgraphId subgraph; LocalPointId point; };
+    struct ConnectArgs { SynchronizerId sync; ConnectSubgraphPoint subgraphPoint; };
+
+    void debug_verify() const;
+    void dot(std::ostream &rOS) const;
+
+    void connect(ConnectArgs connect)
+    {
+        subgraphs[connect.subgraphPoint.subgraph].points[connect.subgraphPoint.point].connectedSyncs.push_back(connect.sync);
+        syncs[connect.sync].connectedPoints.push_back({connect.subgraphPoint.subgraph, connect.subgraphPoint.point});
+    }
+
     lgrn::IdRegistryStl<SubgraphId>             subgraphIds;
     osp::KeyedVec<SubgraphId, Subgraph>         subgraphs;
 
@@ -113,7 +129,22 @@ struct Graph
     osp::KeyedVec<SynchronizerId, Synchronizer> syncs;
 };
 
+class ISyncGraphDebugInfo
+{
+public:
+    virtual bool            is_sync_enabled(SyncGraph const& graph, SynchronizerId syncId) = 0;
+    virtual bool            is_sync_locked(SyncGraph const& graph, SynchronizerId syncId) = 0;
+    virtual LocalPointId    current_point(SyncGraph const& graph, SubgraphId subgraphId) = 0;
+};
 
+struct SyncGraphDOTVisualizer
+{
+    SyncGraph const& graph;
+
+    ISyncGraphDebugInfo *pDebugInfo{nullptr};
+
+    friend std::ostream& operator<<(std::ostream& rStream, SyncGraphDOTVisualizer const& self);
+};
 
 };
 

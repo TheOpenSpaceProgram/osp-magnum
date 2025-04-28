@@ -51,7 +51,7 @@
  *
  * This does it quite well so better be the correct API, or is at least close to the ideal solution.
  */
-#include <osp/executor/single_threaded.h>
+#include <osp/executor/singlethread_framework.h>
 #include <osp/framework/builder.h>
 #include <osp/util/logging.h>
 
@@ -65,14 +65,38 @@ using namespace osp::fw;
 namespace test_a
 {
 
-enum class Stages { Modify, Read };
 
-enum class OptionalPath { Signal, Schedule, Run, Done };
+enum class EStgContinuous {
+    Modify = 0,
+    Schedule = 1,
+    Read = 2
+};
+osp::PipelineTypeInfo const infoForEStgContinuous{
+    .debugName = "Continuous",
+    .stages = {{
+        { .name = "Modify"                          },
+        { .name = "Schedule",   .isSchedule = true  },
+        { .name = "Read",                           } } }};
+
+enum class EStgOptionalPath {
+    Schedule = 0,
+    Signal = 1,
+    Run = 2,
+    Done = 3
+};
+osp::PipelineTypeInfo const infoForEStgOptionalPath{
+    .debugName = "OptionalPath",
+    .stages = {{
+        { .name = "Schedule",   .isSchedule = true  },
+        { .name = "Signal",                         },
+        { .name = "Run",        .useCancel = true   },
+        { .name = "Done"                            } } }};
+
 
 
 struct Aquarium
 {
-    bool runMainLoop = true;
+    bool runMainLoop = false;
     bool runAquariumUpdate = false;
     //int waterLevel = 10;
 };
@@ -105,9 +129,12 @@ struct AquariumSharks
 // The FI* structs themselves are never actually constructed.
 
 struct FIMainLoop {
+    struct LoopBlockIds {
+        LoopBlockId mainLoop;
+    };
     struct DataIds { };
     struct Pipelines {
-        PipelineDef<OptionalPath> mainLoopPL;
+        //PipelineDef<EStgOptionalPath> mainLoopPL{"Main Loop"};
     };
 };
 
@@ -116,8 +143,11 @@ struct FIAquarium {
         DataId aquariumDI;
     };
     struct Pipelines {
-        PipelineDef<Stages> aquariumPL;
-        PipelineDef<OptionalPath> aquariumUpdatePL;
+        // Controls access to Aquarium
+        //PipelineDef<EStgContinuous> aquariumPL{"aquariumPL"};
+
+        /// Boolean decision on whether we want to update the aquarium or not
+        PipelineDef<EStgOptionalPath> aquariumUpdatePL{"aquariumUpdatePL"};
     };
 };
 
@@ -126,7 +156,8 @@ struct FIFish {
         DataId fishDI;
     };
     struct Pipelines {
-        PipelineDef<Stages> fishPL;
+        /// Controls access to AquariumFish struct
+        PipelineDef<EStgContinuous> fishPL{"fishPL"};
     };
 };
 
@@ -135,7 +166,8 @@ struct FISharks {
         DataId sharksDI;
     };
     struct Pipelines {
-        PipelineDef<Stages> sharksPL;
+        /// Controls access to AquariumSharks struct
+        PipelineDef<EStgContinuous> sharksPL{"sharksPL"};
     };
 };
 
@@ -154,45 +186,46 @@ FeatureDef const ftrWorld = feature_def("World", [] (
     // 'Signal' will stop the main loop pipeline from proceeding until exec.signal is called.
     // If wait_for_signal isn't added to the main loop pipeline, then it will just infinite loop
     // when exec.wait(fw) is called.
-    rFB.pipeline(mainLoop.pl.mainLoopPL).loops(true).wait_for_signal(OptionalPath::Signal);
-    rFB.pipeline(aquarium.pl.aquariumUpdatePL).parent(mainLoop.pl.mainLoopPL);
+
+    rFB.pipeline(aquarium.pl.aquariumUpdatePL).parent(mainLoop.loopblks.mainLoop).wait_for_signal(EStgOptionalPath::Signal);
 
     // Allow controlling the main loop so it can exit cleanly, controlled with runMainLoop.
     rFB.task()
         .name       ("Schedule main loop")
-        .schedules  ({mainLoop.pl.mainLoopPL(OptionalPath::Schedule)})
+        .schedules  ({mainLoop.loopblks.mainLoop})
         .args       ({        aquarium.di.aquariumDI })
         .func       ([] (Aquarium const &rAquarium)
     {
-        return rAquarium.runMainLoop ? TaskActions{} : TaskAction::Cancel;
+        return TaskActions{ .cancel = !rAquarium.runMainLoop };
     });
 
     // Running the aquarium update is optional and controlled with runAquariumUpdate.
     // sync_with also ties aquariumUpdatePL to the main loop
     rFB.task()
         .name       ("Schedule aquarium update")
-        .schedules  ({aquarium.pl.aquariumUpdatePL(OptionalPath::Schedule)})
-        .sync_with  ({mainLoop.pl.mainLoopPL(OptionalPath::Run)})
+        .schedules  ({aquarium.pl.aquariumUpdatePL})
         .args       ({        aquarium.di.aquariumDI })
         .func       ([] (Aquarium const &rAquarium)
     {
-        return rAquarium.runAquariumUpdate ? TaskActions{} : TaskAction::Cancel;
+        return TaskActions{ .cancel = ! rAquarium.runAquariumUpdate };
     });
 });
 
 FeatureDef const ftrFish = feature_def("Fish", [] (
         Implement<FIFish>       fish,
-        FeatureBuilder          &rFB, // For demonstration, argument order doesn't matter.
+        DependOn<FIMainLoop>    mainLoop,
+        FeatureBuilder          &rFB, // For demonstration, argument order doesn't matter. This is usually the first argument
         DependOn<FIAquarium>    aquarium)
 {
     rFB.data_emplace<AquariumFish>(fish.di.fishDI);
 
-    rFB.pipeline(fish.pl.fishPL).parent(aquarium.pl.aquariumUpdatePL);
+    rFB.pipeline(fish.pl.fishPL).parent(mainLoop.loopblks.mainLoop);
 });
 
 FeatureDef const ftrSharks = feature_def("Sharks", [] (
         FeatureBuilder          &rFB,
         Implement<FISharks>     sharks,
+        DependOn<FIMainLoop>    mainLoop,
         DependOn<FIAquarium>    aquarium,
         DependOn<FIFish>        fish,
         entt::any               userData) // optional data can be passed in through add_feature
@@ -201,13 +234,12 @@ FeatureDef const ftrSharks = feature_def("Sharks", [] (
 
     rFB.data_emplace<AquariumSharks>(sharks.di.sharksDI);
 
-    rFB.pipeline(sharks.pl.sharksPL).parent(aquarium.pl.aquariumUpdatePL);
+    rFB.pipeline(sharks.pl.sharksPL).parent(mainLoop.loopblks.mainLoop);
 
     // Runs every aquarium update
     rFB.task()
         .name       ("Each shark eats a fish")
-        .run_on     ({aquarium.pl.aquariumUpdatePL(OptionalPath::Run)})
-        .sync_with  ({fish.pl.fishPL(Stages::Modify), sharks.pl.sharksPL(Stages::Read)})
+        .sync_with  ({aquarium.pl.aquariumUpdatePL(EStgOptionalPath::Run), fish.pl.fishPL(EStgContinuous::Modify), sharks.pl.sharksPL(EStgContinuous::Read)})
         .args       ({          fish.di.fishDI,            sharks.di.sharksDI })
         .func       ([] (AquariumFish &rFish, AquariumSharks const& rSharks)
     {
@@ -221,6 +253,10 @@ FeatureDef const ftrSharks = feature_def("Sharks", [] (
 TEST(Tasks, Basics)
 {
     using namespace test_a;
+
+    auto &rPltypeReg = PipelineTypeIdReg::instance();
+    rPltypeReg.assign_pltype_info<EStgContinuous>   (infoForEStgContinuous);
+    rPltypeReg.assign_pltype_info<EStgOptionalPath> (infoForEStgOptionalPath);
 
     auto pSink = std::make_shared<spdlog::sinks::stdout_color_sink_mt>();
 
@@ -248,43 +284,61 @@ TEST(Tasks, Basics)
     auto       &rAquarium       = fw.data_get<Aquarium>(aquarium.di.aquariumDI);
     auto       &rAquariumFish   = fw.data_get<AquariumFish>(fish.di.fishDI);
 
-    osp::exec::SingleThreadedExecutor exec;
+    osp::exec::SinglethreadFWExecutor exec;
     exec.load(fw);
 
-    exec.run(fw, mainLoop.pl.mainLoopPL);
-    exec.wait(fw);
-
-    ASSERT_TRUE(exec.is_running(fw)); // Main loop is started
-
+    ASSERT_FALSE(exec.is_running(fw));
     EXPECT_EQ(rAquariumFish.fishCount, 10);
 
-    // Allow Main loop to iterate, but we don't yet do an aquarium update
-    exec.signal(fw, mainLoop.pl.mainLoopPL);
+    // Signal main loop block to start, but doesn't run because "Schedule main loop" sees rAquarium.runMainLoop=false.
+    exec.signal(fw, mainLoop.loopblks.mainLoop);
+    exec.wait(fw);
+    ASSERT_FALSE(exec.is_running(fw));
+
+    // Start the main loop for real
+    rAquarium.runMainLoop = true;
+    exec.signal(fw, mainLoop.loopblks.mainLoop);
     exec.wait(fw);
 
-    // No aquarium updates yet, all fish still alive
-    EXPECT_EQ(rAquariumFish.fishCount, 10);
+    // execution waits at signal aquariumUpdatePL
+    ASSERT_TRUE(exec.is_running(fw));
+    ASSERT_EQ(rAquariumFish.fishCount, 10);
+
+    exec.signal(fw, aquarium.pl.aquariumUpdatePL);
+    exec.wait(fw);
+
+    // just exits as rAquarium.runAquariumUpdate != true
+    ASSERT_TRUE(exec.is_running(fw));
+    ASSERT_EQ(rAquariumFish.fishCount, 10);
+
+    rAquarium.runAquariumUpdate = true;
+    exec.signal(fw, aquarium.pl.aquariumUpdatePL);
+    exec.wait(fw);
+
 
     // Start updating the aquarium
     rAquarium.runAquariumUpdate = true;
-    exec.signal(fw, mainLoop.pl.mainLoopPL);
+    exec.signal(fw, mainLoop.loopblks.mainLoop);
     exec.wait(fw);
 
-    // Sharks have eaten 2 fish
-    EXPECT_EQ(rAquariumFish.fishCount, 8);
+    ASSERT_TRUE(exec.is_running(fw));
+    ASSERT_EQ(rAquariumFish.fishCount, 8);
 
-    exec.signal(fw, mainLoop.pl.mainLoopPL);
+    // Sharks have eaten 2 fish
+
+
+    exec.signal(fw, mainLoop.loopblks.mainLoop);
     exec.wait(fw);
 
     // Sharks have eaten 2 more fish
-    EXPECT_EQ(rAquariumFish.fishCount, 6);
+    ASSERT_EQ(rAquariumFish.fishCount, 6);
 
     // Stop the main loop
     rAquarium.runMainLoop = false;
-    exec.signal(fw, mainLoop.pl.mainLoopPL);
+    exec.signal(fw, mainLoop.loopblks.mainLoop);
     exec.wait(fw);
 
-    EXPECT_FALSE(exec.is_running(fw));
+    ASSERT_FALSE(exec.is_running(fw));
 }
 
 //-----------------------------------------------------------------------------

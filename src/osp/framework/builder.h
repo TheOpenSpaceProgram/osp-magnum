@@ -27,6 +27,7 @@
 #include "framework.h"
 
 #include "../core/array_view.h"
+#include "longeron/utility/asserts.hpp"
 
 #include <entt/core/any.hpp>
 
@@ -143,7 +144,7 @@ inline constexpr TaskImpl::Func_t as_task_impl_v = as_task_impl<FUNCTOR_T>::valu
 struct TaskRef
 {
     template<typename RANGE_T>
-    TaskRef& add_edges(std::vector<TplTaskPipelineStage>& rContainer, RANGE_T const& add)
+    TaskRef& add_edges(std::vector<TaskSyncToPipeline>& rContainer, RANGE_T const& add)
     {
         for (auto const [pipeline, stage] : add)
         {
@@ -158,54 +159,64 @@ struct TaskRef
 
     TaskRef& name(std::string_view debugName)
     {
-        m_rFW.m_taskImpl.resize(m_rFW.m_tasks.m_taskIds.capacity());
+        m_rFW.m_taskImpl.resize(m_rFW.m_tasks.taskIds.capacity());
         m_rFW.m_taskImpl[taskId].debugName = debugName;
         return *this;
     }
 
     TaskRef& args(std::initializer_list<DataId> args)
     {
-        m_rFW.m_taskImpl.resize(m_rFW.m_tasks.m_taskIds.capacity());
+        m_rFW.m_taskImpl.resize(m_rFW.m_tasks.taskIds.capacity());
         m_rFW.m_taskImpl[taskId].args = args;
         return *this;
     }
 
-    TaskRef& run_on(TplPipelineStage const tpl) noexcept
-    {
-        m_rFW.m_tasks.m_taskRunOn.resize(m_rFW.m_tasks.m_taskIds.capacity());
-        m_rFW.m_tasks.m_taskRunOn[taskId] = tpl;
-
-        return *this;
-    }
-
-    TaskRef& schedules(TplPipelineStage const tpl) noexcept
-    {
-        m_rFW.m_tasks.m_pipelineControl[tpl.pipeline].scheduler = taskId;
-
-        return run_on(tpl);
-    }
-
     TaskRef& sync_with(ArrayView<TplPipelineStage const> const specs) noexcept
     {
-        return add_edges(m_rFW.m_tasks.m_syncWith, specs);
+        return add_edges(m_rFW.m_tasks.syncs, specs);
     }
 
     TaskRef& sync_with(std::initializer_list<TplPipelineStage const> specs) noexcept
     {
-        return add_edges(m_rFW.m_tasks.m_syncWith, specs);
+        return add_edges(m_rFW.m_tasks.syncs, specs);
+    }
+
+    TaskRef& schedules(LoopBlockId const loopblkId) noexcept
+    {
+        m_rFW.m_tasks.loopblkInst[loopblkId].scheduleCondition = taskId;
+        return *this;
+    }
+
+    TaskRef& schedules(PipelineId const pipelineId) noexcept
+    {
+        auto const &typeIds = PipelineTypeIdReg::instance();
+
+        Pipeline               &rPipeline  = m_rFW.m_tasks.pipelineInst[pipelineId];
+        PipelineTypeInfo const &pltypeinfo = typeIds.get(rPipeline.type);
+        auto const &found = std::find_if(pltypeinfo.stages.begin(), pltypeinfo.stages.end(),
+                [] (PipelineTypeInfo::StageInfo const& info) { return info.isSchedule; });
+        LGRN_ASSERTM(found != pltypeinfo.stages.end(), "Invalid pipeline. All pipelines must have a schedule stage.");
+        rPipeline.scheduleCondition = taskId;
+
+//        m_rFW.m_tasks.syncs.push_back({
+//            .task     = taskId,
+//            .pipeline = pipelineId,
+//            .stage    = StageId::from_index(std::distance(pltypeinfo.stages.begin(), found))
+//        });
+        return *this;
     }
 
     template<typename FUNC_T>
     TaskRef& func(FUNC_T&& funcArg)
     {
-        m_rFW.m_taskImpl.resize(m_rFW.m_tasks.m_taskIds.capacity());
+        m_rFW.m_taskImpl.resize(m_rFW.m_tasks.taskIds.capacity());
         m_rFW.m_taskImpl[taskId].func = as_task_impl_v<FUNC_T>;
         return *this;
     }
 
     TaskRef& func_raw(TaskImpl::Func_t func)
     {
-        m_rFW.m_taskImpl.resize(m_rFW.m_tasks.m_taskIds.capacity());
+        m_rFW.m_taskImpl.resize(m_rFW.m_tasks.taskIds.capacity());
         m_rFW.m_taskImpl[taskId].func = func;
         return *this;
     }
@@ -214,6 +225,18 @@ struct TaskRef
     Framework       &m_rFW;
 
 }; // struct TaskRef
+
+struct LoopBlockRef
+{
+    LoopBlockRef& parent(LoopBlockId const parent)
+    {
+        m_rFW.m_tasks.loopblkInst[loopBlockId].parent = parent;
+        return *this;
+    }
+
+    LoopBlockId     loopBlockId;
+    Framework       &m_rFW;
+};
 
 template <typename ENUM_T>
 struct PipelineRef
@@ -224,47 +247,25 @@ struct PipelineRef
         return pipelineId;
     }
 
-    PipelineRef& parent(PipelineId const parent)
+    PipelineRef& parent(LoopBlockId const parent)
     {
-        m_rFW.m_tasks.m_pipelineParents[pipelineId] = parent;
+        LGRN_ASSERT(parent.has_value());
+        m_rFW.m_tasks.pipelineInst[pipelineId].block = parent;
         return static_cast<PipelineRef&>(*this);
-    }
-
-    PipelineRef& parent_with_schedule(PipelineId const parent)
-    {
-        m_rFW.m_tasks.m_pipelineParents[pipelineId] = parent;
-
-        constexpr ENUM_T const scheduleStage = stage_schedule(ENUM_T{0});
-        static_assert(scheduleStage != lgrn::id_null<ENUM_T>(), "Pipeline type has no schedule stage");
-
-        TaskId const scheduler = m_rFW.m_tasks.m_pipelineControl[parent].scheduler;
-        LGRN_ASSERTM(scheduler != lgrn::id_null<TaskId>(), "Parent Pipeline has no scheduler task");
-
-        m_rFW.m_tasks.m_syncWith.push_back({
-            .task     = scheduler,
-            .pipeline = pipelineId,
-            .stage    = StageId(scheduleStage)
-        });
-
-        return static_cast<PipelineRef&>(*this);
-    }
-
-    PipelineRef& loops(bool const loop)
-    {
-        m_rFW.m_tasks.m_pipelineControl[pipelineId].isLoopScope = loop;
-        return *this;
     }
 
     PipelineRef& wait_for_signal(ENUM_T stage)
     {
-        m_rFW.m_tasks.m_pipelineControl[pipelineId].waitStage = StageId(stage);
+        m_rFW.m_tasks.pipelineInst[pipelineId].exteralSignal = StageId::from_index(std::size_t(stage));
         return *this;
     }
 
     PipelineId      pipelineId;
     Framework       &m_rFW;
 
-}; // struct TaskRef
+}; // struct PipelineRef
+
+
 
 /**
  * @brief Assists with building a single Feature
@@ -273,16 +274,22 @@ struct FeatureBuilder
 {
     TaskRef task()
     {
-        TaskId const taskId = m_rFW.m_tasks.m_taskIds.create();
-        m_rFW.m_taskImpl.resize(m_rFW.m_tasks.m_taskIds.capacity());
+        TaskId const taskId = m_rFW.m_tasks.taskIds.create();
+        m_rFW.m_taskImpl.resize(m_rFW.m_tasks.taskIds.capacity());
         rSession.tasks.push_back(taskId);
         return task(taskId);
     };
 
     [[nodiscard]] constexpr TaskRef task(TaskId const taskId) noexcept
     {
-        return { taskId, m_rFW };
+        return TaskRef{ taskId, m_rFW };
     }
+
+    [[nodiscard]] constexpr LoopBlockRef loopblk(LoopBlockId loopblkId) noexcept
+    {
+        return LoopBlockRef{ loopblkId, m_rFW };
+    }
+
 
     [[nodiscard]] entt::any& data(DataId const dataId) noexcept
     {
@@ -312,7 +319,7 @@ struct FeatureBuilder
     FSessionId      sessionId;
     ContextId       ctx;
     ArrayView<ContextId const> ctxScope;
-};
+}; // struct FeatureBuilder
 
 
 struct FeatureDef
@@ -335,16 +342,6 @@ struct FeatureDef
 
 
 //-----------------------------------------------------------------------------
-
-
-struct TagDependOn {};
-struct TagImplement {};
-
-template<CFeatureInterfaceDef FI_T>
-using DependOn = FInterfaceShorthand<FI_T, TagDependOn>;
-
-template<CFeatureInterfaceDef FI_T>
-using Implement = FInterfaceShorthand<FI_T, TagImplement>;
 
 
 
@@ -511,7 +508,13 @@ public:
         std::string_view alreadyImplFI;
     };
 
-    using Error_t = std::variant<ErrDependencyNotFound, ErrAlreadyImplemented>;
+    struct ErrPipelineWithNoParentLoopBlock
+    {
+        std::string_view whileAdding;
+        PipelineId pipeline;
+    };
+
+    using Error_t = std::variant<ErrDependencyNotFound, ErrAlreadyImplemented, ErrPipelineWithNoParentLoopBlock>;
 
     FIInstanceId find_dependency(FITypeId type)
     {

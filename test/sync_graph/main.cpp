@@ -27,15 +27,14 @@
 
 #include <gtest/gtest.h>
 
-#include <osp/sync_graph/graph.h>
+#include <osp/executor/sync_graph.h>
+#include <osp/executor/singlethread_sync_graph.h>
 
 #include <osp/core/keyed_vector.h>
 
 #include <longeron/id_management/id_set_stl.hpp>
 
 #include <vector>
-#include <iostream>
-
 
 
 // probably initialized with uninitialized memory
@@ -45,255 +44,8 @@ using StaticIdSet_t = lgrn::BitViewIdSet<lgrn::BitView<std::array<std::uint64_t,
 
 using namespace test_graph;
 
-/**
- * data required to execute a Graph. Graph stays constant during execution.
- * better executors can be made in the future.
- *
- */
-struct Executor
-{
-    enum class ESyncState : std::int8_t { Inactive, WaitForAlign, WaitForUnlock, WaitForAdvance };
 
-    struct PerSubgraph
-    {
-        LocalCycleId activeCycle;
-        std::uint8_t position;
-    };
-    struct PerSync
-    {
-        lgrn::IdSetStl<SubgraphId>          needToAdvance;
-        ESyncState                          state               {ESyncState::Inactive};
-    };
-
-    void load(Graph const& graph) noexcept
-    {
-        auto const subgraphCapacity = graph.subgraphIds.capacity();
-        perSubgraph.resize(subgraphCapacity);
-        toCycle.resize(subgraphCapacity);
-
-        perSync.resize(graph.syncIds.capacity());
-
-        for (SynchronizerId const syncId : graph.syncIds)
-        {
-            perSync[syncId].needToAdvance.resize(subgraphCapacity);
-        }
-
-        for(SubgraphId const subgraphId : graph.subgraphIds)
-        {
-            SubgraphType const &sgtype = graph.sgtypes[graph.subgraphs[subgraphId].instanceOf];
-            PerSubgraph &rPerSubgraph = perSubgraph[subgraphId];
-            rPerSubgraph.activeCycle = sgtype.initialCycle;
-            rPerSubgraph.position = sgtype.initialPos;
-        }
-    }
-
-    bool update(std::vector<SynchronizerId> &rJustAlignedOut, Graph const& graph) noexcept
-    {
-        // 'pull/push' algorithm
-
-        // 1. Search for syncs that are state=WaitForAlign
-        //   * try to 'pull' connected points towards self. add subgraph to toCycle
-        //   * check for canceled too
-        // 2. Search for syncs that are state=WaitForAdvance
-        //   * try to 'push' not-yet-advanced stages. add subgraph to toCycle
-        // 3. Disqualify candidate subgraphs
-        //   * subgraphs with (current position = a point with a sync on WaitForUnlock)
-        //   * subgraphs with (current position = a point with a sync on WaitForAlign)
-        //   * subgraphs with (current position = a point with a sync on WaitForAdvance and subgraph is not in needToAdvance)
-
-        bool somethingHappened = false;
-        toCycle.clear();
-
-        for (SynchronizerId const syncId : graph.syncIds)
-        {
-            Synchronizer const &rSync = graph.syncs[syncId];
-            Executor::PerSync &rExecSync = perSync[syncId];
-
-            if (rExecSync.state == Executor::ESyncState::WaitForAlign)
-            {
-                bool aligned = true;
-                for (SubgraphPointAddr addr : rSync.connectedPoints)
-                {
-                    Subgraph                const &rSubgraph = graph.subgraphs[addr.subgraph];
-                    Executor::PerSubgraph   const &rExecSubgraph = perSubgraph[addr.subgraph];
-                    SubgraphType            const &sgtype = graph.sgtypes[rSubgraph.instanceOf];
-                    LocalPointId            const point = sgtype.cycles[rExecSubgraph.activeCycle].path[rExecSubgraph.position];
-
-                    // if not yet aligned
-                    if (addr.point != point)
-                    {
-                        toCycle.insert(addr.subgraph); // pull subgraph's position towards self
-                        aligned = false;
-                    }
-                }
-                if (aligned)
-                {
-                    rExecSync.state = Executor::ESyncState::WaitForUnlock;
-                    rJustAlignedOut.push_back(syncId);
-                    somethingHappened = true;
-                }
-            }
-            else if (rExecSync.state == Executor::ESyncState::WaitForAdvance)
-            {
-                for (SubgraphId const subgraphId : perSync[syncId].needToAdvance)
-                {
-                    toCycle.insert(subgraphId); // push subgraph's position out of self
-                }
-            }
-        }
-
-        for (SubgraphId const subgraphId : toCycle)
-        {
-            Subgraph              const &rSubgraph     = graph.subgraphs[subgraphId];
-            Executor::PerSubgraph const &rExecSubgraph = perSubgraph[subgraphId];
-            SubgraphType          const &sgtype        = graph.sgtypes[rSubgraph.instanceOf];
-            LocalPointId          const point          = sgtype.cycles[rExecSubgraph.activeCycle].path[rExecSubgraph.position];
-
-            for (SynchronizerId const syncId : rSubgraph.points[point].connectedSyncs)
-            {
-                Synchronizer const &rSync = graph.syncs[syncId];
-                Executor::PerSync const& rExecSync = perSync[syncId];
-
-                if (rExecSync.state == Executor::ESyncState::WaitForAlign)
-                {
-                    // Sync is aligned with the current point, and wants this subgraph to stay at
-                    // its current position and wait for other subgraphs to align
-                    toCyclcErase.push_back(subgraphId);
-                }
-                else if (rExecSync.state == Executor::ESyncState::WaitForUnlock)
-                {
-                    // Sync is locked (task in progress). don't move!
-                    toCyclcErase.push_back(subgraphId);
-                }
-                else if (     rExecSync.state == Executor::ESyncState::WaitForAdvance
-                         && ! rExecSync.needToAdvance.contains(subgraphId))
-                {
-                    // only happens when a cycle has only 1 state to loop through
-                    toCyclcErase.push_back(subgraphId);
-                }
-            }
-        }
-
-        for (SubgraphId const subgraphId : toCyclcErase)
-        {
-            toCycle.erase(subgraphId);
-        }
-        toCyclcErase.clear();
-
-        for (SubgraphId const subgraphId : toCycle)
-        {
-            Subgraph                const &rSubgraph = graph.subgraphs[subgraphId];
-            SubgraphType            const &sgtype      = graph.sgtypes[rSubgraph.instanceOf];
-            Executor::PerSubgraph &rExecSubgraph = perSubgraph[subgraphId];
-            LocalPointId          const point          = sgtype.cycles[rExecSubgraph.activeCycle].path[rExecSubgraph.position];
-
-            for (SynchronizerId const syncId : graph.subgraphs[subgraphId].points[point].connectedSyncs)
-            {
-                PerSync &rExecSync = perSync[syncId];
-
-                if (rExecSync.state == ESyncState::Inactive)
-                {
-                    continue;
-                }
-
-                rExecSync.needToAdvance.erase(subgraphId);
-
-                if (rExecSync.needToAdvance.empty())
-                {
-                    // done advancing all
-                    rExecSync.state = ESyncState::WaitForAlign;
-                }
-            }
-
-            rExecSubgraph.position ++;
-            if (rExecSubgraph.position == sgtype.cycles[rExecSubgraph.activeCycle].path.size())
-            {
-                rExecSubgraph.position = 0;
-            }
-        }
-
-        somethingHappened |= !toCycle.empty();
-
-        return somethingHappened;
-    }
-
-    bool is_locked(SynchronizerId syncId, Graph const& graph) const noexcept
-    {
-        return perSync[syncId].state == ESyncState::WaitForUnlock;
-    }
-
-    bool select_cycle(SubgraphId const subgraphId, LocalCycleId const cycleId, Graph const& graph) noexcept
-    {
-        Subgraph                const &rSubgraph    = graph.subgraphs[subgraphId];
-        PerSubgraph                   &rPerSubgraph = perSubgraph[subgraphId];
-        SubgraphType            const &sgtype       = graph.sgtypes[rSubgraph.instanceOf];
-        LocalPointId            const currentPoint  = sgtype.cycles[rPerSubgraph.activeCycle].path[rPerSubgraph.position];
-
-        SubgraphType::Cycle const& cycle = sgtype.cycles[cycleId];
-
-        auto const &cycleFirstIt = cycle.path.begin();
-        auto const &cycleLastIt  = cycle.path.end();
-        auto const foundIt = std::find(cycleFirstIt, cycleLastIt, currentPoint);
-
-        if (foundIt == cycleLastIt)
-        {
-            return false;
-        }
-
-        rPerSubgraph.activeCycle = cycleId;
-        rPerSubgraph.position    = std::uint8_t(std::distance(cycleFirstIt, foundIt));
-
-        return true;
-    }
-
-    enum class ESyncAction : std::int8_t { SetEnable, SetDisable, Unlock };
-
-    void batch(ESyncAction const action, osp::ArrayView<SynchronizerId const> const syncs, Graph const& graph)
-    {
-        for (SynchronizerId const syncId : syncs)
-        {
-            PerSync &rExecSync = perSync[syncId];
-            switch(action)
-            {
-            case ESyncAction::SetEnable:
-                if (rExecSync.state == ESyncState::Inactive)
-                {
-                    rExecSync.state = ESyncState::WaitForAlign;
-                }
-                break;
-            case ESyncAction::SetDisable:
-                if (rExecSync.state == ESyncState::WaitForAdvance)
-                {
-                    rExecSync.needToAdvance.clear();
-                }
-                rExecSync.state = ESyncState::Inactive;
-                break;
-            case ESyncAction::Unlock:
-                LGRN_ASSERT(rExecSync.state == ESyncState::WaitForUnlock);
-                rExecSync.state = ESyncState::WaitForAdvance;
-                for (SubgraphPointAddr const addr : graph.syncs[syncId].connectedPoints)
-                {
-                    rExecSync.needToAdvance.insert(addr.subgraph);
-                }
-                break;
-            }
-        }
-    }
-
-    void batch(ESyncAction const action, std::initializer_list<SynchronizerId const> const syncs, Graph const& graph)
-    {
-        batch(action, osp::arrayView(syncs), graph);
-    }
-
-    lgrn::IdSetStl<SubgraphId>              toCycle;
-    std::vector<SubgraphId>                 toCyclcErase;
-
-    osp::KeyedVec<SubgraphId, PerSubgraph>  perSubgraph;
-    osp::KeyedVec<SynchronizerId, PerSync>  perSync;
-};
-
-
-testing::AssertionResult is_locked(std::initializer_list<SynchronizerId> locked, Executor& rExec, std::vector<SynchronizerId> &rJustLocked, Graph const& graph)
+testing::AssertionResult is_locked(std::initializer_list<SynchronizerId> locked, SyncGraphExecutor& rExec, std::vector<SynchronizerId> &rJustLocked, SyncGraph const& graph)
 {
     for (SynchronizerId const syncId : locked)
     {
@@ -320,11 +72,11 @@ bool is_all_not_null(ID_T const& ... ids)
     return (ids.has_value() && ... );
 }
 
-using ESyncAction = Executor::ESyncAction;
+using ESyncAction = SyncGraphExecutor::ESyncAction;
 
 TEST(SyncExec, Basic)
 {
-    Graph const graph = make_test_graph(
+    SyncGraph const graph = make_test_graph(
     {
         .types =
         {
@@ -404,7 +156,7 @@ TEST(SyncExec, Basic)
     SynchronizerId const sync4Id = find_sync("Sync_4", graph);
 
     std::vector<SynchronizerId> justLocked;
-    Executor exec;
+    SyncGraphExecutor exec;
     exec.load(graph);
     exec.batch(ESyncAction::SetEnable, {sync0Id, sync1Id, sync2Id, sync3Id, sync4Id}, graph);
 
@@ -447,7 +199,7 @@ TEST(SyncExec, Basic)
 
 TEST(SyncExec, ParallelSize1Loop)
 {
-    Graph const graph = make_test_graph(
+    SyncGraph const graph = make_test_graph(
     {
         .types =
         {
@@ -486,7 +238,7 @@ TEST(SyncExec, ParallelSize1Loop)
     ASSERT_TRUE(syncId.has_value());
 
     std::vector<SynchronizerId> justLocked;
-    Executor exec;
+    SyncGraphExecutor exec;
     exec.load(graph);
     exec.batch(ESyncAction::SetEnable, {syncId}, graph);
 
@@ -511,7 +263,7 @@ TEST(SyncExec, ParallelSize1Loop)
 
 TEST(SyncExec, BranchingPath)
 {
-    Graph const graph = make_test_graph(
+    SyncGraph const graph = make_test_graph(
     {
         .types =
         {
@@ -604,7 +356,7 @@ TEST(SyncExec, BranchingPath)
     ASSERT_TRUE(is_all_not_null(schedule, eo3pl, withA, withB, branching, branchingViaA, branchingViaB, bp));
 
     std::vector<SynchronizerId> justLocked;
-    Executor exec;
+    SyncGraphExecutor exec;
     exec.load(graph);
 
     exec.batch(ESyncAction::SetEnable, {schedule, eo3pl}, graph);
@@ -721,7 +473,7 @@ TEST(SyncExec, BranchingPath)
 //
 TEST(SyncExec, NestedLoop)
 {
-    Graph const graph = make_test_graph(
+    SyncGraph const graph = make_test_graph(
     {
         .types =
         {
@@ -736,7 +488,7 @@ TEST(SyncExec, NestedLoop)
             },
             {
                 .name = "OSP-Style Intermediate-Value Pipeline",
-                .points = {"Finish", "Start", "Schedule", "Read", "Clear", "Modify"},
+                .points = {"Start", "Schedule", "Read", "Clear", "Modify", "Finish"},
                 .cycles = {
                     { .name = "Control",    .path = {"Start", "Schedule", "Finish"} },
                     { .name = "Running",    .path = {"Schedule", "Read", "Clear", "Modify"} },
@@ -767,17 +519,17 @@ TEST(SyncExec, NestedLoop)
             // This assures children can only run while OuterBlkCtrl is in its Running state.
             // SchInit 'schedule init' assures that all children start (cycles set) at the same
             // time.
-            { .name = "syOtrLCLeft", .connections = {
+            { .name = "syOtrLCLeft", .debugGraphStraight = true, .connections = {
                     { .subgraph = "OuterBlkCtrl",       .point = "Running" },
-                    { .subgraph = "Outer-Results",      .point = "Start" },
                     { .subgraph = "Outer-Request",      .point = "Start" },
+                    { .subgraph = "Outer-Results",      .point = "Start" },
                     { .subgraph = "InnerBlkCtrl",       .point = "Start" }      } },
             { .name = "syOtrLCRight", .connections = {
                     { .subgraph = "OuterBlkCtrl",       .point = "Running" },
                     { .subgraph = "Outer-Request",      .point = "Finish" },
                     { .subgraph = "Outer-Results",      .point = "Finish" },
                     { .subgraph = "InnerBlkCtrl",       .point = "Finish" }     } },
-            { .name = "syOtrLCSchInit", .connections = {
+            { .name = "syOtrLCSchInit",  .debugGraphStraight = true, .connections = {
                     { .subgraph = "Outer-Request",      .point = "Schedule" },
                     { .subgraph = "Outer-Results",      .point = "Schedule" },
                     { .subgraph = "InnerBlkCtrl",       .point = "Schedule" }      } },
@@ -791,7 +543,7 @@ TEST(SyncExec, NestedLoop)
             { .name = "syInrSchedule", .connections = {
                   { .subgraph = "InnerBlkCtrl", .point = "Schedule" } } },
 
-            { .name = "syInrLCLeft", .connections = {
+            { .name = "syInrLCLeft", .debugGraphStraight = true, .connections = {
                     { .subgraph = "InnerBlkCtrl",       .point = "Running" },
                     { .subgraph = "Inner-Process0",     .point = "Start" },
                     { .subgraph = "Inner-Process1",     .point = "Start" }      } },
@@ -815,7 +567,7 @@ TEST(SyncExec, NestedLoop)
             { .name = "syTaskL0ext", .connections =  {
                     { .subgraph = "Outer-Request",      .point = "Read" }       } },
 
-            { .name = "syTaskL0sus", .connections = {
+            { .name = "syTaskL0sus", .debugGraphLongAndUgly = true, .connections = {
                     { .subgraph = "Outer-Request",      .point = "Read" },
                     { .subgraph = "Inner-Process0",     .point = "Finish" }    } },
 
@@ -827,10 +579,10 @@ TEST(SyncExec, NestedLoop)
 
             { .name = "syTaskL1", .connections = {
                     { .subgraph = "Inner-Process0",     .point = "Modify" }     } },
-            { .name = "syTaskL1ext", .connections = {
+            { .name = "syTaskL1ext", .debugGraphLongAndUgly = true, .connections = {
                     { .subgraph = "Outer-Request",      .point = "Read" },
                     { .subgraph = "Inner-Process0",     .point = "Modify" }     } },
-            { .name = "syTaskL1sus", .connections = {
+            { .name = "syTaskL1sus", .debugGraphLongAndUgly = true, .connections = {
                     { .subgraph = "Outer-Request",      .point = "Read" },
                     { .subgraph = "Inner-Process0",     .point = "Finish" }     } },
 
@@ -843,9 +595,9 @@ TEST(SyncExec, NestedLoop)
 
             { .name = "syTaskL3", .connections = {
                     { .subgraph = "Inner-Process1",     .point = "Read" }       } },
-            { .name = "syTaskL3ext", .connections = {
+            { .name = "syTaskL3ext", .debugGraphLongAndUgly = true, .connections = {
                     { .subgraph = "Outer-Results",      .point = "Modify" }     } },
-            { .name = "syTaskL3sus", .connections = {
+            { .name = "syTaskL3sus", .debugGraphLongAndUgly = true, .connections = {
                     { .subgraph = "Outer-Results",      .point = "Modify" },
                     { .subgraph = "Inner-Process1",     .point = "Finish" }     } },
 
@@ -917,7 +669,6 @@ TEST(SyncExec, NestedLoop)
     SynchronizerId const syInrLCCan0        = find_sync("syInrLCCan0",      graph);
     SynchronizerId const syInrLCCan1        = find_sync("syInrLCCan1",      graph);
 
-
     ASSERT_TRUE(is_all_not_null(
             blkCtrl, ospPipeline, blkCtrlControl, blkCtrlRunning, blkCtrlCancel, ospPipelineControl,
             ospPipelineRunning, ospPipelineCancel, outerBlkCtrl, outerRequests, outerResults,
@@ -928,7 +679,7 @@ TEST(SyncExec, NestedLoop)
             syTaskL3sus, syTaskO1, syTaskO2, syTaskO3));
 
     std::vector<SynchronizerId> justLocked;
-    Executor exec;
+    SyncGraphExecutor exec;
     exec.load(graph);
 
     exec.batch(ESyncAction::SetEnable, {

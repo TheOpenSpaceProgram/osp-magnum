@@ -25,12 +25,12 @@
 #pragma once
 
 #include <gtest/gtest.h>
-#include <osp/sync_graph/graph.h>
+#include <osp/executor/sync_graph.h>
 
 namespace test_graph
 {
 
-using namespace osp::sync;
+using namespace osp::exec;
 
 // Most of the main codebase uses strong ID types and variable names, which are fast and harder
 // to mess up, but string names are more 'stupid simple'. Great for a small unit test.
@@ -71,6 +71,8 @@ struct ArgConnectToPoint
 struct ArgSync
 {
     std::string_view name;
+    bool debugGraphStraight = false;
+    bool debugGraphLongAndUgly = false;
     std::initializer_list<ArgConnectToPoint> connections;
 };
 
@@ -81,7 +83,7 @@ struct Args
     std::initializer_list<ArgSync> syncs;
 };
 
-inline SubgraphId find_subgraph(std::string_view debugName, Graph const& graph)
+inline SubgraphId find_subgraph(std::string_view debugName, SyncGraph const& graph)
 {
     auto const &subgraphFirstIt = graph.subgraphs.begin();
     auto const &subgraphLastIt  = graph.subgraphs.end();
@@ -94,7 +96,7 @@ inline SubgraphId find_subgraph(std::string_view debugName, Graph const& graph)
             : SubgraphId::from_index(std::distance(subgraphFirstIt, foundIt));
 }
 
-inline LocalCycleId find_cycle(std::string_view debugName, SubgraphTypeId sgtypeId, Graph const& graph)
+inline LocalCycleId find_cycle(std::string_view debugName, SubgraphTypeId sgtypeId, SyncGraph const& graph)
 {
     SubgraphType const type       = graph.sgtypes[sgtypeId];
     auto const &cyclesFirstIt = type.cycles.begin();
@@ -108,7 +110,7 @@ inline LocalCycleId find_cycle(std::string_view debugName, SubgraphTypeId sgtype
             : LocalCycleId::from_index(std::distance(cyclesFirstIt, foundIt));
 }
 
-inline SubgraphTypeId find_sgtype(std::string_view debugName, Graph const& graph)
+inline SubgraphTypeId find_sgtype(std::string_view debugName, SyncGraph const& graph)
 {
     auto const &sgtypeFirstIt = graph.sgtypes.begin();
     auto const &sgtypeLastIt = graph.sgtypes.end();
@@ -118,7 +120,7 @@ inline SubgraphTypeId find_sgtype(std::string_view debugName, Graph const& graph
     return SubgraphTypeId::from_index(std::distance(sgtypeFirstIt, foundIt));
 }
 
-inline SynchronizerId find_sync(std::string_view debugName, Graph const& graph)
+inline SynchronizerId find_sync(std::string_view debugName, SyncGraph const& graph)
 {
     auto const &syncFirstIt = graph.syncs.begin();
     auto const &syncLastIt = graph.syncs.end();
@@ -128,9 +130,9 @@ inline SynchronizerId find_sync(std::string_view debugName, Graph const& graph)
     return SynchronizerId::from_index(std::distance(syncFirstIt, foundIt));
 }
 
-inline Graph make_test_graph(Args args)
+inline SyncGraph make_test_graph(Args args)
 {
-    Graph out;
+    SyncGraph out;
 
     out.sgtypeIds.reserve(args.types.size());
     out.sgtypes.resize(out.sgtypeIds.capacity());
@@ -151,7 +153,7 @@ inline Graph make_test_graph(Args args)
 
         // set point count and names
         int const pointCount = argSgtype.points.size();
-        rSgtype.pointCount = std::uint8_t(pointCount);
+        //rSgtype.pointCount = std::uint8_t(pointCount);
         rSgtype.points.resize(pointCount);
         for (int i = 0; i < pointCount; ++i)
         {
@@ -201,7 +203,7 @@ inline Graph make_test_graph(Args args)
         rSubgraph.instanceOf = find_sgtype(argSubgraph.type, out);
         LGRN_ASSERTMV(subgraphId.has_value(), "No SubgraphType with name found", argSubgraph.type);
 
-        rSubgraph.points.resize(out.sgtypes[rSubgraph.instanceOf].pointCount);
+        rSubgraph.points.resize(out.sgtypes[rSubgraph.instanceOf].points.size());
     }
 
     // Make synchronizers
@@ -210,7 +212,9 @@ inline Graph make_test_graph(Args args)
         SynchronizerId const syncId = out.syncIds.create();
         Synchronizer &rSync = out.syncs[syncId];
 
-        rSync.debugName = argSync.name;
+        rSync.debugName             = argSync.name;
+        rSync.debugGraphStraight    = argSync.debugGraphStraight;
+        rSync.debugGraphLongAndUgly = argSync.debugGraphLongAndUgly;
 
         for (ArgConnectToPoint const& argConnect : argSync.connections)
         {
@@ -233,6 +237,25 @@ inline Graph make_test_graph(Args args)
             rSync.connectedPoints.push_back({subgraphId, pointId});
         }
     }
+
+    for (SynchronizerId const syncId : out.syncIds)
+    {
+        std::sort(out.syncs[syncId].connectedPoints.begin(),
+                  out.syncs[syncId].connectedPoints.end());
+    }
+    for (SubgraphId const subgraphId : out.subgraphIds)
+    {
+        Subgraph &rSubgraph = out.subgraphs[subgraphId];
+        for (Subgraph::Point &rPoint : rSubgraph.points)
+        {
+            std::sort(rPoint.connectedSyncs.begin(), rPoint.connectedSyncs.end());
+        }
+    }
+
+    out.debug_verify();
+
+    std::cout << "\n\n" << SyncGraphDOTVisualizer{out} << "\n\n";
+
 
     return out;
 } // make_test_graph

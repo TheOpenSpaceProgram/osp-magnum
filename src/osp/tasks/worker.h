@@ -24,19 +24,12 @@
  */
 #pragma once
 
-#include <bitset>
-#include <Corrade/Containers/EnumSet.h>
-
 namespace osp
 {
 
-enum class TaskAction
+struct TaskActions
 {
-    Cancel = 1 << 0
-    // CancelLoop = 1 << 1
+    bool cancel{false};
 };
-
-using TaskActions = Corrade::Containers::EnumSet<TaskAction>;
-CORRADE_ENUMSET_OPERATORS(TaskActions)
 
 } // namespace osp

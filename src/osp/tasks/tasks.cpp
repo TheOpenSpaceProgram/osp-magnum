@@ -31,5 +31,11 @@
 namespace osp
 {
 
+PipelineTypeIdReg& PipelineTypeIdReg::instance()
+{
+    static PipelineTypeIdReg instance;
+    return instance;
+}
+
 } // namespace osp
 
