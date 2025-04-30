@@ -440,15 +440,11 @@ public:
 
     virtual void load(Framework &rFW) = 0;
 
-    virtual void run(Framework &rFW, osp::PipelineId pipeline) = 0;
-
-    virtual void signal(Framework &rFW, osp::LoopBlockId loopblk) = 0;
-
-    virtual void signal(Framework &rFW, osp::PipelineId pipeline) = 0;
+    virtual void task_finish(Framework &rFW, osp::TaskId taskId, bool overrideStatus = false, TaskActions status = {}) = 0;
 
     virtual void wait(Framework &rFW) = 0;
 
-    virtual bool is_running(Framework const &rFW) = 0;
+    virtual bool is_running(Framework const &rFW, LoopBlockId loopblkId) = 0;
 };
 
 

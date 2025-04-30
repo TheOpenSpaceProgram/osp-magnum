@@ -68,12 +68,12 @@ class SinglethreadFWExecutor final : public osp::fw::IExecutor
 
         SubgraphId          subgraph;
 
-        SynchronizerId      signal;
         SynchronizerId      schedule;
         SynchronizerId      enterexit;
         SynchronizerId      checkstop;
         SynchronizerId      left;
         SynchronizerId      right;
+        SynchronizerId      finish;
     };
     struct WtxLoopblk
     {
@@ -88,7 +88,6 @@ class SinglethreadFWExecutor final : public osp::fw::IExecutor
         SubgraphId              main;
         SubgraphId              scheduleStatus;
         SynchronizerId          schedule;
-        SynchronizerId          signal;
         std::vector<TaskId>     cancelsTasks;
     };
     struct WtxPipeline
@@ -114,7 +113,7 @@ class SinglethreadFWExecutor final : public osp::fw::IExecutor
         };
     };
 
-    enum class ESyncType : std::int8_t { Invalid, BlkSignal, BlkSchedule, BlkEnterExit, BlkCheckStop, BlkLeft, BlkRight, PlSignal, Task, TaskSchedule, MaybeCancel };
+    enum class ESyncType : std::int8_t { Invalid, BlkSchedule, BlkEnterExit, BlkCheckStop, BlkLeft, BlkRight, BlkFinish, Task, PlSchedule, MaybeCancel };
 
     struct RoxSync
     {
@@ -141,9 +140,18 @@ class SinglethreadFWExecutor final : public osp::fw::IExecutor
         };
     };
 
+    struct TaskWaitingToFinish
+    {
+        TaskId          taskId;
+        TaskActions     status;
+        SynchronizerId  syncId;
+        PipelineId      pipeline;
+        LoopBlockId     loopblk;
+        bool            neverCancel;
+    };
+
     constexpr static LocalPointId point(int in) { return LocalPointId::from_index(in); }
     constexpr static LocalCycleId cycle(int in) { return LocalCycleId::from_index(in); };
-
 
 public:
 
@@ -209,9 +217,7 @@ public:
                 {.debugName = "Finish"}     // point(3)
             }};
             rSgtype.cycles = {{
-                {.debugName = "Control",  .path = {blkctrlStart, blkctrlSchedule, blkctrlRunning}}, // cycle(0)
-                {.debugName = "Running",  .path = {blkctrlSchedule, blkctrlRunning}},               // cycle(1)
-                {.debugName = "Canceled", .path = {blkctrlSchedule}},                               // cycle(2)
+                {.debugName = "Control",  .path = {blkctrlStart, blkctrlSchedule, blkctrlRunning, blkctrlFinish}}
             }};
             rSgtype.initialCycle = cycle(0);
             rSgtype.initialPos   = 0;
@@ -225,7 +231,7 @@ public:
                 {.debugName = "Done"},      // point(1)
             }};
             rSgtype.cycles = {{
-                {.debugName = "Control",  .path = {point(0), point(1)}}, // cycle(0)
+                {.debugName = "Control",  .path = {point(0), point(1)}}
             }};
             rSgtype.initialCycle = cycle(0);
             rSgtype.initialPos   = 0;
@@ -300,16 +306,15 @@ public:
         {
             LoopBlock     const &loopblk           = tasks.loopblkInst[loopblkId];
             bool          const hasDefaultSchedule = ! loopblk.scheduleCondition.has_value();
-            bool          const hasSignal          = ! loopblk.parent.has_value();
 
             m_roxLoopblkOf[loopblkId] = {
                 .subgraph       = m_graph.subgraphIds.create(),
-                .signal         = hasSignal          ? m_graph.syncIds.create() : SynchronizerId{},
                 .schedule       = hasDefaultSchedule ? m_graph.syncIds.create() : SynchronizerId{},
                 .enterexit      = m_graph.syncIds.create(),
                 .checkstop      = m_graph.syncIds.create(),
                 .left           = m_graph.syncIds.create(),
-                .right          = m_graph.syncIds.create()
+                .right          = m_graph.syncIds.create(),
+                .finish         = m_graph.syncIds.create()
             };
 
         }
@@ -321,7 +326,6 @@ public:
         {
             LoopBlock     const &loopblk           = tasks.loopblkInst[loopblkId];
             bool          const hasDefaultSchedule = ! loopblk.scheduleCondition.has_value();
-            bool          const hasSignal          = ! loopblk.parent.has_value();
             RoxLoopblk    const &roxLoopblk     = m_roxLoopblkOf[loopblkId];
 
             Subgraph &rSubgraph = m_graph.subgraphs[roxLoopblk.subgraph];
@@ -347,35 +351,31 @@ public:
                 // connection happens later in "Connect LoopBlock schedule tasks" below
             }
 
-            if (hasSignal)
-            {
-                Synchronizer &rSignal = m_graph.syncs[roxLoopblk.signal];
-                rSignal.debugName = fmt::format("BC{} Signal", loopblkId.value);
-                m_roxSyncOf[roxLoopblk.signal] = {.tag = ESyncType::BlkSignal, .loopBlk = loopblkId.value};
-                m_graph.connect({.sync = roxLoopblk.signal,  .subgraphPoint = {roxLoopblk.subgraph, blkctrlStart}});
-            }
-
             Synchronizer &rEnterexit    = m_graph.syncs[roxLoopblk.enterexit];
             Synchronizer &rCheckstop    = m_graph.syncs[roxLoopblk.checkstop];
             Synchronizer &rLeft         = m_graph.syncs[roxLoopblk.left];
             Synchronizer &rRight        = m_graph.syncs[roxLoopblk.right];
+            Synchronizer &rFinish       = m_graph.syncs[roxLoopblk.finish];
 
             rEnterexit  .debugName = fmt::format("BC{} Enter/Exit", loopblkId.value);
             rCheckstop  .debugName = fmt::format("BC{} Check-Stop", loopblkId.value);
             rLeft       .debugName = fmt::format("BC{} Left",       loopblkId.value);
             rRight      .debugName = fmt::format("BC{} Right",      loopblkId.value);
-            rEnterexit  .debugGraphStraight = true;
+            rFinish     .debugName = fmt::format("BC{} Finish",      loopblkId.value);
             rCheckstop  .debugGraphLongAndUgly = true;
             rLeft       .debugGraphStraight = true;
             rRight      .debugGraphLoose = true;
+            rEnterexit  .debugGraphLoose = true;
 
             m_roxSyncOf[roxLoopblk.enterexit]   = {.tag = ESyncType::BlkEnterExit, .loopBlk = loopblkId.value};
             m_roxSyncOf[roxLoopblk.checkstop]   = {.tag = ESyncType::BlkCheckStop, .loopBlk = loopblkId.value};
             m_roxSyncOf[roxLoopblk.left]        = {.tag = ESyncType::BlkLeft,      .loopBlk = loopblkId.value};
             m_roxSyncOf[roxLoopblk.right]       = {.tag = ESyncType::BlkRight,     .loopBlk = loopblkId.value};
+            m_roxSyncOf[roxLoopblk.finish]      = {.tag = ESyncType::BlkFinish,    .loopBlk = loopblkId.value};
 
-            m_graph.connect({.sync = roxLoopblk.left,  .subgraphPoint = {roxLoopblk.subgraph, blkctrlRunning}});
-            m_graph.connect({.sync = roxLoopblk.right, .subgraphPoint = {roxLoopblk.subgraph, blkctrlRunning}});
+            m_graph.connect({.sync = roxLoopblk.left,   .subgraphPoint = {roxLoopblk.subgraph, blkctrlRunning}});
+            m_graph.connect({.sync = roxLoopblk.right,  .subgraphPoint = {roxLoopblk.subgraph, blkctrlRunning}});
+            m_graph.connect({.sync = roxLoopblk.finish, .subgraphPoint = {roxLoopblk.subgraph, blkctrlFinish}});
         }
 
         // TODO: set parents between loop blocks
@@ -391,13 +391,11 @@ public:
         {
             Pipeline const &pipeline          = tasks.pipelineInst[pipelineId];
             bool     const hasDefaultSchedule = ! pipeline.scheduleCondition.has_value();
-            bool     const hasSignal          = pipeline.exteralSignal.has_value();
 
             m_roxPipelineOf[pipelineId] = {
                 .main           = m_graph.subgraphIds.create(),
                 .scheduleStatus = m_graph.subgraphIds.create(),
-                .schedule       = hasDefaultSchedule ? m_graph.syncIds.create() : SynchronizerId{},
-                .signal         = hasSignal          ? m_graph.syncIds.create() : SynchronizerId{}
+                .schedule       = hasDefaultSchedule ? m_graph.syncIds.create() : SynchronizerId{}
             };
         }
 
@@ -411,7 +409,6 @@ public:
             RoxPltype     const &roxPltype      = roxPltypeOf[pipeline.type];
             SubgraphType  const &sgtype         = m_graph.sgtypes[roxPltype.sgtype];
             bool          const hasDefaultSchedule = ! pipeline.scheduleCondition.has_value();
-            bool          const hasSignal       = pipeline.exteralSignal.has_value();
             RoxLoopblk          &rRoxLoopblk    = m_roxLoopblkOf[pipeline.block];
 
             rRoxLoopblk.pipelineChildren.push_back(pipelineId);
@@ -448,7 +445,7 @@ public:
             if (hasDefaultSchedule)
             {
                 m_roxSyncOf[roxPl.schedule] = {
-                    .tag            = ESyncType::TaskSchedule,
+                    .tag            = ESyncType::PlSchedule,
                     .taskId         = TaskId{}.value,
                     .pipelineId     = pipelineId.value,
                 };
@@ -457,21 +454,6 @@ public:
                 };
 
                 m_graph.syncs[roxPl.schedule].debugName = fmt::format("PL{} DefaultSchedule", pipelineId.value);
-            }
-
-            if (hasSignal)
-            {
-                m_roxSyncOf[roxPl.signal] = {
-                    .tag            = ESyncType::PlSignal,
-                    .pipelineId     = pipelineId.value
-                };
-                m_wtxSyncOf[roxPl.signal] = {};
-
-                m_graph.syncs[roxPl.signal].debugName = fmt::format("PL{} Signal", pipelineId.value);
-
-                LocalPointId const stagePoint = point(1u + pipeline.exteralSignal.value);
-
-                m_graph.connect({.sync = roxPl.signal, .subgraphPoint = {roxPl.main, stagePoint}});
             }
         }
 
@@ -556,7 +538,7 @@ public:
 
                 // Convert existing task to a Schedule
                 rRoxPipeline    .schedule   = rRoxTask.main;
-                rTaskMainRoxSync.tag        = ESyncType::TaskSchedule;
+                rTaskMainRoxSync.tag        = ESyncType::PlSchedule;
                 rTaskMainRoxSync.pipelineId = pipelineId.value;
                 rTaskMainSync   .debugName  = fmt::format("PL{} Schedule{}", pipelineId.value, rTaskMainSync.debugName);
             }
@@ -700,7 +682,7 @@ public:
         {
             for (TaskId const taskId : m_roxPipelineOf[pipelineId].cancelsTasks)
             {
-                LGRN_ASSERTMV(m_roxSyncOf[m_roxTaskOf[taskId].main].tag != ESyncType::TaskSchedule,
+                LGRN_ASSERTMV(m_roxSyncOf[m_roxTaskOf[taskId].main].tag != ESyncType::PlSchedule,
                               "schedule tasks can't be cancellable",
                               rFW.m_taskImpl[taskId].debugName);
             }
@@ -725,7 +707,7 @@ public:
             if ( ! tasks.loopblkInst[loopblkId].parent.has_value() )
             {
                 RoxLoopblk const& rRoxLoopblk = m_roxLoopblkOf[loopblkId];
-                m_exec.batch(ESyncAction::SetEnable, {rRoxLoopblk.signal, rRoxLoopblk.schedule}, m_graph);
+                m_exec.batch(ESyncAction::SetEnable, {rRoxLoopblk.schedule, rRoxLoopblk.finish}, m_graph);
             }
         }
 
@@ -734,20 +716,32 @@ public:
 
     void on_sync_locked(SynchronizerId const syncId) {};
 
-    void run(osp::fw::Framework& rFW, osp::PipelineId pipeline) override
+    void task_finish(osp::fw::Framework &rFW, osp::TaskId taskId, bool overrideStatus = false, TaskActions status = {}) override
     {
+        auto const &first = m_tasksWaiting.begin();
+        auto const &last  = m_tasksWaiting.end();
+        auto const found  = std::find_if(first, last, [taskId] (TaskWaitingToFinish const& check)
+        {
+            return check.taskId == taskId;
+        });
+        LGRN_ASSERT(found != last);
 
+        TaskWaitingToFinish const wait = *found;
+
+        m_tasksWaiting.erase(found);
+
+        if (wait.loopblk.has_value())
+        {
+            finish_schedule_block(wait.loopblk, overrideStatus ? status : wait.status);
+        }
+        else if (wait.pipeline.has_value())
+        {
+            finish_schedule_pipeline(wait.pipeline, overrideStatus ? status : wait.status, wait.neverCancel, rFW);
+        }
+
+        m_exec.batch(Unlock, {wait.syncId}, m_graph);
     }
 
-    void signal(osp::fw::Framework& rFW, osp::LoopBlockId loopblk) override
-    {
-        signal(m_roxLoopblkOf[loopblk].signal);
-    }
-
-    void signal(osp::fw::Framework& rFW, osp::PipelineId pipeline) override
-    {
-        signal(m_roxPipelineOf[pipeline].signal);
-    }
 
     void wait(osp::fw::Framework& rFW) override
     {
@@ -758,7 +752,11 @@ public:
                 LGRN_ASSERTM(i != 41, "Task graph updates not stopping; likely a pipeline is infinite looping.");
 
                 bool const somethingChanged = m_exec.update(m_justAligned, m_graph);
-                if ( ! somethingChanged )
+                if ( somethingChanged )
+                {
+                    (void)0;
+                }
+                else
                 {
                     break;
                 }
@@ -784,7 +782,7 @@ public:
         }
     }
 
-    bool is_running(osp::fw::Framework const& rFW) override
+    bool is_running(osp::fw::Framework const& rFW, LoopBlockId loopblkId) override
     {
         for (LoopBlockId const loopblkId : rFW.m_tasks.loopblkIds)
         {
@@ -815,39 +813,104 @@ private:
         m_wtxSubgraphOf     .resize(capacity);
     }
 
-    void signal(SynchronizerId syncId)
+    struct TaskStuff
     {
-        auto const found = std::find(m_signalsLockedWaiting.begin(), m_signalsLockedWaiting.end(), syncId);
-        if (found != m_signalsLockedWaiting.end())
-        {
-            m_signalsLockedWaiting.erase(found);
-            m_exec.batch(Unlock, { syncId }, m_graph);
-        }
-        else
-        {
-            m_signalsEarly.push_back(syncId);
-        }
-    }
+        TaskActions status;
+        bool externalFinish{false};
+        bool nullTask{false};
+    };
 
-    TaskActions run_task(TaskId const taskId, osp::fw::Framework const& rFW)
+    TaskStuff run_task(TaskId const taskId, osp::fw::Framework& rFW)
     {
-        if ( ! taskId.has_value() ) { return {}; }
+        if( ! taskId.has_value() ) { return { .nullTask = true }; }
 
         fw::TaskImpl const &taskImpl = rFW.m_taskImpl[taskId];
 
-        if (taskImpl.func == nullptr) { return {}; }
+        if (taskImpl.func == nullptr) { return {.externalFinish = taskImpl.externalFinish, .nullTask = true }; }
 
         m_argumentRefs.clear();
         m_argumentRefs.reserve(taskImpl.args.size());
         for (fw::DataId const dataId : taskImpl.args)
         {
-            m_argumentRefs.push_back(dataId.has_value() ? rFW.m_data[dataId].as_ref() : entt::any{});
+            entt::any data = dataId.has_value() ? rFW.m_data[dataId].as_ref() : entt::any{};
+            LGRN_ASSERTV(data.data() != nullptr, taskImpl.debugName, taskId.value, dataId.value);
+            m_argumentRefs.push_back(std::move(data));
         }
 
-        return taskImpl.func(fw::WorkerContext{}, m_argumentRefs);
+        return {
+            .status         = taskImpl.func(fw::WorkerContext{}, m_argumentRefs),
+            .externalFinish = taskImpl.externalFinish,
+            .nullTask       = false
+        };
     }
 
-    void process_aligned_sync(SynchronizerId const syncAlignedId, osp::fw::Framework const& rFW)
+    void finish_schedule_block(LoopBlockId const loopblkId, TaskActions const status)
+    {
+        WtxLoopblk &rWtxLoopblk = m_wtxLoopblkOf[loopblkId];
+        if (status.cancel)
+        {
+            rWtxLoopblk.state = WtxLoopblk::EState::NotRunning;
+        }
+        else
+        {
+            RoxLoopblk const& roxLoopblk = m_roxLoopblkOf[loopblkId];
+            rWtxLoopblk.state = WtxLoopblk::EState::ScheduledToRun;
+            m_exec.batch(SetEnable, {roxLoopblk.enterexit, roxLoopblk.left, roxLoopblk.right}, m_graph);
+        }
+    }
+
+    void finish_schedule_pipeline(PipelineId const pipelineId, TaskActions const status, bool neverCancels, osp::fw::Framework const& rFW)
+    {
+        WtxPipeline &rWtxPipeline = m_wtxPipelineOf[pipelineId];
+        if (rWtxPipeline.isCanceled && ! status.cancel)
+        {
+            if ( ! neverCancels )
+            {
+                WtxLoopblk &rWtxLoopblk = m_wtxLoopblkOf[rFW.m_tasks.pipelineInst[pipelineId].block];
+                ++rWtxLoopblk.pipelinesRunning;
+            }
+
+            RoxPipeline &rRoxPipeline = m_roxPipelineOf[pipelineId];
+            rWtxPipeline.isCanceled = false;
+            for (TaskId const cancelTaskId : rRoxPipeline.cancelsTasks)
+            {
+                SynchronizerId const cancelSyncId = m_roxTaskOf[cancelTaskId].main;
+                WtxSync &rCancelWtxSync = m_wtxSyncOf[cancelSyncId];
+                --rCancelWtxSync.canceledByPipelines;
+                std::cout << "decrement " << pipelineId.value << " canceledByPipelines=" << rCancelWtxSync.canceledByPipelines << " inactiveBlocks=" << rCancelWtxSync.inactiveBlocks << "\n";
+                if (rCancelWtxSync.canceledByPipelines == 0 && rCancelWtxSync.inactiveBlocks == 0)
+                {
+                    std::cout << "enable task " << cancelTaskId.value << "\n";
+                    m_exec.batch(SetEnable, {cancelSyncId}, m_graph);
+                }
+            }
+        }
+        else if ( ! rWtxPipeline.isCanceled && status.cancel )
+        {
+            RoxPipeline &rRoxPipeline = m_roxPipelineOf[pipelineId];
+            rWtxPipeline.isCanceled = true;
+
+            WtxLoopblk &rWtxLoopblk = m_wtxLoopblkOf[rFW.m_tasks.pipelineInst[pipelineId].block];
+            --rWtxLoopblk.pipelinesRunning;
+
+            for (TaskId const cancelTaskId : rRoxPipeline.cancelsTasks)
+            {
+                SynchronizerId const cancelSyncId = m_roxTaskOf[cancelTaskId].main;
+                WtxSync &rCancelWtxSync = m_wtxSyncOf[cancelSyncId];
+                if (rCancelWtxSync.canceledByPipelines == 0 && rCancelWtxSync.inactiveBlocks == 0)
+                {
+                    std::cout << "disable task " << cancelTaskId.value << "\n";
+                    m_exec.batch(SetDisable, {cancelSyncId}, m_graph);
+                }
+                ++rCancelWtxSync.canceledByPipelines;
+            }
+        }
+    }
+
+
+
+
+    void process_aligned_sync(SynchronizerId const syncAlignedId, osp::fw::Framework& rFW)
     {
         std::cout << "locked SY" << syncAlignedId.value << " -- ";
         RoxSync const &rRoxSync = m_roxSyncOf[syncAlignedId];
@@ -855,40 +918,29 @@ private:
 
         switch(rRoxSync.tag)
         {
-
         case ESyncType::BlkSchedule:
         {
-            // start the block's pipelines and stuff
-            RoxLoopblk const& roxLoopblk = m_roxLoopblkOf[LoopBlockId{rRoxSync.loopBlk}];
-            WtxLoopblk &rWtxLoopblk = m_wtxLoopblkOf[LoopBlockId{rRoxSync.loopBlk}];
-
             auto const taskId = TaskId{rRoxSync.taskId};
             std::cout << "schedule task! " << taskId.value << " " << taskId.has_value() << "\n";
 
-            TaskActions const status = run_task(taskId, rFW);
+            auto const [status, externalFinish, nullTask] = run_task(taskId, rFW);
 
-            if ( ! status.cancel )
+            if (externalFinish)
             {
-                rWtxLoopblk.state = WtxLoopblk::EState::ScheduledToRun;
-
-                // enable signals
-                for (PipelineId const pipeline : roxLoopblk.pipelineChildren)
-                {
-                    RoxPipeline const &roxPipeline = m_roxPipelineOf[pipeline];
-                    if (roxPipeline.signal.has_value())
-                    {
-                        m_exec.batch(SetEnable, {roxPipeline.signal}, m_graph);
-                    }
-                }
-
-                m_exec.batch(SetEnable, {roxLoopblk.enterexit, roxLoopblk.left, roxLoopblk.right}, m_graph);
+                m_tasksWaiting.push_back({
+                    .taskId         = taskId,
+                    .status         = status,
+                    .syncId         = syncAlignedId,
+                    .pipeline       = {},
+                    .loopblk        = LoopBlockId{rRoxSync.loopBlk},
+                    .neverCancel    = false
+                });
             }
-            else if ( status.cancel )
+            else
             {
-                rWtxLoopblk.state = WtxLoopblk::EState::NotRunning;
+                finish_schedule_block(LoopBlockId{rRoxSync.loopBlk}, status);
+                m_exec.batch(Unlock, {syncAlignedId}, m_graph);
             }
-
-            m_exec.batch(Unlock, {syncAlignedId}, m_graph);
 
             break;
         }
@@ -945,9 +997,6 @@ private:
                 {
                     RoxPipeline const &roxPipeline = m_roxPipelineOf[pipeline];
                     m_exec.select_cycle(roxPipeline.main, cycle(0) /*Control*/, m_graph);
-
-                    // make sure that scheduleStatus subgraphs are left on their Run point
-                    m_reset.push_back(roxPipeline.scheduleStatus);
                 }
             }
             else
@@ -1000,11 +1049,6 @@ private:
                     RoxPipeline const &roxPipeline  = m_roxPipelineOf[pipelineId];
                     WtxPipeline       &rWtxPipeline = m_wtxPipelineOf[pipelineId];
 
-                    if (roxPipeline.signal.has_value())
-                    {
-                        m_exec.batch(SetDisable, {roxPipeline.signal}, m_graph);
-                    }
-
                     if ( ! rWtxPipeline.isCanceled )
                     {
                         rWtxPipeline.isCanceled = true;
@@ -1015,8 +1059,8 @@ private:
                             WtxSync &rCancelWtxSync = m_wtxSyncOf[cancelSyncId];
                             if (rCancelWtxSync.canceledByPipelines == 0 && rCancelWtxSync.inactiveBlocks == 0)
                             {
-                                std::cout << "disable task owo " << cancelTaskId.value << "\n";
-                                m_exec.batch(SetDisable, {cancelSyncId}, m_graph);
+                                std::cout << "disable task " << cancelTaskId.value << "\n";
+                                m_disableSyncs.push_back(cancelSyncId);
                             }
                             ++rCancelWtxSync.canceledByPipelines;
                         }
@@ -1033,58 +1077,49 @@ private:
         case ESyncType::Task:
         {
             std::cout << "task!\n";
-            run_task(TaskId{rRoxSync.taskId}, rFW);
-            m_exec.batch(Unlock, {syncAlignedId}, m_graph);
+            auto const taskId = TaskId{rRoxSync.taskId};
+            auto const [status, externalFinish, nullTask] = run_task(taskId, rFW);
+
+            if (externalFinish)
+            {
+                m_tasksWaiting.push_back({
+                    .taskId         = taskId,
+                    .status         = status,
+                    .syncId         = syncAlignedId,
+                    .pipeline       = {},
+                    .loopblk        = {},
+                    .neverCancel    = false
+                });
+            }
+            else
+            {
+                m_exec.batch(Unlock, {syncAlignedId}, m_graph);
+            }
             break;
         }
-        case ESyncType::TaskSchedule:
+        case ESyncType::PlSchedule:
         {
             auto const taskId = TaskId{rRoxSync.taskId};
             std::cout << "schedule task! " << taskId.value << " " << taskId.has_value() << "\n";
 
-            TaskActions const status = run_task(taskId, rFW);
+            auto const [status, externalFinish, nullTask] = run_task(taskId, rFW);
 
-            auto const pipelineId = PipelineId{rRoxSync.pipelineId};
-            LGRN_ASSERT(pipelineId.has_value());
-
-            WtxPipeline &rWtxPipeline = m_wtxPipelineOf[pipelineId];
-            if (rWtxPipeline.isCanceled && ! status.cancel)
+            if (externalFinish)
             {
-                RoxPipeline &rRoxPipeline = m_roxPipelineOf[pipelineId];
-                std::cout << "owo\n!";
-                rWtxPipeline.isCanceled = false;
-                for (TaskId const cancelTaskId : rRoxPipeline.cancelsTasks)
-                {
-                    SynchronizerId const cancelSyncId = m_roxTaskOf[cancelTaskId].main;
-                    WtxSync &rCancelWtxSync = m_wtxSyncOf[cancelSyncId];
-                    --rCancelWtxSync.canceledByPipelines;
-                    std::cout << "decrement " << taskId.value << " canceledByPipelines=" << rCancelWtxSync.canceledByPipelines << " inactiveBlocks=" << rCancelWtxSync.inactiveBlocks << "\n";
-                    if (rCancelWtxSync.canceledByPipelines == 0 && rCancelWtxSync.inactiveBlocks == 0)
-                    {
-                        std::cout << "enable task owo " << cancelTaskId.value << "\n";
-                        m_exec.batch(SetEnable, {cancelSyncId}, m_graph);
-                    }
-                }
+                m_tasksWaiting.push_back({
+                    .taskId         = taskId,
+                    .status         = status,
+                    .syncId         = syncAlignedId,
+                    .pipeline       = PipelineId{rRoxSync.pipelineId},
+                    .loopblk        = {},
+                    .neverCancel    = false
+                });
             }
-            else if ( ! rWtxPipeline.isCanceled && status.cancel )
+            else
             {
-                std::cout << "uwu\n!";
-                RoxPipeline &rRoxPipeline = m_roxPipelineOf[pipelineId];
-                rWtxPipeline.isCanceled = true;
-                for (TaskId const cancelTaskId : rRoxPipeline.cancelsTasks)
-                {
-                    SynchronizerId const cancelSyncId = m_roxTaskOf[cancelTaskId].main;
-                    WtxSync &rCancelWtxSync = m_wtxSyncOf[cancelSyncId];
-                    if (rCancelWtxSync.canceledByPipelines == 0 && rCancelWtxSync.inactiveBlocks == 0)
-                    {
-                        std::cout << "disable task owo " << cancelTaskId.value << "\n";
-                        m_exec.batch(SetDisable, {cancelSyncId}, m_graph);
-                    }
-                    ++rCancelWtxSync.canceledByPipelines;
-                }
+                finish_schedule_pipeline(PipelineId{rRoxSync.pipelineId}, status, nullTask, rFW);
+                m_exec.batch(Unlock, {syncAlignedId}, m_graph);
             }
-
-            m_exec.batch(Unlock, {syncAlignedId}, m_graph);
             break;
         }
 
@@ -1094,28 +1129,21 @@ private:
             m_disableSyncs.push_back(syncAlignedId);
             break;
         }
+        case ESyncType::BlkFinish:
+        {
+            RoxLoopblk const& roxLoopblk = m_roxLoopblkOf[LoopBlockId{rRoxSync.loopBlk}];
+            for (PipelineId const pipeline : roxLoopblk.pipelineChildren)
+            {
+                RoxPipeline const &roxPipeline = m_roxPipelineOf[pipeline];
+                // set subgraphs back to their initial point for next iteration
+                m_reset.push_back(roxPipeline.main);
+                m_reset.push_back(roxPipeline.scheduleStatus);
+            }
+        }
         case ESyncType::MaybeCancel:
             std::cout << "maybecan!\n";
             m_exec.batch(Unlock, {syncAlignedId}, m_graph);
             break;
-        case ESyncType::BlkSignal:
-        case ESyncType::PlSignal:
-        {
-            std::cout << "signl\n";
-            auto const foundEarly = std::find(m_signalsEarly.begin(), m_signalsEarly.end(), syncAlignedId);
-            if (foundEarly != m_signalsEarly.end())
-            {
-                // signal() was already called, unlock
-                m_signalsEarly.erase(foundEarly);
-                m_exec.batch(Unlock, {syncAlignedId}, m_graph);
-            }
-            else
-            {
-                m_signalsLockedWaiting.push_back(syncAlignedId);
-            }
-
-            break;
-        }
         case ESyncType::Invalid:
             LGRN_ASSERTV(false, syncAlignedId.value, m_graph.syncs[syncAlignedId].debugName);
             break;
@@ -1133,9 +1161,7 @@ private:
     std::vector<SynchronizerId>             m_justAligned;
     std::vector<SynchronizerId>             m_disableSyncs;
     std::vector<SubgraphId>                 m_reset;
-
-    std::vector<SynchronizerId>             m_signalsEarly;
-    std::vector<SynchronizerId>             m_signalsLockedWaiting;
+    std::vector<TaskWaitingToFinish>        m_tasksWaiting;
 
     std::vector<entt::any>                  m_argumentRefs;
     KeyedVec<SynchronizerId, WtxSync>       m_wtxSyncOf;

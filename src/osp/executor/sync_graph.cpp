@@ -110,13 +110,13 @@ constexpr std::initializer_list<std::string_view> sc_colorPalette = {
 std::ostream& operator<<(std::ostream& rStream, SyncGraphDOTVisualizer const& self)
 {
     rStream << "graph G {\n"
-            << "    rankdir=LR ranksep=0\n"
+            << "    rankdir=LR ranksep=0 nodesep=0.25\n"
                "    edge[fontcolor=white,fontname=\"Helvetica,Arial,sans-serif\"]\n"
                "    node[fontcolor=white,fontname=\"Helvetica,Arial,sans-serif\"]\n"
                "    bgcolor=\"#181122\"\n"
                "    node[shape=\"rectangle\",style=filled,fillcolor=grey28,penwidth=0]\n";
 
-    rStream << "    edge[minlen=3 color=\"#47474780\" penwidth=15 weight=160]\n";
+    rStream << "    edge[minlen=2 color=\"#47474780\" penwidth=15 weight=300]\n";
 
     for (SubgraphId const subgraphId : self.graph.subgraphIds)
     {
@@ -136,7 +136,7 @@ std::ostream& operator<<(std::ostream& rStream, SyncGraphDOTVisualizer const& se
 
             if (i == 0)
             {
-                rStream << " xlabel=\"[SGT" << subgraph.instanceOf.value << "] " << sgtype.debugName << " " << "[SG" << subgraphId.value << "] " << subgraph.debugName << "\"";
+                rStream << " xlabel=\"[SGT" << subgraph.instanceOf.value << "] " << sgtype.debugName << "\n" << "[SG" << subgraphId.value << "] " << subgraph.debugName << "\"";
             }
             rStream << "]\n";
         }
@@ -155,7 +155,7 @@ std::ostream& operator<<(std::ostream& rStream, SyncGraphDOTVisualizer const& se
 
     int color = 0;
 
-    rStream << "    edge[minlen=1 penwidth=5 weight=20] node[style=filled]\n";
+    rStream << "    edge[minlen=2 penwidth=5 weight=20] node[style=filled]\n";
 
     for (SynchronizerId const syncId : self.graph.syncIds)
     {
@@ -174,7 +174,7 @@ std::ostream& operator<<(std::ostream& rStream, SyncGraphDOTVisualizer const& se
                     << "    sylabel" << syncId.value
                     << " -- "
                     << "sg" << it->subgraph.value << "p" << int(it->point.value)
-                    << "[minlen=1 "
+                    << "[weight=50 minlen=0 "
                     << "color=\""<< sc_colorPalette.begin()[color] << (enabled ? "FF" : "10") << "\" "
                     << (locked ? "style=dashed" : "")
                     << "];\n";

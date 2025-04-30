@@ -163,9 +163,6 @@ struct Pipeline
 
     /// Read output value of this task as the condition to cancel this pipeline. Can be null
     TaskId scheduleCondition;
-
-    /// Which stage to connect an external signal to. Can be null
-    StageId exteralSignal;
 };
 
 struct TaskSyncToPipeline

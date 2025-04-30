@@ -99,6 +99,9 @@ private:
                           index,
                           functor.name());
 
+            LGRN_ASSERTMV(argIn.data() != nullptr,
+                          "empty entt::any", argIn.type().name(), functor.name());
+
             return entt::any_cast<T&>(argIn);
         }
     }
@@ -164,6 +167,13 @@ struct TaskRef
         return *this;
     }
 
+    TaskRef& ext_finish(bool value)
+    {
+        m_rFW.m_taskImpl.resize(m_rFW.m_tasks.taskIds.capacity());
+        m_rFW.m_taskImpl[taskId].externalFinish = value;
+        return *this;
+    }
+
     TaskRef& args(std::initializer_list<DataId> args)
     {
         m_rFW.m_taskImpl.resize(m_rFW.m_tasks.taskIds.capacity());
@@ -221,6 +231,11 @@ struct TaskRef
         return *this;
     }
 
+    constexpr operator TaskId() noexcept
+    {
+        return taskId;
+    }
+
     TaskId          taskId;
     Framework       &m_rFW;
 
@@ -254,12 +269,6 @@ struct PipelineRef
         return static_cast<PipelineRef&>(*this);
     }
 
-    PipelineRef& wait_for_signal(ENUM_T stage)
-    {
-        m_rFW.m_tasks.pipelineInst[pipelineId].exteralSignal = StageId::from_index(std::size_t(stage));
-        return *this;
-    }
-
     PipelineId      pipelineId;
     Framework       &m_rFW;
 
@@ -289,7 +298,6 @@ struct FeatureBuilder
     {
         return LoopBlockRef{ loopblkId, m_rFW };
     }
-
 
     [[nodiscard]] entt::any& data(DataId const dataId) noexcept
     {

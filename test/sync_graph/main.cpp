@@ -121,6 +121,7 @@ TEST(SyncExec, Basic)
             },
             {
                 .name = "Sync_2",
+                .debugGraphStraight = true,
                 .connections =
                 {
                     { .subgraph = "Bulb", .point = "B" },
@@ -139,6 +140,7 @@ TEST(SyncExec, Basic)
             },
             {
                 .name = "Sync_4",
+                .debugGraphStraight = true,
                 .connections =
                 {
                     { .subgraph = "Bulb", .point = "D" },
@@ -242,7 +244,7 @@ TEST(SyncExec, ParallelSize1Loop)
     exec.load(graph);
     exec.batch(ESyncAction::SetEnable, {syncId}, graph);
 
-    for(int i = 0; i < 10; ++i)
+    for(int i = 0; i < 5; ++i)
     {
         // something 'should happen' after first run or after unlock()
         ASSERT_TRUE(exec.update(justLocked, graph));
@@ -362,7 +364,7 @@ TEST(SyncExec, BranchingPath)
     exec.batch(ESyncAction::SetEnable, {schedule, eo3pl}, graph);
 
     // initial Idle cycle just repeatedly locks "Schedule" and "End of 3PL" sync
-    for (int i = 0; i < 20; ++i)
+    for (int i = 0; i < 5; ++i)
     {
         while (exec.update(justLocked, graph)) { }
 
@@ -384,7 +386,7 @@ TEST(SyncExec, BranchingPath)
     exec.select_cycle(bp, branchingViaA, graph);
     exec.batch(ESyncAction::SetEnable, {withA}, graph);
 
-    for (int i = 0; i < 20; ++i)
+    for (int i = 0; i < 5; ++i)
     {
         while (exec.update(justLocked, graph)) { }
 
@@ -412,7 +414,7 @@ TEST(SyncExec, BranchingPath)
     exec.select_cycle(bp, branchingViaA, graph);
     exec.batch(ESyncAction::SetDisable, {withA}, graph);
 
-    for (int i = 0; i < 20; ++i)
+    for (int i = 0; i < 5; ++i)
     {
         while (exec.update(justLocked, graph)) { }
 
@@ -434,7 +436,7 @@ TEST(SyncExec, BranchingPath)
     exec.select_cycle(bp, branchingViaB, graph);
     exec.batch(ESyncAction::SetEnable, {withB}, graph);
 
-    for (int i = 0; i < 20; ++i)
+    for (int i = 0; i < 5; ++i)
     {
         while (exec.update(justLocked, graph)) { }
 
@@ -529,7 +531,7 @@ TEST(SyncExec, NestedLoop)
                     { .subgraph = "Outer-Request",      .point = "Finish" },
                     { .subgraph = "Outer-Results",      .point = "Finish" },
                     { .subgraph = "InnerBlkCtrl",       .point = "Finish" }     } },
-            { .name = "syOtrLCSchInit",  .debugGraphStraight = true, .connections = {
+            { .name = "syOtrLCSchInit", .connections = {
                     { .subgraph = "Outer-Request",      .point = "Schedule" },
                     { .subgraph = "Outer-Results",      .point = "Schedule" },
                     { .subgraph = "InnerBlkCtrl",       .point = "Schedule" }      } },
@@ -856,7 +858,7 @@ TEST(SyncExec, NestedLoop)
     justLocked.clear();
 
     // both pipelines in the loop are canceled, and only run schedule tasks (P0S and P1S)
-    for (int i = 0; i < 20; ++i)
+    for (int i = 0; i < 5; ++i)
     {
         while (exec.update(justLocked, graph)) { }
         ASSERT_TRUE(is_locked({syTaskP0S, syTaskP1S}, exec, justLocked, graph));

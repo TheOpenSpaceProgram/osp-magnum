@@ -59,6 +59,7 @@ struct TaskImpl
     std::string             debugName;
     std::vector<DataId>     args;
     Func_t                  func    { nullptr };
+    bool                    externalFinish{false};
 };
 
 } // namespace osp

@@ -80,15 +80,13 @@ osp::PipelineTypeInfo const infoForEStgContinuous{
 
 enum class EStgOptionalPath {
     Schedule = 0,
-    Signal = 1,
-    Run = 2,
-    Done = 3
+    Run = 1,
+    Done = 2
 };
 osp::PipelineTypeInfo const infoForEStgOptionalPath{
     .debugName = "OptionalPath",
     .stages = {{
         { .name = "Schedule",   .isSchedule = true  },
-        { .name = "Signal",                         },
         { .name = "Run",        .useCancel = true   },
         { .name = "Done"                            } } }};
 
@@ -96,8 +94,11 @@ osp::PipelineTypeInfo const infoForEStgOptionalPath{
 
 struct Aquarium
 {
-    bool runMainLoop = false;
-    bool runAquariumUpdate = false;
+    TaskId scheduleMainLoop;
+    TaskId scheduleAquariumUpdate;
+
+//    bool runMainLoop = false;
+//    bool runAquariumUpdate = false;
     //int waterLevel = 10;
 };
 
@@ -181,34 +182,30 @@ FeatureDef const ftrWorld = feature_def("World", [] (
         Implement<FIMainLoop>   mainLoop,
         Implement<FIAquarium>   aquarium)
 {
-    rFB.data_emplace<Aquarium>(aquarium.di.aquariumDI);
+    auto &rAquarium = rFB.data_emplace<Aquarium>(aquarium.di.aquariumDI);
 
-    // 'Signal' will stop the main loop pipeline from proceeding until exec.signal is called.
-    // If wait_for_signal isn't added to the main loop pipeline, then it will just infinite loop
-    // when exec.wait(fw) is called.
-
-    rFB.pipeline(aquarium.pl.aquariumUpdatePL).parent(mainLoop.loopblks.mainLoop).wait_for_signal(EStgOptionalPath::Signal);
+    rFB.pipeline(aquarium.pl.aquariumUpdatePL).parent(mainLoop.loopblks.mainLoop);
 
     // Allow controlling the main loop so it can exit cleanly, controlled with runMainLoop.
-    rFB.task()
+    rAquarium.scheduleMainLoop = rFB.task()
         .name       ("Schedule main loop")
-        .schedules  ({mainLoop.loopblks.mainLoop})
-        .args       ({        aquarium.di.aquariumDI })
-        .func       ([] (Aquarium const &rAquarium)
-    {
-        return TaskActions{ .cancel = !rAquarium.runMainLoop };
-    });
+        .ext_finish (true)
+        .schedules  ({mainLoop.loopblks.mainLoop});
+//        .func       ([] (Aquarium const &rAquarium)
+//    {
+//        return TaskActions{ .cancel = !rAquarium.runMainLoop };
+//    });
 
     // Running the aquarium update is optional and controlled with runAquariumUpdate.
     // sync_with also ties aquariumUpdatePL to the main loop
-    rFB.task()
+    rAquarium.scheduleAquariumUpdate = rFB.task()
         .name       ("Schedule aquarium update")
-        .schedules  ({aquarium.pl.aquariumUpdatePL})
-        .args       ({        aquarium.di.aquariumDI })
-        .func       ([] (Aquarium const &rAquarium)
-    {
-        return TaskActions{ .cancel = ! rAquarium.runAquariumUpdate };
-    });
+        .ext_finish (true)
+        .schedules  ({aquarium.pl.aquariumUpdatePL});
+//        .func       ([] (Aquarium const &rAquarium)
+//    {
+//        return TaskActions{ .cancel = ! rAquarium.runAquariumUpdate };
+//    });
 });
 
 FeatureDef const ftrFish = feature_def("Fish", [] (
@@ -287,58 +284,45 @@ TEST(Tasks, Basics)
     osp::exec::SinglethreadFWExecutor exec;
     exec.load(fw);
 
-    ASSERT_FALSE(exec.is_running(fw));
+    exec.wait(fw);
+    ASSERT_FALSE(exec.is_running(fw, mainLoop.loopblks.mainLoop));
     EXPECT_EQ(rAquariumFish.fishCount, 10);
 
-    // Signal main loop block to start, but doesn't run because "Schedule main loop" sees rAquarium.runMainLoop=false.
-    exec.signal(fw, mainLoop.loopblks.mainLoop);
+    // Run main loop block but canceled so it doesn't do anything.
+    exec.task_finish(fw, rAquarium.scheduleMainLoop, true, {.cancel = true});
     exec.wait(fw);
-    ASSERT_FALSE(exec.is_running(fw));
-
-    // Start the main loop for real
-    rAquarium.runMainLoop = true;
-    exec.signal(fw, mainLoop.loopblks.mainLoop);
+    exec.task_finish(fw, rAquarium.scheduleMainLoop, true, {.cancel = true});
     exec.wait(fw);
-
-    // execution waits at signal aquariumUpdatePL
-    ASSERT_TRUE(exec.is_running(fw));
+    ASSERT_FALSE(exec.is_running(fw, mainLoop.loopblks.mainLoop));
     ASSERT_EQ(rAquariumFish.fishCount, 10);
 
-    exec.signal(fw, aquarium.pl.aquariumUpdatePL);
+    // Run main loop but not canceled, this starts running
+    exec.task_finish(fw, rAquarium.scheduleMainLoop, true, {.cancel = false});
     exec.wait(fw);
+    ASSERT_TRUE(exec.is_running(fw, mainLoop.loopblks.mainLoop));
 
-    // just exits as rAquarium.runAquariumUpdate != true
-    ASSERT_TRUE(exec.is_running(fw));
-    ASSERT_EQ(rAquariumFish.fishCount, 10);
-
-    rAquarium.runAquariumUpdate = true;
-    exec.signal(fw, aquarium.pl.aquariumUpdatePL);
+    // by here, scheduleAquariumUpdate should be locked
+    exec.task_finish(fw, rAquarium.scheduleAquariumUpdate, true, {.cancel = false});
     exec.wait(fw);
+    ASSERT_TRUE(exec.is_running(fw, mainLoop.loopblks.mainLoop));
+    ASSERT_EQ(rAquariumFish.fishCount, 8); // sharks ate 2 fish
 
-
-    // Start updating the aquarium
-    rAquarium.runAquariumUpdate = true;
-    exec.signal(fw, mainLoop.loopblks.mainLoop);
+    // repeat
+    exec.task_finish(fw, rAquarium.scheduleAquariumUpdate, true, {.cancel = false});
     exec.wait(fw);
+    ASSERT_TRUE(exec.is_running(fw, mainLoop.loopblks.mainLoop));
+    ASSERT_EQ(rAquariumFish.fishCount, 6); // sharks ate 2 more fish
 
-    ASSERT_TRUE(exec.is_running(fw));
-    ASSERT_EQ(rAquariumFish.fishCount, 8);
-
-    // Sharks have eaten 2 fish
-
-
-    exec.signal(fw, mainLoop.loopblks.mainLoop);
+    // repeat
+    exec.task_finish(fw, rAquarium.scheduleAquariumUpdate, true, {.cancel = false});
     exec.wait(fw);
+    ASSERT_TRUE(exec.is_running(fw, mainLoop.loopblks.mainLoop));
+    ASSERT_EQ(rAquariumFish.fishCount, 4);
 
-    // Sharks have eaten 2 more fish
-    ASSERT_EQ(rAquariumFish.fishCount, 6);
-
-    // Stop the main loop
-    rAquarium.runMainLoop = false;
-    exec.signal(fw, mainLoop.loopblks.mainLoop);
+    // exit
+    exec.task_finish(fw, rAquarium.scheduleAquariumUpdate, true, {.cancel = true});
     exec.wait(fw);
-
-    ASSERT_FALSE(exec.is_running(fw));
+    ASSERT_FALSE(exec.is_running(fw, mainLoop.loopblks.mainLoop));
 }
 
 //-----------------------------------------------------------------------------

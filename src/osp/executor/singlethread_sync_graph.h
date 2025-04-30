@@ -33,6 +33,8 @@
 
 #include <chrono>
 
+#include <optional>
+
 namespace osp::exec
 {
 
