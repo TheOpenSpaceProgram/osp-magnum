@@ -153,27 +153,38 @@ using FSessionId        = StrongId<std::uint32_t, struct DummyForFSessionId>;
 
 //-----------------------------------------------------------------------------
 
+// "FI struct" feature interface struct
+
 struct FIEmpty
 {
     struct LoopBlockIds { };
     struct DataIds      { };
     struct Pipelines    { };
+    struct TaskIds      { };
 };
 
+// DataIds and Pipelines are required for a valid Feature Interface Def
 template<typename T>
 concept CFeatureInterfaceDef = requires{ typename T::DataIds; typename T::Pipelines; };
 
+// LoopBlockIds is optional
 template <CFeatureInterfaceDef FI_T>
 struct loopblkids_from_fi { using type = FIEmpty::LoopBlockIds; };
-
 template <CFeatureInterfaceDef FI_T> requires( requires{typename FI_T::LoopBlockIds;} )
 struct loopblkids_from_fi<FI_T> { using type = typename FI_T::LoopBlockIds; };
+
+// TaskIds is optional
+template <CFeatureInterfaceDef FI_T>
+struct taskids_from_fi { using type = FIEmpty::TaskIds; };
+template <CFeatureInterfaceDef FI_T> requires( requires{typename FI_T::TaskIds;} )
+struct taskids_from_fi<FI_T> { using type = typename FI_T::TaskIds; };
 
 
 struct FITypeInfo
 {
     std::string                  name;
     std::size_t                  loopblkCount{};
+    std::size_t                  taskCount{};
     std::size_t                  dataCount{};
     std::vector<PipelineDefInfo> pipelines;
 };
@@ -250,7 +261,8 @@ private:
 
         return instance().register_type({
                 .name           = std::string{entt::type_id<FI_T>().name()},
-                .loopblkCount   = sizeof(typename loopblkids_from_fi<FI_T>::type) / sizeof(DataId),
+                .loopblkCount   = sizeof(typename loopblkids_from_fi<FI_T>::type) / sizeof(LoopBlockId),
+                .taskCount      = sizeof(typename taskids_from_fi<FI_T>::type) / sizeof(TaskId),
                 .dataCount      = sizeof(typename FI_T::DataIds) / sizeof(DataId),
                 .pipelines      = std::move(info) });
     }
@@ -265,6 +277,7 @@ struct FeatureInterface
     std::vector<DataId>             data;
     std::vector<LoopBlockId>        loopblks;
     std::vector<PipelineId>         pipelines;
+    std::vector<TaskId>             tasks;
 
     FITypeId                        type;
     ContextId                       context;
@@ -277,12 +290,14 @@ struct TagImplement {};
 template<CFeatureInterfaceDef FI_T, typename TAG_T = void>
 struct FInterfaceShorthand
 {
-    FIInstanceId id;
-    ContextId    ctx;
+    FIInstanceId                id;
+    ContextId                   ctx;
+
+    typename FI_T::DataIds      di;
+    typename FI_T::Pipelines    pl;
 
     typename loopblkids_from_fi<FI_T>::type loopblks;
-    typename FI_T::DataIds                  di;
-    typename FI_T::Pipelines                pl;
+    typename taskids_from_fi<FI_T>::type    tasks;
 };
 
 template<CFeatureInterfaceDef FI_T>
@@ -370,15 +385,6 @@ struct Framework
 
             FeatureInterface const &rInterface = m_fiinstData[fiId];
 
-            if constexpr ( ! std::is_empty_v<decltype(out.loopblks)> )
-            {
-                auto const blkMembers = arrayCast<DataId>(  arrayCast<std::byte>( arrayView(&out.loopblks, 1) )  );
-                for (std::size_t i = 0; i < blkMembers.size(); ++i)
-                {
-                    std::memcpy(&blkMembers[i], &rInterface.loopblks[i], sizeof(LoopBlockId));
-                }
-            }
-
             if constexpr ( ! std::is_empty_v<decltype(out.pl)> )
             {
                 auto const plMembers = arrayCast<PipelineDefBlank_t>(  arrayCast<std::byte>( arrayView(&out.pl, 1) )  );
@@ -394,6 +400,24 @@ struct Framework
                 for (std::size_t i = 0; i < diMembers.size(); ++i)
                 {
                     std::memcpy(&diMembers[i], &rInterface.data[i], sizeof(DataId));
+                }
+            }
+
+            if constexpr ( ! std::is_empty_v<decltype(out.loopblks)> )
+            {
+                auto const blkMembers = arrayCast<DataId>(  arrayCast<std::byte>( arrayView(&out.loopblks, 1) )  );
+                for (std::size_t i = 0; i < blkMembers.size(); ++i)
+                {
+                    std::memcpy(&blkMembers[i], &rInterface.loopblks[i], sizeof(LoopBlockId));
+                }
+            }
+
+            if constexpr ( ! std::is_empty_v<decltype(out.tasks)> )
+            {
+                auto const taskMembers = arrayCast<TaskId>(  arrayCast<std::byte>( arrayView(&out.tasks, 1) )  );
+                for (std::size_t i = 0; i < taskMembers.size(); ++i)
+                {
+                    std::memcpy(&taskMembers[i], &rInterface.tasks[i], sizeof(TaskId));
                 }
             }
         }

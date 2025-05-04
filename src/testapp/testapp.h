@@ -37,7 +37,14 @@
 namespace testapp
 {
 
-using MainLoopFunc_t = std::function<bool()>;
+struct MainLoopArgs
+{
+    osp::fw::Framework &rFW;
+    osp::fw::IExecutor &rExecutor;
+    osp::fw::ContextId mainCtx;
+};
+
+using MainLoopFunc_t = std::function<bool(MainLoopArgs)>;
 
 inline std::vector<MainLoopFunc_t>& main_loop_stack()
 {
@@ -45,46 +52,37 @@ inline std::vector<MainLoopFunc_t>& main_loop_stack()
     return instance;
 }
 
-struct TestApp
-{
-    struct UpdateParams {
-        float deltaTimeIn;
-        bool update;
-        bool sceneUpdate;
-        bool resync;
-        bool sync;
-        bool render;
-    };
+void run_cleanup(osp::fw::ContextId ctx, osp::fw::Framework &rFW, osp::fw::IExecutor &rExec);
 
-    /**
-     * @brief Deal with resource reference counts for a clean termination
-     */
-    void clear_resource_owners();
+//struct TestApp
+//{
+//    struct UpdateParams {
+//        float deltaTimeIn;
+//        bool update;
+//        bool sceneUpdate;
+//        bool resync;
+//        bool sync;
+//        bool render;
+//    };
 
-    void drive_default_main_loop();
+//    /**
+//     * @brief Deal with resource reference counts for a clean termination
+//     */
+//    void clear_resource_owners();
 
-    void drive_scene_cycle(UpdateParams p);
+//    void drive_default_main_loop();
 
-    void run_context_cleanup(osp::fw::ContextId);
+//    void drive_scene_cycle(UpdateParams p);
 
-    void init();
+//    void run_context_cleanup(osp::fw::ContextId);
 
-    osp::fw::Framework m_framework;
-    osp::fw::ContextId m_mainContext;
-    osp::fw::IExecutor *m_pExecutor  { nullptr };
-    osp::PkgId         m_defaultPkg  { lgrn::id_null<osp::PkgId>() };
+//    void init();
 
-    int m_argc;
-    char** m_argv;
 
-private:
 
-    /**
-     * @brief As the name implies
-     *
-     * prefer not to use names like this outside of testapp
-     */
-    void load_a_bunch_of_stuff();
-};
+//private:
+
+
+//};
 
 } // namespace testapp

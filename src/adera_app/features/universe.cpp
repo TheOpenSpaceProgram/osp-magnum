@@ -46,6 +46,7 @@ using namespace osp;
 
 namespace adera
 {
+#if 0  // SYNCEXEC
 
 // Universe Scenario
 
@@ -841,5 +842,5 @@ FeatureDef const ftrSolarSystemDraw = feature_def("SolarSystemDraw", [] (
     });
 }); // ftrSolarSystemDraw
 
-
+#endif
 } // namespace adera

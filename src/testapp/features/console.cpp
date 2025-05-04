@@ -86,11 +86,10 @@ private:
 FeatureDef const ftrREPL = feature_def("REPL", [] (FeatureBuilder &rFB, Implement<FICinREPL> cinREPL, DependOn<FIMainApp> mainApp)
 {
     rFB.data_emplace< std::vector<std::string> >(cinREPL.di.cinLines);
-    rFB.pipeline(cinREPL.pl.cinLines).parent(mainApp.pl.mainLoop);
+    rFB.pipeline(cinREPL.pl.cinLines).parent(mainApp.loopblks.mainLoop);
 
     rFB.task()
         .name       ("Read stdin buffer")
-        .run_on     ({mainApp.pl.mainLoop(Run)})
         .sync_with  ({cinREPL.pl.cinLines(Modify_)})
         .args       ({            cinREPL.di.cinLines})
         .func([] (std::vector<std::string> &rCinLines) noexcept

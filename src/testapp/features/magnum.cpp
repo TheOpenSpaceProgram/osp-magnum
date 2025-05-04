@@ -65,6 +65,11 @@ using osp::input::UserInputHandler;
 namespace testapp
 {
 
+FeatureDef const ftrTerrainDrawMagnum = {};
+
+
+
+
 FeatureDef const ftrMagnum = feature_def("Magnum", [] (
         FeatureBuilder              &rFB,
         Implement<FIMagnum>         magnum,
@@ -76,10 +81,10 @@ FeatureDef const ftrMagnum = feature_def("Magnum", [] (
     auto &rUserInput = rFB.data_get<UserInputHandler>(windowApp.di.userInput);
     config_controls(rUserInput);
 
-    rFB.pipeline(magnum.pl.meshGL)         .parent(windowApp.pl.sync);
-    rFB.pipeline(magnum.pl.textureGL)      .parent(windowApp.pl.sync);
-    rFB.pipeline(magnum.pl.entMeshGL)      .parent(windowApp.pl.sync);
-    rFB.pipeline(magnum.pl.entTextureGL)   .parent(windowApp.pl.sync);
+    rFB.pipeline(magnum.pl.meshGL)         .parent(mainApp.loopblks.mainLoop);
+    rFB.pipeline(magnum.pl.textureGL)      .parent(mainApp.loopblks.mainLoop);
+    rFB.pipeline(magnum.pl.entMeshGL)      .parent(mainApp.loopblks.mainLoop);
+    rFB.pipeline(magnum.pl.entTextureGL)   .parent(mainApp.loopblks.mainLoop);
 
     auto const &args = entt::any_cast<MagnumWindowApp::Arguments>(userData);
 
@@ -93,7 +98,7 @@ FeatureDef const ftrMagnum = feature_def("Magnum", [] (
 
     rFB.task()
         .name       ("Clean up Magnum renderer")
-        .run_on     ({cleanup.pl.cleanup(Run_)})
+        .sync_with  ({cleanup.pl.cleanup(Run_)})
         .args       ({    mainApp.di.resources,  magnum.di.renderGl})
         .func       ([] (Resources &rResources, RenderGL &rRenderGl) noexcept
     {
@@ -103,7 +108,7 @@ FeatureDef const ftrMagnum = feature_def("Magnum", [] (
 
 }); // ftrMagnum
 
-
+#if 0  // SYNCEXEC
 
 FeatureDef const ftrMagnumScene = feature_def("MagnumScene", [] (
         FeatureBuilder              &rFB,
@@ -640,6 +645,7 @@ FeatureDef const ftrTerrainDrawMagnum = feature_def("ShaderPhong", [] (
 
 }); // ftrShaderPhong
 
+#endif
 
 } // namespace testapp
 

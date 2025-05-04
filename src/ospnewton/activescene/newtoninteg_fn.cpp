@@ -22,7 +22,7 @@
  * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
  * SOFTWARE.
  */
-
+#if 0  // SYNCEXEC
 #include "newtoninteg_fn.h"          // IWYU pragma: associated
 
 #include <osp/activescene/basic_fn.h>
@@ -264,4 +264,4 @@ void SysNewton::find_colliders_recurse(
 
 }
 
-
+#endif

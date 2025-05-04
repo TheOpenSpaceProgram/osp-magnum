@@ -32,8 +32,8 @@ def write_loop():
             latest_graph_data = ""
             print("writing")
 
-            p = subprocess.run(["dot", "-o", "/tmp/graph.png", "-Tpng"], input=graph_data_write, text=True)
-        time.sleep(0.05)
+            p = subprocess.run(["dot", "-Gsize=16,9\\!", "-o", "/tmp/graph.png", "-Tpng"], input=graph_data_write, text=True)
+        time.sleep(0.25)
 
 
 write_loop_thread = threading.Thread(target=write_loop)

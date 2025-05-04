@@ -25,9 +25,17 @@
 #pragma once
 
 #include <osp/framework/framework.h>
+#include <osp/core/resourcetypes.h>
 
 namespace testapp
 {
+
+struct MagnumRendererArgs
+{
+    int    argc;
+    char** argv;
+    osp::PkgId defaultPkg;
+};
 
 void start_magnum_renderer(osp::fw::Framework &rFW, osp::fw::ContextId ctx, entt::any userData);
 

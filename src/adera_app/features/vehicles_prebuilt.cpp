@@ -43,6 +43,8 @@ using osp::restypes::gc_importer;
 namespace adera
 {
 
+#if 0  // SYNCEXEC
+
 Matrix4 quick_transform(Vector3 const pos, Quaternion const rot) noexcept
 {
     return Matrix4::from(rot.toMatrix(), pos);
@@ -220,5 +222,6 @@ FeatureDef const ftrPrebuiltVehicles = feature_def("PrebuiltVehicles", [] (
 
 }); // setup_prebuilt_vehicles
 
+#endif
 
 } // namespace adera

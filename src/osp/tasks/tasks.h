@@ -49,24 +49,6 @@
 #include <unordered_map>
 #include <vector>
 
-#define OSP_DECLARE_STAGE_NAMES(type, ...)                                                                  \
-    inline osp::ArrayView<std::string_view const> stage_names([[maybe_unused]] type _) noexcept             \
-    {                                                                                                       \
-        static auto const arr = std::initializer_list<std::string_view>{__VA_ARGS__};                       \
-        return osp::arrayView(arr);                                                                         \
-    }
-
-#define OSP_DECLARE_STAGE_SCHEDULE(type, schedule_enum)                     \
-    constexpr inline type stage_schedule([[maybe_unused]] type _) noexcept  \
-    {                                                                       \
-        return schedule_enum;                                               \
-    }
-
-#define OSP_DECLARE_STAGE_NO_SCHEDULE(type)                                 \
-    constexpr inline type stage_schedule([[maybe_unused]] type _) noexcept  \
-    {                                                                       \
-        return lgrn::id_null<type>();                                       \
-    }
 
 namespace osp
 {

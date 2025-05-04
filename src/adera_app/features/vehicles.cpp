@@ -52,6 +52,8 @@ using namespace Magnum::Math::Literals;
 namespace adera
 {
 
+#if 0  // SYNCEXEC
+
 FeatureDef const ftrParts = feature_def("Parts", [] (
         FeatureBuilder              &rFB,
         Implement<FIParts>          parts,
@@ -565,5 +567,6 @@ FeatureDef const ftrSignalsFloat = feature_def("SignalsFloat", [] (
     });
 }); // ftrSignalsFloat
 
+#endif
 
 } // namespace adera

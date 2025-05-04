@@ -53,6 +53,8 @@ using namespace planeta;
 namespace adera
 {
 
+#if 0  // SYNCEXEC
+
 FeatureDef const ftrTerrain = feature_def("Terrain", [] (
         FeatureBuilder              &rFB,
         Implement<FITerrain>        terrain,
@@ -814,5 +816,7 @@ FeatureDef const ftrTerrainDebugDraw = feature_def("TerrainDebugDraw", [] (
 
 }); // ftrTerrainDebugDraw
 
+
+#endif
 
 } // namespace adera

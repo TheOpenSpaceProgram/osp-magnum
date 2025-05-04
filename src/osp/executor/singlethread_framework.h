@@ -181,12 +181,17 @@ public:
         m_graph.subgraphs   .clear();
         m_graph.syncIds     .bitview().set();
         m_graph.syncs       .clear();
+        m_exec.perSubgraph  .clear();
+        m_exec.perSync      .clear();
+        m_exec.toCyclcErase .clear();
+        m_exec.toCycle      .clear();
         m_roxLoopblkOf      .clear();
         m_roxPipelineOf     .clear();
         m_roxSyncOf         .clear();
         m_wtxSubgraphOf     .clear();
         m_wtxSyncOf         .clear();
         m_roxTaskOf         .clear();
+        m_tasksWaiting      .clear();
 
         m_roxTaskOf         .resize(tasks.taskIds.capacity());
         m_roxLoopblkOf      .resize(tasks.loopblkIds.capacity());
@@ -361,9 +366,9 @@ public:
             rCheckstop  .debugName = fmt::format("BC{} Check-Stop", loopblkId.value);
             rLeft       .debugName = fmt::format("BC{} Left",       loopblkId.value);
             rRight      .debugName = fmt::format("BC{} Right",      loopblkId.value);
-            rFinish     .debugName = fmt::format("BC{} Finish",      loopblkId.value);
-            rCheckstop  .debugGraphLongAndUgly = true;
+            rFinish     .debugName = fmt::format("BC{} Finish",     loopblkId.value);
             rLeft       .debugGraphStraight = true;
+            rCheckstop  .debugGraphLoose = true;
             rRight      .debugGraphLoose = true;
             rEnterexit  .debugGraphLoose = true;
 
@@ -695,7 +700,7 @@ public:
 
 
 
-        std::cout << "\n\n" << SyncGraphDOTVisualizer{m_graph} << "\n\n";
+        //std::cout << "\n\n" << SyncGraphDOTVisualizer{m_graph} << "\n\n";
 
         m_exec.load(m_graph);
 
@@ -877,10 +882,10 @@ private:
                 SynchronizerId const cancelSyncId = m_roxTaskOf[cancelTaskId].main;
                 WtxSync &rCancelWtxSync = m_wtxSyncOf[cancelSyncId];
                 --rCancelWtxSync.canceledByPipelines;
-                std::cout << "decrement " << pipelineId.value << " canceledByPipelines=" << rCancelWtxSync.canceledByPipelines << " inactiveBlocks=" << rCancelWtxSync.inactiveBlocks << "\n";
+                //std::cout << "decrement " << pipelineId.value << " canceledByPipelines=" << rCancelWtxSync.canceledByPipelines << " inactiveBlocks=" << rCancelWtxSync.inactiveBlocks << "\n";
                 if (rCancelWtxSync.canceledByPipelines == 0 && rCancelWtxSync.inactiveBlocks == 0)
                 {
-                    std::cout << "enable task " << cancelTaskId.value << "\n";
+                    //std::cout << "enable task " << cancelTaskId.value << "\n";
                     m_exec.batch(SetEnable, {cancelSyncId}, m_graph);
                 }
             }
@@ -899,7 +904,7 @@ private:
                 WtxSync &rCancelWtxSync = m_wtxSyncOf[cancelSyncId];
                 if (rCancelWtxSync.canceledByPipelines == 0 && rCancelWtxSync.inactiveBlocks == 0)
                 {
-                    std::cout << "disable task " << cancelTaskId.value << "\n";
+                    //std::cout << "disable task " << cancelTaskId.value << "\n";
                     m_exec.batch(SetDisable, {cancelSyncId}, m_graph);
                 }
                 ++rCancelWtxSync.canceledByPipelines;
@@ -912,7 +917,7 @@ private:
 
     void process_aligned_sync(SynchronizerId const syncAlignedId, osp::fw::Framework& rFW)
     {
-        std::cout << "locked SY" << syncAlignedId.value << " -- ";
+        //std::cout << "locked SY" << syncAlignedId.value << " -- ";
         RoxSync const &rRoxSync = m_roxSyncOf[syncAlignedId];
         WtxSync       &rWtxSync = m_wtxSyncOf[syncAlignedId];
 
@@ -921,7 +926,7 @@ private:
         case ESyncType::BlkSchedule:
         {
             auto const taskId = TaskId{rRoxSync.taskId};
-            std::cout << "schedule task! " << taskId.value << " " << taskId.has_value() << "\n";
+            //std::cout << "schedule task! " << taskId.value << " " << taskId.has_value() << "\n";
 
             auto const [status, externalFinish, nullTask] = run_task(taskId, rFW);
 
@@ -946,13 +951,13 @@ private:
         }
         case ESyncType::BlkLeft:
         {
-            std::cout << "left!\n";
+            //std::cout << "left!\n";
             m_disableSyncs.push_back(syncAlignedId);
             break;
         }
         case ESyncType::BlkEnterExit:
         {
-            std::cout << "enter/exit\n";
+            //std::cout << "enter/exit\n";
             WtxLoopblk &rWtxLoopblk = m_wtxLoopblkOf[LoopBlockId{rRoxSync.loopBlk}];
             if (rWtxLoopblk.state == WtxLoopblk::EState::ScheduledToRun)
             {
@@ -1010,7 +1015,7 @@ private:
 
         case ESyncType::BlkCheckStop:
         {
-            std::cout << "checkstop!\n";
+            //std::cout << "checkstop!\n";
             RoxLoopblk const &roxLoopblk  = m_roxLoopblkOf[LoopBlockId{rRoxSync.loopBlk}];
             WtxLoopblk       &rWtxLoopblk = m_wtxLoopblkOf[LoopBlockId{rRoxSync.loopBlk}];
             if (rWtxLoopblk.pipelinesRunning == 0)
@@ -1076,7 +1081,7 @@ private:
         }
         case ESyncType::Task:
         {
-            std::cout << "task!\n";
+            //std::cout << "task!\n";
             auto const taskId = TaskId{rRoxSync.taskId};
             auto const [status, externalFinish, nullTask] = run_task(taskId, rFW);
 
@@ -1100,7 +1105,7 @@ private:
         case ESyncType::PlSchedule:
         {
             auto const taskId = TaskId{rRoxSync.taskId};
-            std::cout << "schedule task! " << taskId.value << " " << taskId.has_value() << "\n";
+            //std::cout << "schedule task! " << taskId.value << " " << taskId.has_value() << "\n";
 
             auto const [status, externalFinish, nullTask] = run_task(taskId, rFW);
 
@@ -1125,7 +1130,7 @@ private:
 
         case ESyncType::BlkRight:
         {
-            std::cout << "right!\n";
+            //std::cout << "right!\n";
             m_disableSyncs.push_back(syncAlignedId);
             break;
         }
@@ -1141,7 +1146,7 @@ private:
             }
         }
         case ESyncType::MaybeCancel:
-            std::cout << "maybecan!\n";
+            //std::cout << "maybecan!\n";
             m_exec.batch(Unlock, {syncAlignedId}, m_graph);
             break;
         case ESyncType::Invalid:

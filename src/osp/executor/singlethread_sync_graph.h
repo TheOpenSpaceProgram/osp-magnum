@@ -33,6 +33,7 @@
 
 #include <chrono>
 
+#include <iostream>
 #include <optional>
 
 namespace osp::exec
@@ -205,11 +206,13 @@ public:
     {
         if (file.empty()) { return; }
 
-        SyncGraphDOTVisualizer asd{.graph = graph, .pDebugInfo = nullptr};
+        SyncGraphDOTVisualizer visualizer{.graph = graph, .pDebugInfo = nullptr};
 
         try
         {
-            *stream << "<NEW_GRAPH>\n" << rExec.startTime.time_since_epoch() << "\n" << asd << "\n</NEW_GRAPH>\n";
+            std::ostringstream os;
+            os << "<NEW_GRAPH>\n" << rExec.startTime.time_since_epoch() << "\n" << visualizer << "\n</NEW_GRAPH>\n";
+            *stream << os.view();
             stream->flush();
         }
         catch(const std::exception &e)
@@ -222,10 +225,12 @@ public:
     {
         if (file.empty()) { return; }
         SyncGraphExecutorDebugInfo info(rExec);
-        SyncGraphDOTVisualizer asd{.graph = graph, .pDebugInfo = &info};
+        SyncGraphDOTVisualizer visualizer{.graph = graph, .pDebugInfo = &info};
         try
         {
-            *stream << "<UPDATE_GRAPH>\n" << rExec.startTime.time_since_epoch() << "\n" << asd << "\n</UPDATE_GRAPH>\n";
+            std::ostringstream os;
+            os << "<UPDATE_GRAPH>\n" << rExec.startTime.time_since_epoch() << "\n" << visualizer << "\n</UPDATE_GRAPH>\n";
+            *stream << os.view();
             stream->flush();
         }
         catch(const std::exception &e)
@@ -307,7 +312,7 @@ bool SyncGraphExecutor::update(std::vector<SynchronizerId> &rJustAlignedOut, Syn
             for (SubgraphPointAddr addr : rSync.connectedPoints)
             {
                 Subgraph                const &rSubgraph = graph.subgraphs[addr.subgraph];
-                PerSubgraph   const &rExecSubgraph = perSubgraph[addr.subgraph];
+                PerSubgraph             const &rExecSubgraph = perSubgraph[addr.subgraph];
                 SubgraphType            const &sgtype = graph.sgtypes[rSubgraph.instanceOf];
                 LocalPointId            const point = sgtype.cycles[rExecSubgraph.activeCycle].path[rExecSubgraph.position];
 

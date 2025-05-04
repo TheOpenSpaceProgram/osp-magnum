@@ -53,7 +53,7 @@ using osp::restypes::gc_importer;
 namespace adera
 {
 
-
+#if 0
 FeatureDef const ftrJolt = feature_def("Jolt", [] (
         FeatureBuilder              &rFB,
         Implement<FIJolt>           jolt,
@@ -705,6 +705,6 @@ FeatureDef const ftrRocketThrustJolt = feature_def("RocketThrustJolt", [] (
 
     rRocketsJolt.factorIndex = static_cast<std::uint8_t>(index);
 }); // ftrRocketThrustJolt
-
+#endif
 
 } // namespace adera

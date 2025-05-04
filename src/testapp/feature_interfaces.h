@@ -35,7 +35,7 @@ struct FICinREPL {
     };
 
     struct Pipelines {
-        PipelineDef<EStgIntr> cinLines          {"cmdIn"};
+        PipelineDef<EStgIntr> cinLines          {"cinLines"};
     };
 };
 

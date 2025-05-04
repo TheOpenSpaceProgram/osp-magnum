@@ -155,7 +155,7 @@ std::ostream& operator<<(std::ostream& rStream, SyncGraphDOTVisualizer const& se
 
     int color = 0;
 
-    rStream << "    edge[minlen=2 penwidth=5 weight=20] node[style=filled]\n";
+    rStream << "    edge[minlen=1 penwidth=5 weight=20] node[style=filled]\n";
 
     for (SynchronizerId const syncId : self.graph.syncIds)
     {

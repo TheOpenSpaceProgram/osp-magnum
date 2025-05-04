@@ -45,26 +45,60 @@ using namespace osp;
 namespace adera
 {
 
-FeatureDef const ftrMain = feature_def("Main", [] (FeatureBuilder &rFB, Implement<FIMainApp> mainApp)
+
+FeatureDef const ftrMainApp = feature_def("Main", [] (FeatureBuilder &rFB, Implement<FIMainApp> mainApp)
 {
     rFB.data_emplace< AppContexts >             (mainApp.di.appContexts, AppContexts{.main = rFB.ctx});
     rFB.data_emplace< MainLoopControl >         (mainApp.di.mainLoopCtrl);
     rFB.data_emplace< osp::Resources >          (mainApp.di.resources);
     rFB.data_emplace< FrameworkModify >         (mainApp.di.frameworkModify);
 
-    rFB.pipeline(mainApp.pl.mainLoop).loops(true).wait_for_signal(ModifyOrSignal);
-    rFB.pipeline(mainApp.pl.stupidWorkaround).parent(mainApp.pl.mainLoop);
+    rFB.pipeline(mainApp.pl.keepOpen).parent(mainApp.loopblks.mainLoop);
 
-    rFB.task()
+    rFB.task(mainApp.tasks.schedule)
         .name       ("Schedule Main Loop")
-        .schedules  ({mainApp.pl.mainLoop(Schedule)})
+        .schedules  ({mainApp.loopblks.mainLoop})
         .args       ({         mainApp.di.mainLoopCtrl})
-        .func([] (MainLoopControl const &rMainLoopCtrl) noexcept -> osp::TaskActions
+        .ext_finish(true)
+        .func       ([] (MainLoopControl &rLoopControl) noexcept
     {
-        return rMainLoopCtrl.doUpdate ? osp::TaskActions{} : osp::TaskAction::Cancel;
+        rLoopControl.mainScheduleWaiting = true;
+    });
+
+    rFB.task(mainApp.tasks.keepOpen )
+        .name       ("Schedule KeepOpen")
+        .schedules  ({mainApp.pl.keepOpen})
+        .args       ({         mainApp.di.mainLoopCtrl})
+        .ext_finish(true)
+        .func       ([] (MainLoopControl &rLoopControl) noexcept
+    {
+        rLoopControl.keepOpenWaiting = true;
     });
 });
 
+FeatureDef const ftrCleanupCtx = feature_def("CleanupCtx", [] (
+        FeatureBuilder              &rFB,
+        Implement<FICleanupContext> cleanup)
+{
+    rFB.data_emplace<bool>(cleanup.di.ranOnce, false);
+    rFB.pipeline(cleanup.pl.cleanup).parent(cleanup.loopblks.cleanup);
+
+    rFB.task(cleanup.tasks.blockSchedule)
+        .name        ("Schedule Clean-Up Loopblock")
+        .schedules   (cleanup.loopblks.cleanup)
+        .ext_finish  (true);
+
+    rFB.task(cleanup.tasks.pipelineSchedule)
+        .name       ("Schedule Clean-Up Pipeline")
+        .schedules  (cleanup.pl.cleanup)
+        .args       ({                     cleanup.di.ranOnce})
+        .func       ([] (bool &rRanOnce) noexcept -> osp::TaskActions
+    {
+        bool const ranOncePrev = rRanOnce;
+        rRanOnce = true;
+        return {.cancel = ranOncePrev};
+    });
+}); // ftrCleanupCtx
 
 FeatureDef const ftrScene = feature_def("Scene", [] (
         FeatureBuilder          &rFB,
@@ -73,20 +107,23 @@ FeatureDef const ftrScene = feature_def("Scene", [] (
 {
     rFB.data_emplace<float>(scn.di.deltaTimeIn, 0.0f);
     rFB.data_emplace<SceneLoopControl>(scn.di.loopControl);
-    rFB.pipeline(scn.pl.loopControl).parent(mainApp.pl.mainLoop);
-    rFB.pipeline(scn.pl.update)     .parent(mainApp.pl.mainLoop);
+    rFB.pipeline(scn.pl.loopControl).parent(mainApp.loopblks.mainLoop);
+    rFB.pipeline(scn.pl.update)     .parent(mainApp.loopblks.mainLoop);
 
-    rFB.task()
-        .name       ("Schedule Scene update")
-        .schedules  ({scn.pl.update(Schedule)})
-        .sync_with   ({scn.pl.loopControl(Ready)})
-        .args       ({                     scn.di.loopControl})
-        .func       ([] (SceneLoopControl const &rLoopControl) noexcept -> osp::TaskActions
-    {
-        return rLoopControl.doSceneUpdate ? osp::TaskActions{} : osp::TaskAction::Cancel;
-    });
+//    rFB.task()
+//        .name       ("Schedule Scene update")
+//        .schedule   (scn.pl.update)
+//        .sync_with   ({scn.pl.loopControl(Ready)})
+//        .args       ({                     scn.di.loopControl})
+//        .func       ([] (SceneLoopControl const &rLoopControl) noexcept -> osp::TaskActions
+//    {
+//        return rLoopControl.doSceneUpdate ? osp::TaskActions{} : osp::TaskAction::Cancel;
+//    });
 }); // ftrScene
 
+
+
+#if 0  // SYNCEXEC
 
 FeatureDef const ftrCommonScene = feature_def("CommonScene", [] (
         FeatureBuilder              &rFB,
@@ -195,41 +232,41 @@ FeatureDef const ftrCommonScene = feature_def("CommonScene", [] (
 
 }); // ftrCommonScene
 
+#endif
 
 FeatureDef const ftrWindowApp = feature_def("WindowApp", [] (
         FeatureBuilder              &rFB,
         Implement<FIWindowApp>      windowApp,
-        Implement<FICleanupContext> cleanup,
         DependOn<FIMainApp>         mainApp)
 {
-    rFB.pipeline(windowApp.pl.inputs).parent(mainApp.pl.mainLoop).wait_for_signal(ModifyOrSignal);
-    rFB.pipeline(windowApp.pl.sync)  .parent(mainApp.pl.mainLoop).wait_for_signal(ModifyOrSignal);
-    rFB.pipeline(windowApp.pl.resync).parent(mainApp.pl.mainLoop).wait_for_signal(ModifyOrSignal);
-    rFB.pipeline(cleanup.pl.cleanupWorkaround).parent(cleanup.pl.cleanup);
+    rFB.pipeline(windowApp.pl.inputs).parent(mainApp.loopblks.mainLoop);
+    rFB.pipeline(windowApp.pl.sync)  .parent(mainApp.loopblks.mainLoop);
+    rFB.pipeline(windowApp.pl.resync).parent(mainApp.loopblks.mainLoop);
 
     auto &rUserInput     = rFB.data_emplace<osp::input::UserInputHandler>(windowApp.di.userInput, 12);
     auto &rWindowAppCtrl = rFB.data_emplace<WindowAppLoopControl>        (windowApp.di.windowAppLoopCtrl);
 
     rFB.task()
         .name       ("Schedule Renderer Sync")
-        .schedules  ({windowApp.pl.sync(Schedule)})
+        .schedules  (windowApp.pl.sync)
         .args       ({                   windowApp.di.windowAppLoopCtrl})
         .func       ([] (WindowAppLoopControl const &rWindowAppLoopCtrl) noexcept -> osp::TaskActions
     {
-        return rWindowAppLoopCtrl.doSync ? osp::TaskActions{} : osp::TaskAction::Cancel;
+        return {.cancel = true};//rWindowAppLoopCtrl.doSync ? osp::TaskActions{} : osp::TaskAction::Cancel;
     });
 
     rFB.task()
         .name       ("Schedule Renderer Resync")
-        .schedules  ({windowApp.pl.resync(Schedule)})
+        .schedules  ({windowApp.pl.resync})
         .args       ({                   windowApp.di.windowAppLoopCtrl})
         .func       ([] (WindowAppLoopControl const &rWindowAppLoopCtrl) noexcept -> osp::TaskActions
     {
-        return rWindowAppLoopCtrl.doResync ? osp::TaskActions{} : osp::TaskAction::Cancel;
+        return {.cancel = true};//rWindowAppLoopCtrl.doResync ? osp::TaskActions{} : osp::TaskAction::Cancel;
     });
 
 }); // ftrWindowApp
 
+#if 0  // SYNCEXEC
 
 FeatureDef const ftrSceneRenderer = feature_def("SceneRenderer", [] (
         FeatureBuilder              &rFB,
@@ -471,4 +508,5 @@ FeatureDef const ftrSceneRenderer = feature_def("SceneRenderer", [] (
     });
 }); // setup_scene_renderer
 
+#endif
 } // namespace adera

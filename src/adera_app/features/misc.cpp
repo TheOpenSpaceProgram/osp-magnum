@@ -42,7 +42,7 @@ using osp::input::EButtonControlIndex;
 
 namespace adera
 {
-
+#if 0  // SYNCEXEC
 
 FeatureDef const ftrCameraFree = feature_def("CameraFree", [] (
         FeatureBuilder              &rFB,
@@ -104,6 +104,6 @@ FeatureDef const ftrCursor = feature_def("Cursor", [] (
     });
 
 }); // ftrCursor
-
+#endif
 
 } // namespace adera

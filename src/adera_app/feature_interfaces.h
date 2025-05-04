@@ -29,7 +29,6 @@
 namespace ftr_inter
 {
 
-
 enum class EStgOptn : uint8_t
 {
     ModifyOrSignal,
@@ -37,17 +36,16 @@ enum class EStgOptn : uint8_t
     Run,
     Done
 };
-OSP_DECLARE_STAGE_NAMES(EStgOptn, "Modify/Signal", "Schedule", "Run", "Done");
-OSP_DECLARE_STAGE_SCHEDULE(EStgOptn, EStgOptn::Schedule);
-
-
-enum class EStgEvnt : uint8_t
+inline osp::PipelineTypeInfo const gc_infoForEStgOptn
 {
-    Run_,
-    Done_
+    .debugName = "Optional",
+    .stages = {{
+        { .name = "Modify/Signal"                   },
+        { .name = "Schedule",   .isSchedule = true  },
+        { .name = "Run",        .useCancel = true   },
+        { .name = "Done",                           }
+    }}
 };
-OSP_DECLARE_STAGE_NAMES(EStgEvnt, "Run", "Done");
-OSP_DECLARE_STAGE_NO_SCHEDULE(EStgEvnt);
 
 /**
  * @brief Intermediate container that is filled, used, then cleared right away
@@ -60,25 +58,18 @@ enum class EStgIntr : uint8_t
     UseOrRun,
     Clear
 };
-OSP_DECLARE_STAGE_NAMES(EStgIntr, "Resize", "Modify", "Schedule", "Use/Run", "Clear");
-OSP_DECLARE_STAGE_SCHEDULE(EStgIntr, EStgIntr::Schedule_);
-
-/**
- * @brief 'Reversed' Intermediate container
- *
- * This is used as a workaround for flaws in osp/tasks/execute.cpp being incapable of handling
- * certain patterns of task dependencies
- */
-enum class EStgRevd : uint8_t
+inline osp::PipelineTypeInfo const gc_infoForEStgIntr
 {
-    Schedule__,
-    UseOrRun_,
-    Clear_,
-    Resize_,
-    Modify__,
+    .debugName = "Intermediate container",
+    .stages = {{
+        { .name = "Resize"                          },
+        { .name = "Modify"                          },
+        { .name = "Schedule",   .isSchedule = true  },
+        { .name = "UseOrRun",   .useCancel = true   },
+        { .name = "Clear",                          }
+    }}
 };
-OSP_DECLARE_STAGE_NAMES(EStgRevd, "Schedule", "Use/Run", "Clear", "Resize", "Modify");
-OSP_DECLARE_STAGE_SCHEDULE(EStgRevd, EStgRevd::Schedule__);
+
 
 /**
  * @brief Continuous Containers, data that persists and is modified over time
@@ -86,9 +77,6 @@ OSP_DECLARE_STAGE_SCHEDULE(EStgRevd, EStgRevd::Schedule__);
  */
 enum class EStgCont : uint8_t
 {
-    Prev,
-    ///< Previous state of container
-
     Delete,
     ///< Remove elements from a container or mark them for deletion. This often involves reading
     ///< a set of elements to delete. This is run first since it leaves empty spaces for new
@@ -100,20 +88,57 @@ enum class EStgCont : uint8_t
     Modify,
     ///< Modify existing elements
 
+    ScheduleC,
+
     Ready
     ///< Container is ready to use
 };
-OSP_DECLARE_STAGE_NAMES(EStgCont, "Prev", "Delete", "New", "Modify", "Use");
-OSP_DECLARE_STAGE_NO_SCHEDULE(EStgCont);
+inline osp::PipelineTypeInfo const gc_infoForEStgCont
+{
+    .debugName = "Continuous container",
+    .stages = {{
+        { .name = "Delete",                         },
+        { .name = "New",                            },
+        { .name = "Modify",                         },
+        { .name = "Schedule",   .isSchedule = true  },
+        { .name = "Ready",                          }
+    }}
+};
+
+
+enum class EStgEvnt : uint8_t
+{
+    Schedule__,
+    Run_,
+    Done_
+};
+inline osp::PipelineTypeInfo const gc_infoForEStgEvnt
+{
+    .debugName = "Event",
+    .stages = {{
+        { .name = "Schedule",   .isSchedule = true  },
+        { .name = "Run",        .useCancel = true   },
+        { .name = "Done",                           }
+    }}
+};
 
 enum class EStgFBO
 {
+    ScheduleFBO,
     Bind,
     Draw,
     Unbind
 };
-OSP_DECLARE_STAGE_NAMES(EStgFBO, "Bind", "Draw", "Unbind");
-OSP_DECLARE_STAGE_NO_SCHEDULE(EStgFBO);
+inline osp::PipelineTypeInfo const gc_infoForEStgFBO
+{
+    .debugName = "FrameBufferObject?",
+    .stages = {{
+        { .name = "ScheduleFBO", .isSchedule = true },
+        { .name = "Bind",                           },
+        { .name = "Draw",                           },
+        { .name = "Unbind",                         }
+    }}
+};
 
 
 enum class EStgLink
@@ -122,60 +147,83 @@ enum class EStgLink
     NodeUpd,
     MachUpd
 };
-OSP_DECLARE_STAGE_NAMES(EStgLink, "Schedule", "NodeUpd", "MachUpd");
-OSP_DECLARE_STAGE_SCHEDULE(EStgLink, EStgLink::ScheduleLink);
+inline osp::PipelineTypeInfo const gc_infoForEStgLink
+{
+    .debugName = "osp::link Nested update loop",
+    .stages = {{
+        { .name = "ScheduleLink", .isSchedule = true},
+        { .name = "Bind",                           },
+        { .name = "Draw",                           }
+    }}
+};
 
 namespace stages
 {
     using enum EStgOptn;
     using enum EStgCont;
     using enum EStgIntr;
-    using enum EStgRevd;
     using enum EStgEvnt;
     using enum EStgFBO;
     using enum EStgLink;
 } // namespace stages
 
-
-//-----------------------------------------------------------------------------
-
 inline void register_stage_enums()
 {
-    osp::PipelineInfo::sm_stageNames.resize(32);
-    osp::PipelineInfo::register_stage_enum<EStgOptn>();
-    osp::PipelineInfo::register_stage_enum<EStgEvnt>();
-    osp::PipelineInfo::register_stage_enum<EStgIntr>();
-    osp::PipelineInfo::register_stage_enum<EStgRevd>();
-    osp::PipelineInfo::register_stage_enum<EStgCont>();
-    osp::PipelineInfo::register_stage_enum<EStgFBO>();
-    osp::PipelineInfo::register_stage_enum<EStgLink>();
+    auto &rPltypeReg = osp::PipelineTypeIdReg::instance();
+    rPltypeReg.assign_pltype_info<EStgOptn>(gc_infoForEStgOptn);
+    rPltypeReg.assign_pltype_info<EStgEvnt>(gc_infoForEStgEvnt);
+    rPltypeReg.assign_pltype_info<EStgIntr>(gc_infoForEStgIntr);
+    rPltypeReg.assign_pltype_info<EStgCont>(gc_infoForEStgCont);
+    rPltypeReg.assign_pltype_info<EStgFBO> (gc_infoForEStgFBO);
+    rPltypeReg.assign_pltype_info<EStgLink>(gc_infoForEStgLink);
 }
+
 
 using osp::PipelineDef;
 using osp::fw::DataId;
+using osp::LoopBlockId;
+using osp::TaskId;
+
 
 //-----------------------------------------------------------------------------
 
 struct FIMainApp {
+    struct LoopBlockIds {
+        LoopBlockId mainLoop;
+    };
+
     struct DataIds {
         DataId appContexts;
         DataId resources;
         DataId mainLoopCtrl;
         DataId frameworkModify;
     };
+    struct TaskIds {
+        TaskId schedule;
+        TaskId keepOpen;
+    };
 
     struct Pipelines {
-        PipelineDef<EStgOptn> mainLoop          {"mainLoop"};
-        PipelineDef<EStgOptn> stupidWorkaround  {"stupidWorkaround - mainLoop needs a child or else something errors"};
+        PipelineDef<EStgOptn> keepOpen          {"keepOpen"};
     };
 };
 
 struct FICleanupContext {
-    struct DataIds { };
+    struct DataIds {
+        DataId ranOnce;
+    };
+
+    struct TaskIds {
+        TaskId blockSchedule;
+        TaskId pipelineSchedule;
+    };
+
+    struct LoopBlockIds {
+        LoopBlockId cleanup;
+    };
 
     struct Pipelines {
         PipelineDef<EStgEvnt> cleanup           {"cleanup           - Scene cleanup before destruction"};
-        PipelineDef<EStgOptn> cleanupWorkaround {"cleanupWorkaround"};
     };
 };
 
@@ -255,7 +303,7 @@ struct FIPhysShapes {
     struct Pipelines {
         PipelineDef<EStgIntr> spawnRequest      {"spawnRequest      - Spawned shapes"};
         PipelineDef<EStgIntr> spawnedEnts       {"spawnedEnts"};
-        PipelineDef<EStgRevd> ownedEnts         {"ownedEnts"};
+        PipelineDef<EStgIntr> ownedEnts         {"ownedEnts"};
     };
 };
 
@@ -295,7 +343,7 @@ struct FIPrefabs {
     struct Pipelines {
         PipelineDef<EStgIntr> spawnRequest      {"spawnRequest"};
         PipelineDef<EStgIntr> spawnedEnts       {"spawnedEnts"};
-        PipelineDef<EStgRevd> ownedEnts         {"ownedEnts"};
+        PipelineDef<EStgIntr> ownedEnts         {"ownedEnts"};
 
         PipelineDef<EStgCont> instanceInfo      {"instanceInfo"};
 
@@ -321,7 +369,7 @@ struct FIBounds {
 
     struct Pipelines {
         PipelineDef<EStgCont> boundsSet         {"boundsSet"};
-        PipelineDef<EStgRevd> outOfBounds       {"outOfBounds"};
+        PipelineDef<EStgIntr> outOfBounds       {"outOfBounds"};
     };
 };
 
@@ -587,6 +635,12 @@ struct FIWindowApp {
     struct DataIds {
         DataId windowAppLoopCtrl;
         DataId userInput;
+    };
+
+    struct TaskIds {
+        TaskId scheduleInputs;
+        TaskId scheduleSync;
+        TaskId scheduleResync;
     };
 
     struct Pipelines {

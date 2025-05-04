@@ -57,6 +57,14 @@ void Framework::close_context(ContextId ctx)
         }
         rFIInst.pipelines.clear();
 
+        for (LoopBlockId const loopblkId : rFIInst.loopblks)
+        {
+            m_tasks.loopblkIds.remove(loopblkId);
+            m_tasks.loopblkInst[loopblkId] = {};
+        }
+        rFIInst.loopblks.clear();
+
+
         rFIInst.context = {};
         rFIInst.type = {};
 

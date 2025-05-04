@@ -48,6 +48,8 @@ using osp::input::EButtonControlIndex;
 namespace adera
 {
 
+#if 0  // SYNCEXEC
+
 void add_floor(Framework &rFW, ContextId sceneCtx, PkgId pkg, int size)
 {
     auto const physShapes = rFW.get_interface<FIPhysShapes>(sceneCtx);
@@ -518,5 +520,6 @@ FeatureDef const ftrBounds = feature_def("Bounds", [] (
     });
 }); // ftrBounds
 
+#endif
 
 } // namespace adera

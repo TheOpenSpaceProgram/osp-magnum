@@ -33,9 +33,12 @@
 namespace adera
 {
 
+
 struct MainLoopControl
 {
-    bool doUpdate;
+    //bool doUpdate;
+    bool mainScheduleWaiting    {false};
+    bool keepOpenWaiting        {false};
 };
 
 struct SceneLoopControl
@@ -65,7 +68,7 @@ struct FrameworkModify
     {
         using Func_t = void(*)(osp::fw::Framework &rFW, osp::fw::ContextId ctx, entt::any userData);
         entt::any           userData;
-        osp::fw::ContextId  ctx;
+        osp::fw::ContextId  mainCtx;
         Func_t              func;
     };
 

@@ -52,6 +52,8 @@ using namespace osp;
 namespace adera
 {
 
+#if 0  // SYNCEXEC
+
 FeatureDef const ftrMachMagicRockets = feature_def("MachMagicRockets", [] (
         FeatureBuilder              &rFB,
         DependOn<FIScene>           scn,
@@ -523,5 +525,6 @@ FeatureDef const ftrVehicleCamera = feature_def("VehicleCamera", [] (
     });
 }); // setup_camera_vehicle
 
+#endif
 
 } // namespace adera

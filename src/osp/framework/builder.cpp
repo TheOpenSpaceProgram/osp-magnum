@@ -113,6 +113,11 @@ void ContextBuilder::add_feature(FeatureDef const &def, entt::any setupData) noe
                     m_rFW.m_tasks.pipelineInst[plId].type      = subjectInfo.pipelines[i].type;
                     m_rFW.m_tasks.pipelineInst[plId].name      = subjectInfo.pipelines[i].name;
                 }
+
+                rFI.tasks.resize(subjectInfo.taskCount);
+                m_rFW.m_tasks.taskIds.create(rFI.tasks.begin(), rFI.tasks.end());
+                m_rFW.m_taskImpl.resize(m_rFW.m_tasks.taskIds.capacity());
+                rFSession.tasks.insert(rFSession.tasks.end(), rFI.tasks.begin(), rFI.tasks.end());
             }
         }
     }

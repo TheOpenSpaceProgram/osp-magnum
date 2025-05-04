@@ -29,7 +29,9 @@
 namespace adera
 {
 
-extern osp::fw::FeatureDef const ftrMain;
+extern osp::fw::FeatureDef const ftrMainApp;
+
+extern osp::fw::FeatureDef const ftrCleanupCtx;
 
 extern osp::fw::FeatureDef const ftrScene;
 

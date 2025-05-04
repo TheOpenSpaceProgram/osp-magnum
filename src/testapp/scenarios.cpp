@@ -73,7 +73,6 @@ static ScenarioMap_t make_scenarios()
 {   
     ScenarioMap_t scenarioMap;
 
-
     auto const add_scenario = [&scenarioMap] (ScenarioOption scenario)
     {
         scenarioMap.emplace(scenario.name, scenario);
@@ -89,21 +88,20 @@ static ScenarioMap_t make_scenarios()
                        "* [WASD]            - Move camera\n"
                        "* [QE]              - Move camera up/down\n"
                        "* [Drag MouseRight] - Orbit camera\n",
-        .loadFunc = [] (TestApp& rTestApp)
+        .loadFunc = [] (ScenarioArgs args)
     {
-        auto        &rFw      = rTestApp.m_framework;
-        auto  const mainApp   = rFw.get_interface<FIMainApp>  (rTestApp.m_mainContext);
-        auto        &rAppCtxs = rFw.data_get<adera::AppContexts&>(mainApp.di.appContexts);
+        auto  const mainApp   = args.rFW.get_interface<FIMainApp>  (args.mainContext);
+        auto        &rAppCtxs = args.rFW.data_get<adera::AppContexts&>(mainApp.di.appContexts);
 
-
-        rAppCtxs.scene  = rFw.m_contextIds.create();
-        ContextBuilder  sceneCB { rAppCtxs.scene,  {rTestApp.m_mainContext}, rFw };
+        rAppCtxs.scene  = args.rFW.m_contextIds.create();
+        ContextBuilder  sceneCB { rAppCtxs.scene,  {args.mainContext}, args.rFW };
         sceneCB.add_feature(ftrScene);
-        sceneCB.add_feature(ftrEngineTest, rTestApp.m_defaultPkg);
+        sceneCB.add_feature(ftrEngineTest, args.defaultPkg);
         ContextBuilder::finalize(std::move(sceneCB));
     }});
 
 
+/*
 
     static constexpr auto sc_gravityForce = Vector3{0.0f, 0.0f, -9.81f};
 
@@ -343,7 +341,7 @@ static ScenarioMap_t make_scenarios()
 
         auto const scene = rFW.get_interface<FIScene>(sceneCtx);
 
-        sceneCB.add_feature(ftrUniverseCore, PipelineId{mainApp.pl.mainLoop});
+        //sceneCB.add_feature(ftrUniverseCore, PipelineId{mainApp.pl.mainLoop});
         sceneCB.add_feature(ftrUniverseSceneFrame);
         sceneCB.add_feature(ftrUniverseTestPlanets);
         ContextBuilder::finalize(std::move(sceneCB));
@@ -381,7 +379,7 @@ static ScenarioMap_t make_scenarios()
         sceneCB.add_feature(ftrSolarSystem);
         ContextBuilder::finalize(std::move(sceneCB));
     }});
-
+*/
     return scenarioMap;
 }
 

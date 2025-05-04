@@ -47,6 +47,8 @@ using namespace osp;
 namespace adera
 {
 
+#if 0  // SYNCEXEC
+
 FeatureDef const ftrPhysics = feature_def("Physics", [] (
         FeatureBuilder          &rFB,
         Implement<FIPhysics>    phys,
@@ -215,5 +217,6 @@ FeatureDef const ftrPrefabDraw = feature_def("PrefabDraw", [] (
     });
 }); // ftrPrefabDraw
 
+#endif
 
 } // namespace adera
