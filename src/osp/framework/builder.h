@@ -262,6 +262,12 @@ struct PipelineRef
         return pipelineId;
     }
 
+    PipelineRef& initial_stage(ENUM_T const stage)
+    {
+        m_rFW.m_tasks.pipelineInst[pipelineId].initialStage = StageId{std::uint8_t(stage)};
+        return static_cast<PipelineRef&>(*this);
+    }
+
     PipelineRef& parent(LoopBlockId const parent)
     {
         LGRN_ASSERT(parent.has_value());

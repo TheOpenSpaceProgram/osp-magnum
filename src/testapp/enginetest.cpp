@@ -132,11 +132,26 @@ entt::any make_scene(osp::Resources& rResources, osp::PkgId const pkg)
     DrawEnt const   cubeDraw = rScene.m_scnRdr.m_drawIds.create();
 
     // Resize some containers to fit all existing entities
-    std::size_t const maxEnts = rScene.m_activeIds.vec().capacity();
-    rScene.m_matPhong.resize(maxEnts);
-    rScene.m_basic.m_scnGraph.resize(maxEnts);
-    rScene.m_scnRdr.resize_active(maxEnts);
-    rScene.m_scnRdr.resize_draw();
+    auto const maxActiveEnts = rScene.m_activeIds.capacity();
+    rScene.m_matPhong               .resize(maxActiveEnts);
+    rScene.m_basic.m_scnGraph       .resize(maxActiveEnts);
+    rScene.m_scnRdr.m_needDrawTf    .resize(maxActiveEnts);
+    rScene.m_scnRdr.m_activeToDraw  .resize(maxActiveEnts);
+    rScene.m_scnRdr.drawTfObserverEnable.resize(maxActiveEnts);
+
+    auto const maxDrawEnts = rScene.m_scnRdr.m_drawIds.capacity();
+    rScene.m_scnRdr.m_opaque        .resize(maxDrawEnts);
+    rScene.m_scnRdr.m_transparent   .resize(maxDrawEnts);
+    rScene.m_scnRdr.m_visible       .resize(maxDrawEnts);
+    rScene.m_scnRdr.m_color         .resize(maxDrawEnts);
+    rScene.m_scnRdr.m_drawTransform .resize(maxDrawEnts);
+    rScene.m_scnRdr.m_diffuseTex    .resize(maxDrawEnts);
+    rScene.m_scnRdr.m_mesh          .resize(maxDrawEnts);
+    for (MaterialId const materialId : rScene.m_scnRdr.m_materialIds)
+    {
+        Material &mat = rScene.m_scnRdr.m_materials[materialId];
+        mat.m_ents.resize(maxDrawEnts);
+    }
 
     // Take ownership of the cube mesh Resource. This will create a scene-space
     // MeshId that we can assign to ActiveEnts
@@ -148,6 +163,7 @@ entt::any make_scene(osp::Resources& rResources, osp::PkgId const pkg)
 
     rScene.m_scnRdr.m_needDrawTf.insert(cubeEnt);
     rScene.m_scnRdr.m_activeToDraw[cubeEnt] = cubeDraw;
+    rScene.m_scnRdr.m_color[cubeDraw] = {1.0f, 1.0f, 1.0f, 1.0f};
     rScene.m_scnRdr.m_mesh[cubeDraw] = rScene.m_drawing.m_meshRefCounts.ref_add(meshCube);
     rScene.m_scnRdr.m_meshDirty.push_back(cubeDraw);
 
@@ -180,7 +196,7 @@ void update_test_scene(EngineTestScene& rScene, float const delta)
 {
     // Clear drawing-related dirty flags/vectors
     rScene.m_scnRdr.m_meshDirty.clear();
-    rScene.m_scnRdr.m_diffuseDirty.clear();
+    rScene.m_scnRdr.m_diffuseTexDirty.clear();
     rScene.m_matPhongDirty.clear();
 
     // Rotate the cube
@@ -361,7 +377,7 @@ entt::any make_renderer(EngineTestScene& rScene, MagnumWindowApp &rApp, RenderGL
         // Set all textures dirty
         if (rScene.m_scnRdr.m_diffuseTex[drawEnt] != lgrn::id_null<TexId>())
         {
-            rScene.m_scnRdr.m_diffuseDirty.push_back(drawEnt);
+            rScene.m_scnRdr.m_diffuseTexDirty.push_back(drawEnt);
         }
     }
 

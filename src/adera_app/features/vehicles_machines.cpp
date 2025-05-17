@@ -114,7 +114,7 @@ FeatureDef const ftrMagicRocketThrustIndicator = feature_def("MagicRocketThrustI
     rFB.task()
         .name       ("Create DrawEnts for Thrust indicators")
         .run_on     ({windowApp.pl.sync(Run)})
-        .sync_with  ({scnRender.pl.drawEntResized(ModifyOrSignal), scnRender.pl.drawEnt(New), parts.pl.machIds(Ready)})
+        .sync_with  ({scnRender.pl.drawEntResized(ModifyOrSignal), scnRender.pl.drawIds(New), parts.pl.machIds(Ready)})
         .args       ({               scnRender.di.scnRender,                  parts.di.scnParts,                 rktIndicate.di.indicator})
         .func([]    (ACtxSceneRender &rScnRender,  ACtxParts const& rScnParts, ThrustIndicator& rThrustIndicator) noexcept
     {
@@ -135,7 +135,7 @@ FeatureDef const ftrMagicRocketThrustIndicator = feature_def("MagicRocketThrustI
     rFB.task()
         .name       ("Add mesh and materials to Thrust indicators")
         .run_on     ({windowApp.pl.sync(Run)})
-        .sync_with  ({scnRender.pl.drawEntResized(Done), scnRender.pl.drawEnt(Ready), scnRender.pl.entMesh(New), scnRender.pl.material(New), scnRender.pl.materialDirty(Modify_), scnRender.pl.entMeshDirty(Modify_)})
+        .sync_with  ({scnRender.pl.drawEntResized(Done), scnRender.pl.drawIds(Ready), scnRender.pl.entMesh(New), scnRender.pl.material(New), scnRender.pl.materialDirty(Modify_), scnRender.pl.meshDirty(Modify_)})
         .args       ({         comScn.di.basic,                 scnRender.di.scnRender,             comScn.di.drawing,                      comScn.di.drawingRes,                 parts.di.scnParts,                             sigFloat.di.sigValFloat,                 rktIndicate.di.indicator})
         .func([]    (ACtxBasic& rBasic, ACtxSceneRender &rScnRender, ACtxDrawing& rDrawing, ACtxDrawingRes const& rDrawingRes, ACtxParts const& rScnParts, SignalValues_t<float> const& rSigValFloat, ThrustIndicator& rThrustIndicator) noexcept
     {

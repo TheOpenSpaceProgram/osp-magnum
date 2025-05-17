@@ -107,11 +107,18 @@ void ContextBuilder::add_feature(FeatureDef const &def, entt::any setupData) noe
                 rFI.pipelines.resize(subjectInfo.pipelines.size());
                 m_rFW.m_tasks.pipelineIds.create(rFI.pipelines.begin(), rFI.pipelines.end());
                 m_rFW.m_tasks.pipelineInst.resize(m_rFW.m_tasks.pipelineIds.capacity());
+                auto const &pltypeReg = PipelineTypeIdReg::instance();
                 for (std::size_t i = 0; i < subjectInfo.pipelines.size(); ++i)
                 {
-                    PipelineId const plId = rFI.pipelines[i];
-                    m_rFW.m_tasks.pipelineInst[plId].type      = subjectInfo.pipelines[i].type;
-                    m_rFW.m_tasks.pipelineInst[plId].name      = subjectInfo.pipelines[i].name;
+                    PipelineId const plId    = rFI.pipelines[i];
+                    auto       const defInfo = subjectInfo.pipelines[i];
+                    m_rFW.m_tasks.pipelineInst[plId] = {
+                        .name              = defInfo.name,
+                        .type              = defInfo.type,
+                        .block             = {}, // assigned in feature def function body.
+                        .scheduleCondition = {}, // same here
+                        .initialStage      = pltypeReg.get(defInfo.type).initialStage
+                    };
                 }
 
                 rFI.tasks.resize(subjectInfo.taskCount);

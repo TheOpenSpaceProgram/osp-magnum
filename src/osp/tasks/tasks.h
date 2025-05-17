@@ -39,8 +39,10 @@
 #include <osp/core/keyed_vector.h>
 #include <osp/core/strong_id.h>
 
+#include <longeron/id_management/id_set_stl.hpp>
 #include <longeron/id_management/registry_stl.hpp>
 #include <longeron/containers/intarray_multimap.hpp>
+
 
 #include <entt/core/family.hpp>
 
@@ -71,15 +73,13 @@ struct PipelineTypeInfo
         /// Only 1 per pipeline
         bool isSchedule     {false};
 
-        // Only 1 per pipeline
-        //bool useSignal     {false};
-
         /// Cancel connected
         bool useCancel        {false};
     };
 
     std::string debugName;
     osp::KeyedVec<StageId, StageInfo> stages;
+    StageId     initialStage;
 };
 
 struct PipelineTypeIdReg
@@ -145,6 +145,9 @@ struct Pipeline
 
     /// Read output value of this task as the condition to cancel this pipeline. Can be null
     TaskId scheduleCondition;
+
+    /// Must never be null
+    StageId initialStage;
 };
 
 struct TaskSyncToPipeline
@@ -218,6 +221,26 @@ struct PipelineDefInfo
     std::string_view        name;
     PipelineTypeId          type;
 };
+
+
+
+struct TaskOrderReport
+{
+    struct Step
+    {
+        // union{
+        TaskId      taskId;
+        PipelineId  pipelineId;
+        StageId     stageId;
+        int         time;
+    };
+
+    std::vector<Step>       steps;
+    std::vector<TaskId>     failedLocked;
+    std::vector<TaskId>     failedNotAdded;
+};
+
+void check_task_order(Tasks const& tasks, TaskOrderReport& rOut, ArrayView<LoopBlockId const> loopblks);
 
 
 } // namespace osp

@@ -105,61 +105,53 @@ FeatureDef const ftrScene = feature_def("Scene", [] (
         Implement<FIScene>      scn,
         DependOn<FIMainApp>     mainApp)
 {
-    rFB.data_emplace<float>(scn.di.deltaTimeIn, 0.0f);
+    rFB.data_emplace<float>(scn.di.deltaTimeIn, 1.0f / 60.0f);
     rFB.data_emplace<SceneLoopControl>(scn.di.loopControl);
-    rFB.pipeline(scn.pl.loopControl).parent(mainApp.loopblks.mainLoop);
+    //rFB.pipeline(scn.pl.loopControl).parent(mainApp.loopblks.mainLoop);
     rFB.pipeline(scn.pl.update)     .parent(mainApp.loopblks.mainLoop);
 
 //    rFB.task()
 //        .name       ("Schedule Scene update")
-//        .schedule   (scn.pl.update)
-//        .sync_with   ({scn.pl.loopControl(Ready)})
+//        .schedules  (scn.pl.update)
+//        //.sync_with  ({scn.pl.loopControl(Ready)})
 //        .args       ({                     scn.di.loopControl})
 //        .func       ([] (SceneLoopControl const &rLoopControl) noexcept -> osp::TaskActions
 //    {
-//        return rLoopControl.doSceneUpdate ? osp::TaskActions{} : osp::TaskAction::Cancel;
+//        return {.cancel = false};//! rLoopControl.doSceneUpdate}; SYNCEXEC
 //    });
 }); // ftrScene
 
 
-
-#if 0  // SYNCEXEC
-
 FeatureDef const ftrCommonScene = feature_def("CommonScene", [] (
         FeatureBuilder              &rFB,
         Implement<FICommonScene>    comScn,
-        Implement<FICleanupContext> cleanup,
+        DependOn<FICleanupContext>  cleanup,
         DependOn<FIScene>           scn,
         DependOn<FIMainApp>         mainApp,
         entt::any                   userData)
 {
     /* not used here */   rFB.data_emplace< ActiveEntVec_t >(comScn.di.activeEntDel);
-    /* not used here */   rFB.data_emplace< DrawEntVec_t >  (comScn.di.drawEntDel);
     auto &rBasic        = rFB.data_emplace< ACtxBasic >     (comScn.di.basic);
     auto &rDrawing      = rFB.data_emplace< ACtxDrawing >   (comScn.di.drawing);
     auto &rDrawingRes   = rFB.data_emplace< ACtxDrawingRes >(comScn.di.drawingRes);
     auto &rNamedMeshes  = rFB.data_emplace< NamedMeshes >   (comScn.di.namedMeshes);
 
-    rFB.pipeline(comScn.pl.activeEnt)           .parent(scn.pl.update);
-    rFB.pipeline(comScn.pl.activeEntResized)    .parent(scn.pl.update);
-    rFB.pipeline(comScn.pl.activeEntDelete)     .parent(scn.pl.update);
-    rFB.pipeline(comScn.pl.transform)           .parent(scn.pl.update);
-    rFB.pipeline(comScn.pl.hierarchy)           .parent(scn.pl.update);
-    rFB.pipeline(cleanup.pl.cleanupWorkaround).parent(cleanup.pl.cleanup);
+    rFB.pipeline(comScn.pl.activeEnt)           .parent(mainApp.loopblks.mainLoop);
+    rFB.pipeline(comScn.pl.activeEntDelete)     .parent(mainApp.loopblks.mainLoop);
+    rFB.pipeline(comScn.pl.transform)           .parent(mainApp.loopblks.mainLoop);
+    rFB.pipeline(comScn.pl.hierarchy)           .parent(mainApp.loopblks.mainLoop);
+    rFB.pipeline(comScn.pl.meshIds)             .parent(mainApp.loopblks.mainLoop);
+    rFB.pipeline(comScn.pl.texIds)              .parent(mainApp.loopblks.mainLoop);
+    rFB.pipeline(comScn.pl.texToRes)            .parent(mainApp.loopblks.mainLoop);
+    rFB.pipeline(comScn.pl.meshToRes)           .parent(mainApp.loopblks.mainLoop);
+
+    rFB.task().schedules(comScn.pl.activeEntDelete).args({comScn.di.activeEntDel}).name("Schedule activeEntDelete")
+              .func(  [] (ActiveEntVec_t const &rActiveEntDel) noexcept -> TaskActions
+                      { return {.cancel = rActiveEntDel.empty()}; });
 
     rFB.task()
-        .name       ("Cancel entity delete tasks stuff if no entities were deleted")
-        .run_on     ({comScn.pl.activeEntDelete(Schedule_)})
-        .args       ({     comScn.di.basic,  comScn.di.activeEntDel })
-        .func       ([] (ACtxBasic &rBasic, ActiveEntVec_t const &rActiveEntDel) noexcept
-    {
-        return rActiveEntDel.empty() ? TaskAction::Cancel : TaskActions{};
-    });
-
-    rFB.task()
-        .name       ("Delete ActiveEnt IDs")
-        .run_on     ({comScn.pl.activeEntDelete(EStgIntr::UseOrRun)})
-        .sync_with  ({comScn.pl.activeEnt(Delete)})
+        .name       ("Delete ActiveEnt IDs of deleted ActiveEnts")
+        .sync_with  ({comScn.pl.activeEntDelete(UseOrRun), comScn.pl.activeEnt(Delete)})
         .args       ({     comScn.di.basic,              comScn.di.activeEntDel })
         .func       ([] (ACtxBasic &rBasic, ActiveEntVec_t const &rActiveEntDel) noexcept
     {
@@ -173,29 +165,41 @@ FeatureDef const ftrCommonScene = feature_def("CommonScene", [] (
     });
 
     rFB.task()
-        .name       ("Delete basic components")
-        .run_on     ({comScn.pl.activeEntDelete(UseOrRun)})
-        .sync_with  ({comScn.pl.transform(Delete)})
+        .name       ("Delete transforms of deleted ActiveEnts")
+        .sync_with  ({comScn.pl.activeEntDelete(UseOrRun), comScn.pl.transform(Delete)})
         .args       ({     comScn.di.basic,              comScn.di.activeEntDel })
         .func       ([] (ACtxBasic &rBasic, ActiveEntVec_t const &rActiveEntDel) noexcept
     {
-        update_delete_basic(rBasic, rActiveEntDel.cbegin(), rActiveEntDel.cend());
+        for (ActiveEnt const ent : rActiveEntDel)
+        {
+            if (rBasic.m_transform.contains(ent))
+            {
+                rBasic.m_transform.remove(ent);
+            }
+        }
     });
 
     rFB.task()
         .name       ("Clear ActiveEnt delete vector once we're done with it")
-        .run_on     ({comScn.pl.activeEntDelete(Clear)})
+        .sync_with  ({comScn.pl.activeEntDelete(Clear)})
         .args       ({      comScn.di.activeEntDel })
         .func([]    (ActiveEntVec_t &rActiveEntDel) noexcept
     {
         rActiveEntDel.clear();
     });
 
+    // ------
+
+    rFB.task().schedules(comScn.pl.activeEntDelete).args({comScn.di.activeEntDel}).name("activeEntDelete")
+              .func(  [] (ActiveEntVec_t const &rActiveEntDel) noexcept -> TaskActions
+                      { return {.cancel = rActiveEntDel.empty()}; });
+
+
     // Clean up tasks
 
     rFB.task()
         .name       ("Clean up resource owners")
-        .run_on     ({cleanup.pl.cleanup(Run_)})
+        .sync_with  ({cleanup.pl.cleanup(Run_)})
         .args       ({       comScn.di.drawing,        comScn.di.drawingRes,  mainApp.di.resources})
         .func       ([] (ACtxDrawing &rDrawing, ACtxDrawingRes &rDrawingRes, Resources &rResources) noexcept
     {
@@ -204,7 +208,7 @@ FeatureDef const ftrCommonScene = feature_def("CommonScene", [] (
 
     rFB.task()
         .name       ("Clean up NamedMeshes mesh and texture owners")
-        .run_on     ({cleanup.pl.cleanup(Run_)})
+        .sync_with  ({cleanup.pl.cleanup(Run_)})
         .args       ({       comScn.di.drawing,     comScn.di.namedMeshes })
         .func       ([] (ACtxDrawing &rDrawing, NamedMeshes &rNamedMeshes) noexcept
     {
@@ -232,7 +236,6 @@ FeatureDef const ftrCommonScene = feature_def("CommonScene", [] (
 
 }); // ftrCommonScene
 
-#endif
 
 FeatureDef const ftrWindowApp = feature_def("WindowApp", [] (
         FeatureBuilder              &rFB,
@@ -252,122 +255,120 @@ FeatureDef const ftrWindowApp = feature_def("WindowApp", [] (
         .args       ({                   windowApp.di.windowAppLoopCtrl})
         .func       ([] (WindowAppLoopControl const &rWindowAppLoopCtrl) noexcept -> osp::TaskActions
     {
-        return {.cancel = true};//rWindowAppLoopCtrl.doSync ? osp::TaskActions{} : osp::TaskAction::Cancel;
+        return {.cancel = ! rWindowAppLoopCtrl.doSync};
     });
 
     rFB.task()
         .name       ("Schedule Renderer Resync")
         .schedules  ({windowApp.pl.resync})
-        .args       ({                   windowApp.di.windowAppLoopCtrl})
-        .func       ([] (WindowAppLoopControl const &rWindowAppLoopCtrl) noexcept -> osp::TaskActions
+        .args       ({             windowApp.di.windowAppLoopCtrl})
+        .func       ([] (WindowAppLoopControl &rWindowAppLoopCtrl) noexcept -> osp::TaskActions
     {
-        return {.cancel = true};//rWindowAppLoopCtrl.doResync ? osp::TaskActions{} : osp::TaskAction::Cancel;
+        bool const doResyncPrev = rWindowAppLoopCtrl.doResync;
+        rWindowAppLoopCtrl.doResync = false;
+        return {.cancel = ! doResyncPrev};
     });
 
 }); // ftrWindowApp
 
-#if 0  // SYNCEXEC
 
 FeatureDef const ftrSceneRenderer = feature_def("SceneRenderer", [] (
         FeatureBuilder              &rFB,
         Implement<FISceneRenderer>  scnRender,
-        Implement<FICleanupContext> cleanup,
+        DependOn<FICleanupContext>  cleanup,
         DependOn<FICommonScene>     comScn,
         DependOn<FIMainApp>         mainApp,
         DependOn<FIWindowApp>       windowApp)
 {
-    rFB.pipeline(scnRender.pl.render).parent(mainApp.pl.mainLoop);
-
-    rFB.pipeline(scnRender.pl.drawEnt)         .parent(windowApp.pl.sync);
-    rFB.pipeline(scnRender.pl.drawEntResized)  .parent(windowApp.pl.sync);
-    rFB.pipeline(scnRender.pl.drawEntDelete)   .parent(windowApp.pl.sync);
-    rFB.pipeline(scnRender.pl.entMesh)         .parent(windowApp.pl.sync);
-    rFB.pipeline(scnRender.pl.entTexture)      .parent(windowApp.pl.sync);
-    rFB.pipeline(scnRender.pl.entTextureDirty) .parent(windowApp.pl.sync);
-    rFB.pipeline(scnRender.pl.entMeshDirty)    .parent(windowApp.pl.sync);
-    rFB.pipeline(scnRender.pl.drawTransforms)  .parent(scnRender.pl.render);
-    rFB.pipeline(scnRender.pl.material)        .parent(windowApp.pl.sync);
-    rFB.pipeline(scnRender.pl.materialDirty)   .parent(windowApp.pl.sync);
-    rFB.pipeline(scnRender.pl.group)           .parent(windowApp.pl.sync);
-    rFB.pipeline(scnRender.pl.groupEnts)       .parent(windowApp.pl.sync);
-    rFB.pipeline(scnRender.pl.entMesh)         .parent(windowApp.pl.sync);
-    rFB.pipeline(scnRender.pl.entTexture)      .parent(windowApp.pl.sync);
-    rFB.pipeline(scnRender.pl.mesh)            .parent(windowApp.pl.sync);
-    rFB.pipeline(scnRender.pl.texture)         .parent(windowApp.pl.sync);
-    rFB.pipeline(scnRender.pl.meshResDirty)    .parent(windowApp.pl.sync);
-    rFB.pipeline(scnRender.pl.textureResDirty) .parent(windowApp.pl.sync);
+    rFB.pipeline(scnRender.pl.render)           .parent(mainApp.loopblks.mainLoop);
+    rFB.pipeline(scnRender.pl.drawEnt)          .parent(mainApp.loopblks.mainLoop);
+    rFB.pipeline(scnRender.pl.misc)             .parent(mainApp.loopblks.mainLoop);
+    rFB.pipeline(scnRender.pl.drawTransforms)   .parent(mainApp.loopblks.mainLoop);
+    rFB.pipeline(scnRender.pl.activeDrawTfs)    .parent(mainApp.loopblks.mainLoop);
+    rFB.pipeline(scnRender.pl.diffuseTex)       .parent(mainApp.loopblks.mainLoop);
+    rFB.pipeline(scnRender.pl.diffuseTexDirty)  .parent(mainApp.loopblks.mainLoop);
+    rFB.pipeline(scnRender.pl.mesh)             .parent(mainApp.loopblks.mainLoop);
+    rFB.pipeline(scnRender.pl.meshDirty)        .parent(mainApp.loopblks.mainLoop);
+    rFB.pipeline(scnRender.pl.material)         .parent(mainApp.loopblks.mainLoop);
+    rFB.pipeline(scnRender.pl.materialDirty)    .parent(mainApp.loopblks.mainLoop);
+    rFB.pipeline(scnRender.pl.drawEntDelete)    .parent(mainApp.loopblks.mainLoop);
 
     auto &rScnRender = rFB.data_emplace<ACtxSceneRender>(scnRender.di.scnRender);
     /* unused */       rFB.data_emplace<DrawTfObservers>(scnRender.di.drawTfObservers);
+    /* unused */       rFB.data_emplace<DrawEntVec_t>   (scnRender.di.drawEntDel);
 
-    // TODO: format after framework changes
-
-    rFB.task()
-        .name       ("Schedule Scene Render")
-        .schedules  ({scnRender.pl.render(Schedule)})
-        .args       ({                   windowApp.di.windowAppLoopCtrl})
-        .func       ([] (WindowAppLoopControl const &rWindowAppLoopCtrl) noexcept -> osp::TaskActions
-    {
-        return rWindowAppLoopCtrl.doRender ? osp::TaskActions{} : osp::TaskAction::Cancel;
-    });
 
     rFB.task()
-        .name       ("Resize ACtxSceneRender containers to fit all DrawEnts")
-        .run_on     ({scnRender.pl.drawEntResized(Run)})
-        .sync_with  ({scnRender.pl.entMesh(New), scnRender.pl.entTexture(New)})
-        .args       ({scnRender.di.scnRender})
+        .name       ("Resize ACtxSceneRender misc containers to fit all DrawEnts")
+        .sync_with  ({scnRender.pl.drawEnt(Ready), scnRender.pl.misc(Resize_)})
+        .args       ({        scnRender.di.scnRender})
         .func       ([] (ACtxSceneRender &rScnRender) noexcept
     {
-        rScnRender.resize_draw();
+        auto const capacity = rScnRender.m_drawIds.capacity();
+        rScnRender.m_opaque     .resize(capacity);
+        rScnRender.m_transparent.resize(capacity);
+        rScnRender.m_visible    .resize(capacity);
+        rScnRender.m_color      .resize(capacity, {1.0f, 1.0f, 1.0f, 1.0f}); // Default to white
     });
 
     rFB.task()
-        .name       ("Resize ACtxSceneRender to fit ActiveEnts")
-        .run_on     ({comScn.pl.activeEntResized(Run)})
-        .args       ({               comScn.di.basic,                  scnRender.di.scnRender})
-        .func([]    (ACtxBasic const &rBasic,  ACtxSceneRender &rScnRender) noexcept
+        .name       ("Resize ACtxSceneRender::m_drawTransform to fit all DrawEnts")
+        .sync_with  ({scnRender.pl.drawEnt(Ready), scnRender.pl.drawTransforms(Resize_)})
+        .args       ({        scnRender.di.scnRender})
+        .func       ([] (ACtxSceneRender &rScnRender) noexcept
     {
-        rScnRender.resize_active(rBasic.m_activeIds.capacity());
-    });
-
-    // Duplicate task needed for resync to account for existing ActiveEnts when the renderer opens,
-    // as activeEntResized doesn't run during resync
-    rFB.task()
-        .name       ("Resync ACtxSceneRender to fit ActiveEnts")
-        .run_on     ({windowApp.pl.resync(Run)})
-        .sync_with  ({comScn.pl.activeEntResized(Run)})
-        .args       ({               comScn.di.basic,                  scnRender.di.scnRender})
-        .func([]    (ACtxBasic const &rBasic,  ACtxSceneRender &rScnRender) noexcept
-    {
-        rScnRender.resize_active(rBasic.m_activeIds.capacity());
+        rScnRender.m_drawTransform.resize(rScnRender.m_drawIds.capacity());
     });
 
     rFB.task()
-        .name       ("Schedule Assign GL textures")
-        .schedules  ({scnRender.pl.entTextureDirty(Schedule_)})
-        .sync_with  ({scnRender.pl.texture(Ready), scnRender.pl.entTexture(Ready)})
-        .args       ({            scnRender.di.scnRender })
-        .func([] (ACtxSceneRender &rScnRender) noexcept -> TaskActions
+        .name       ("Resize ACtxSceneRender::m_diffuseTex to fit all DrawEnts")
+        .sync_with  ({scnRender.pl.drawEnt(Ready), scnRender.pl.diffuseTex(Resize_)})
+        .args       ({        scnRender.di.scnRender})
+        .func       ([] (ACtxSceneRender &rScnRender) noexcept
     {
-        return rScnRender.m_diffuseDirty.empty() ? TaskAction::Cancel : TaskActions{};
+        rScnRender.m_diffuseTex.resize(rScnRender.m_drawIds.capacity());
     });
 
     rFB.task()
-        .name       ("Schedule Assign GL meshes")
-        .schedules  ({scnRender.pl.entMeshDirty(Schedule_)})
-        .sync_with  ({scnRender.pl.mesh(Ready), scnRender.pl.entMesh(Ready)})
-        .args       ({            scnRender.di.scnRender })
-        .func([] (ACtxSceneRender &rScnRender) noexcept -> TaskActions
+        .name       ("Resize ACtxSceneRender::m_mesh to fit all DrawEnts")
+        .sync_with  ({scnRender.pl.drawEnt(Ready), scnRender.pl.mesh(Resize_)})
+        .args       ({        scnRender.di.scnRender})
+        .func       ([] (ACtxSceneRender &rScnRender) noexcept
     {
-        return rScnRender.m_meshDirty.empty() ? TaskAction::Cancel : TaskActions{};
+        rScnRender.m_mesh.resize(rScnRender.m_drawIds.capacity());
+    });
+
+
+    rFB.task()
+        .name       ("Resize ACtxSceneRender::m_material[#].m_ents to fit all DrawEnts")
+        .sync_with  ({scnRender.pl.drawEnt(Ready), scnRender.pl.material(Resize_)})
+        .args       ({        scnRender.di.scnRender})
+        .func       ([] (ACtxSceneRender &rScnRender) noexcept
+    {
+        auto const capacity = rScnRender.m_drawIds.capacity();
+        for (MaterialId matId : rScnRender.m_materialIds)
+        {
+            rScnRender.m_materials[matId].m_ents.resize(capacity);
+        }
+    });
+
+    rFB.task()
+        .name       ("Resize ACtxSceneRender::{m_needDrawTf,m_activeToDraw,drawTfObserverEnable} to fit all ActiveEnts")
+        .sync_with  ({comScn.pl.activeEnt(Ready), scnRender.pl.activeDrawTfs(Resize_)})
+        .args       ({           comScn.di.basic,       scnRender.di.scnRender})
+        .func       ([] (ACtxBasic const& rBasic,  ACtxSceneRender &rScnRender) noexcept
+    {
+        auto const capacity = rBasic.m_activeIds.capacity();
+        rScnRender.m_needDrawTf        .resize(capacity);
+        rScnRender.m_activeToDraw      .resize(capacity, lgrn::id_null<DrawEnt>());
+        rScnRender.drawTfObserverEnable.resize(capacity, 0);
     });
 
     rFB.task()
         .name       ("Calculate draw transforms")
-        .run_on     ({scnRender.pl.render(Run)})
-        .sync_with  ({comScn.pl.hierarchy(Ready), comScn.pl.transform(Ready), comScn.pl.activeEnt(Ready), scnRender.pl.drawTransforms(Modify_), scnRender.pl.drawEnt(Ready), scnRender.pl.drawEntResized(Done), comScn.pl.activeEntResized(Done)})
-        .args       ({            comScn.di.basic,                   comScn.di.drawing,                 scnRender.di.scnRender,                 scnRender.di.drawTfObservers })
-        .func([] (ACtxBasic const &rBasic, ACtxDrawing const &rDrawing, ACtxSceneRender &rScnRender, DrawTfObservers &rDrawTfObservers) noexcept
+        .sync_with  ({scnRender.pl.render(Run), comScn.pl.hierarchy(Ready), comScn.pl.transform(Ready), comScn.pl.activeEnt(Ready), scnRender.pl.drawTransforms(Modify), scnRender.pl.drawEnt(Ready), scnRender.pl.activeDrawTfs(Ready)})
+        .args       ({           comScn.di.basic,           comScn.di.drawing,      scnRender.di.scnRender,                 scnRender.di.drawTfObservers })
+        .func       ([] (ACtxBasic const &rBasic, ACtxDrawing const &rDrawing, ACtxSceneRender &rScnRender, DrawTfObservers &rDrawTfObservers) noexcept
     {
         auto rootChildren = SysSceneGraph::children(rBasic.m_scnGraph);
         SysRender::update_draw_transforms(
@@ -395,10 +396,9 @@ FeatureDef const ftrSceneRenderer = feature_def("SceneRenderer", [] (
 
     rFB.task()
         .name       ("Delete DrawEntity of deleted ActiveEnts")
-        .run_on     ({comScn.pl.activeEntDelete(UseOrRun)})
-        .sync_with  ({scnRender.pl.drawEntDelete(Modify_)})
-        .args       ({            scnRender.di.scnRender,                      comScn.di.activeEntDel,              comScn.di.drawEntDel })
-        .func([] (ACtxSceneRender &rScnRender, ActiveEntVec_t const &rActiveEntDel, DrawEntVec_t &rDrawEntDel) noexcept
+        .sync_with  ({comScn.pl.activeEntDelete(UseOrRun), scnRender.pl.drawEntDelete(Modify_)})
+        .args       ({        scnRender.di.scnRender,              comScn.di.activeEntDel,   scnRender.di.drawEntDel })
+        .func       ([] (ACtxSceneRender &rScnRender, ActiveEntVec_t const &rActiveEntDel, DrawEntVec_t &rDrawEntDel) noexcept
     {
         for (ActiveEnt const ent : rActiveEntDel)
         {
@@ -415,21 +415,28 @@ FeatureDef const ftrSceneRenderer = feature_def("SceneRenderer", [] (
     });
 
     rFB.task()
+        .name       ("Clear DrawEnt delete vector once we're done with it")
+        .schedules  (scnRender.pl.drawEntDelete)
+        .args       ({     scnRender.di.drawEntDel })
+        .func       ([] (DrawEntVec_t &rDrawEntDel) noexcept -> osp::TaskActions
+    {
+        return {.cancel = rDrawEntDel.empty()};
+    });
+
+    rFB.task()
         .name       ("Delete drawing components")
-        .run_on     ({scnRender.pl.drawEntDelete(UseOrRun)})
-        .sync_with  ({scnRender.pl.entTexture(Delete), scnRender.pl.entMesh(Delete)})
-        .args       ({        comScn.di.drawing,                 scnRender.di.scnRender,                    comScn.di.drawEntDel })
-        .func([] (ACtxDrawing &rDrawing, ACtxSceneRender &rScnRender, DrawEntVec_t const &rDrawEntDel) noexcept
+        .sync_with  ({scnRender.pl.drawEntDelete(UseOrRun), scnRender.pl.diffuseTex(Delete), scnRender.pl.mesh(Delete)})
+        .args       ({       comScn.di.drawing,      scnRender.di.scnRender,         scnRender.di.drawEntDel })
+        .func       ([] (ACtxDrawing &rDrawing, ACtxSceneRender &rScnRender, DrawEntVec_t const &rDrawEntDel) noexcept
     {
         SysRender::update_delete_drawing(rScnRender, rDrawing, rDrawEntDel.cbegin(), rDrawEntDel.cend());
     });
 
     rFB.task()
         .name       ("Delete DrawEntity IDs")
-        .run_on     ({scnRender.pl.drawEntDelete(UseOrRun)})
-        .sync_with  ({scnRender.pl.drawEnt(Delete)})
-        .args       ({            scnRender.di.scnRender,                    comScn.di.drawEntDel })
-        .func([] (ACtxSceneRender &rScnRender, DrawEntVec_t const &rDrawEntDel) noexcept
+        .sync_with  ({scnRender.pl.drawEntDelete(UseOrRun), scnRender.pl.drawEnt(Delete)})
+        .args       ({        scnRender.di.scnRender,            scnRender.di.drawEntDel })
+        .func       ([] (ACtxSceneRender &rScnRender, DrawEntVec_t const &rDrawEntDel) noexcept
     {
         for (DrawEnt const drawEnt : rDrawEntDel)
         {
@@ -442,10 +449,9 @@ FeatureDef const ftrSceneRenderer = feature_def("SceneRenderer", [] (
 
     rFB.task()
         .name       ("Delete DrawEnt from materials")
-        .run_on     ({scnRender.pl.drawEntDelete(UseOrRun)})
-        .sync_with  ({scnRender.pl.material(Delete)})
-        .args       ({            scnRender.di.scnRender,                    comScn.di.drawEntDel })
-        .func([] (ACtxSceneRender &rScnRender, DrawEntVec_t const &rDrawEntDel) noexcept
+        .sync_with  ({scnRender.pl.drawEntDelete(UseOrRun), scnRender.pl.material(Delete)})
+        .args       ({        scnRender.di.scnRender,         scnRender.di.drawEntDel })
+        .func       ([] (ACtxSceneRender &rScnRender, DrawEntVec_t const &rDrawEntDel) noexcept
     {
         for (DrawEnt const ent : rDrawEntDel)
         {
@@ -459,38 +465,69 @@ FeatureDef const ftrSceneRenderer = feature_def("SceneRenderer", [] (
         }
     });
 
+    // -------------
+
+
+    rFB.task().schedules(scnRender.pl.drawEntDelete).args({scnRender.di.drawEntDel}).name("Schedule drawEntDelete")
+              .func(  [] (DrawEntVec_t const &rDrawEntDel) noexcept -> TaskActions
+                      { return {.cancel = rDrawEntDel.empty()}; });
+    rFB.task().schedules(scnRender.pl.diffuseTexDirty).args({scnRender.di.scnRender}).name("Schedule diffuseTexDirty")
+              .func(  [] (ACtxSceneRender const &rScnRender) noexcept -> TaskActions
+                      { return {.cancel = rScnRender.m_diffuseTexDirty.empty()}; });
+    rFB.task().schedules(scnRender.pl.meshDirty).args({scnRender.di.scnRender}).name("Schedule meshDirty")
+              .func(  [] (ACtxSceneRender const &rScnRender) noexcept -> TaskActions
+                      { return {.cancel = rScnRender.m_meshDirty.empty()}; });
+
+    rFB.task()
+        .name       ("Schedule materialDirty")
+        .schedules  ({scnRender.pl.materialDirty})
+        .args       ({              scnRender.di.scnRender })
+        .func       ([] (ACtxSceneRender const &rScnRender) noexcept -> TaskActions
+    {
+        for (MaterialId const matId : rScnRender.m_materialIds)
+        {
+            if ( ! rScnRender.m_materials[matId].m_dirty.empty() )
+            {
+                return {.cancel = false };
+            }
+        }
+        return {.cancel = true };
+    });
+
+    // -------------
+
     rFB.task()
         .name       ("Clear DrawEnt delete vector once we're done with it")
-        .run_on     ({scnRender.pl.drawEntDelete(Clear)})
-        .args       ({         comScn.di.drawEntDel })
-        .func([] (DrawEntVec_t &rDrawEntDel) noexcept
+        .sync_with  ({scnRender.pl.drawEntDelete(Clear)})
+        .args       ({     scnRender.di.drawEntDel })
+        .func       ([] (DrawEntVec_t &rDrawEntDel) noexcept
     {
         rDrawEntDel.clear();
     });
 
     rFB.task()
         .name       ("Clear dirty DrawEnt's textures once we're done with it")
-        .run_on     ({scnRender.pl.entMeshDirty(Clear)})
-        .args       ({            scnRender.di.scnRender})
-        .func([] (ACtxSceneRender &rScnRender) noexcept
+        .sync_with  ({scnRender.pl.meshDirty(Clear)})
+        .args       ({        scnRender.di.scnRender})
+        .func       ([] (ACtxSceneRender &rScnRender) noexcept
     {
         rScnRender.m_meshDirty.clear();
     });
 
     rFB.task()
         .name       ("Clear dirty DrawEnt's textures once we're done with it")
-        .run_on     ({scnRender.pl.entTextureDirty(Clear)})
-        .args       ({            scnRender.di.scnRender})
-        .func([] (ACtxSceneRender &rScnRender) noexcept
+        .sync_with  ({scnRender.pl.diffuseTexDirty(Clear)})
+        .args       ({        scnRender.di.scnRender})
+        .func       ([] (ACtxSceneRender &rScnRender) noexcept
     {
-        rScnRender.m_diffuseDirty.clear();
+        rScnRender.m_diffuseTexDirty.clear();
     });
 
     rFB.task()
         .name       ("Clear dirty materials once we're done with it")
-        .run_on     ({scnRender.pl.materialDirty(Clear)})
-        .args       ({            scnRender.di.scnRender})
-        .func([] (ACtxSceneRender &rScnRender) noexcept
+        .sync_with  ({scnRender.pl.materialDirty(Clear)})
+        .args       ({        scnRender.di.scnRender})
+        .func       ([] (ACtxSceneRender &rScnRender) noexcept
     {
         for (Material &rMat : rScnRender.m_materials)
         {
@@ -500,7 +537,7 @@ FeatureDef const ftrSceneRenderer = feature_def("SceneRenderer", [] (
 
     rFB.task()
         .name       ("Clean up scene owners")
-        .run_on     ({cleanup.pl.cleanup(Run_)})
+        .sync_with  ({cleanup.pl.cleanup(Run_)})
         .args       ({       comScn.di.drawing,      scnRender.di.scnRender})
         .func       ([] (ACtxDrawing &rDrawing, ACtxSceneRender &rScnRender) noexcept
     {
@@ -508,5 +545,4 @@ FeatureDef const ftrSceneRenderer = feature_def("SceneRenderer", [] (
     });
 }); // setup_scene_renderer
 
-#endif
 } // namespace adera

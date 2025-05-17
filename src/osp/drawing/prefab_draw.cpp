@@ -41,8 +41,6 @@ using osp::restypes::gc_importer;
 void SysPrefabDraw::init_drawents(
         ACtxPrefabs&                rPrefabs,
         Resources&                  rResources,
-        ACtxBasic const&            rBasic,
-        ACtxDrawing&                rDrawing,
         ACtxSceneRender&            rScnRender)
 {
     auto itPfEnts = rPrefabs.spawnedEntsOffset.begin();
@@ -74,7 +72,6 @@ void SysPrefabDraw::resync_drawents(
         ACtxPrefabs&                rPrefabs,
         Resources&                  rResources,
         ACtxBasic const&            rBasic,
-        ACtxDrawing&                rDrawing,
         ACtxSceneRender&            rScnRender)
 {
     for (ActiveEnt const root : rPrefabs.roots)
@@ -107,7 +104,6 @@ void SysPrefabDraw::resync_drawents(
 void SysPrefabDraw::init_mesh_texture_material(
         ACtxPrefabs&                rPrefabs,
         Resources&                  rResources,
-        ACtxBasic const&            rBasic,
         ACtxDrawing&                rDrawing,
         ACtxDrawingRes&             rDrawingRes,
         ACtxSceneRender&            rScnRender,
@@ -170,7 +166,7 @@ void SysPrefabDraw::init_mesh_texture_material(
                     osp::ResId const texRes = rImportData.m_textures[baseColor];
                     TexId const texId = SysRender::own_texture_resource(rDrawing, rDrawingRes, rResources, texRes);
                     rScnRender.m_diffuseTex[drawEnt] = rDrawing.m_texRefCounts.ref_add(texId);
-                    rScnRender.m_diffuseDirty.push_back(drawEnt);
+                    rScnRender.m_diffuseTexDirty.push_back(drawEnt);
                 }
             }
 
@@ -240,7 +236,7 @@ void SysPrefabDraw::resync_mesh_texture_material(
                     osp::ResId const texRes = rImportData.m_textures[baseColor];
                     TexId const texId = SysRender::own_texture_resource(rDrawing, rDrawingRes, rResources, texRes);
                     rScnRender.m_diffuseTex[drawEnt] = rDrawing.m_texRefCounts.ref_add(texId);
-                    rScnRender.m_diffuseDirty.push_back(drawEnt);
+                    rScnRender.m_diffuseTexDirty.push_back(drawEnt);
                 }
             }
 

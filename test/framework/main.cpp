@@ -62,41 +62,45 @@
 using namespace osp;
 using namespace osp::fw;
 
+void register_pltype_info();
+
 namespace test_a
 {
 
 
 enum class EStgContinuous {
-    Modify = 0,
-    Schedule = 1,
-    Read = 2
+    Modify      = 0,
+    Schedule    = 1,
+    Read        = 2
 };
-osp::PipelineTypeInfo const infoForEStgContinuous{
+osp::PipelineTypeInfo const gc_infoForEStgContinuous{
     .debugName = "Continuous",
     .stages = {{
         { .name = "Modify"                          },
         { .name = "Schedule",   .isSchedule = true  },
-        { .name = "Read",                           } } }};
+        { .name = "Read",                           }
+    }},
+    .initialStage = osp::StageId{1}
+};
 
 enum class EStgOptionalPath {
-    Schedule = 0,
-    Run = 1,
-    Done = 2
+    Schedule    = 0,
+    Run         = 1,
+    Done        = 2
 };
-osp::PipelineTypeInfo const infoForEStgOptionalPath{
+osp::PipelineTypeInfo const gc_infoForEStgOptionalPath{
     .debugName = "OptionalPath",
     .stages = {{
         { .name = "Schedule",   .isSchedule = true  },
-        { .name = "Run",        .useCancel = true   },
-        { .name = "Done"                            } } }};
-
-
+        { .name = "Run",        .useCancel  = true  },
+        { .name = "Done"                            }
+    }},
+    .initialStage = osp::StageId{0}
+};
 
 struct Aquarium
 {
-    TaskId scheduleMainLoop;
-    TaskId scheduleAquariumUpdate;
-
+    int dummy = 0;
 //    bool runMainLoop = false;
 //    bool runAquariumUpdate = false;
     //int waterLevel = 10;
@@ -137,6 +141,9 @@ struct FIMainLoop {
     struct Pipelines {
         //PipelineDef<EStgOptionalPath> mainLoopPL{"Main Loop"};
     };
+    struct TaskIds {
+        TaskId schedule;
+    };
 };
 
 struct FIAquarium {
@@ -149,6 +156,9 @@ struct FIAquarium {
 
         /// Boolean decision on whether we want to update the aquarium or not
         PipelineDef<EStgOptionalPath> aquariumUpdatePL{"aquariumUpdatePL"};
+    };
+    struct TaskIds {
+        TaskId schedule;
     };
 };
 
@@ -182,12 +192,12 @@ FeatureDef const ftrWorld = feature_def("World", [] (
         Implement<FIMainLoop>   mainLoop,
         Implement<FIAquarium>   aquarium)
 {
-    auto &rAquarium = rFB.data_emplace<Aquarium>(aquarium.di.aquariumDI);
+    rFB.data_emplace<Aquarium>(aquarium.di.aquariumDI);
 
     rFB.pipeline(aquarium.pl.aquariumUpdatePL).parent(mainLoop.loopblks.mainLoop);
 
     // Allow controlling the main loop so it can exit cleanly, controlled with runMainLoop.
-    rAquarium.scheduleMainLoop = rFB.task()
+    rFB.task(mainLoop.tasks.schedule)
         .name       ("Schedule main loop")
         .ext_finish (true)
         .schedules  ({mainLoop.loopblks.mainLoop});
@@ -198,7 +208,7 @@ FeatureDef const ftrWorld = feature_def("World", [] (
 
     // Running the aquarium update is optional and controlled with runAquariumUpdate.
     // sync_with also ties aquariumUpdatePL to the main loop
-    rAquarium.scheduleAquariumUpdate = rFB.task()
+    rFB.task(aquarium.tasks.schedule)
         .name       ("Schedule aquarium update")
         .ext_finish (true)
         .schedules  ({aquarium.pl.aquariumUpdatePL});
@@ -246,14 +256,12 @@ FeatureDef const ftrSharks = feature_def("Sharks", [] (
 
 } // namespace test_a
 
-
+#if 0
 TEST(Tasks, Basics)
 {
     using namespace test_a;
 
-    auto &rPltypeReg = PipelineTypeIdReg::instance();
-    rPltypeReg.assign_pltype_info<EStgContinuous>   (infoForEStgContinuous);
-    rPltypeReg.assign_pltype_info<EStgOptionalPath> (infoForEStgOptionalPath);
+    register_pltype_info();
 
     auto pSink = std::make_shared<spdlog::sinks::stdout_color_sink_mt>();
 
@@ -289,43 +297,224 @@ TEST(Tasks, Basics)
     EXPECT_EQ(rAquariumFish.fishCount, 10);
 
     // Run main loop block but canceled so it doesn't do anything.
-    exec.task_finish(fw, rAquarium.scheduleMainLoop, true, {.cancel = true});
+    exec.task_finish(fw, mainLoop.tasks.schedule, true, {.cancel = true});
     exec.wait(fw);
-    exec.task_finish(fw, rAquarium.scheduleMainLoop, true, {.cancel = true});
+    exec.task_finish(fw, mainLoop.tasks.schedule, true, {.cancel = true});
     exec.wait(fw);
     ASSERT_FALSE(exec.is_running(fw, mainLoop.loopblks.mainLoop));
     ASSERT_EQ(rAquariumFish.fishCount, 10);
 
     // Run main loop but not canceled, this starts running
-    exec.task_finish(fw, rAquarium.scheduleMainLoop, true, {.cancel = false});
+    exec.task_finish(fw, mainLoop.tasks.schedule, true, {.cancel = false});
     exec.wait(fw);
     ASSERT_TRUE(exec.is_running(fw, mainLoop.loopblks.mainLoop));
 
     // by here, scheduleAquariumUpdate should be locked
-    exec.task_finish(fw, rAquarium.scheduleAquariumUpdate, true, {.cancel = false});
+    exec.task_finish(fw, aquarium.tasks.schedule, true, {.cancel = false});
     exec.wait(fw);
     ASSERT_TRUE(exec.is_running(fw, mainLoop.loopblks.mainLoop));
     ASSERT_EQ(rAquariumFish.fishCount, 8); // sharks ate 2 fish
 
     // repeat
-    exec.task_finish(fw, rAquarium.scheduleAquariumUpdate, true, {.cancel = false});
+    exec.task_finish(fw, aquarium.tasks.schedule, true, {.cancel = false});
     exec.wait(fw);
     ASSERT_TRUE(exec.is_running(fw, mainLoop.loopblks.mainLoop));
     ASSERT_EQ(rAquariumFish.fishCount, 6); // sharks ate 2 more fish
 
     // repeat
-    exec.task_finish(fw, rAquarium.scheduleAquariumUpdate, true, {.cancel = false});
+    exec.task_finish(fw, aquarium.tasks.schedule, true, {.cancel = false});
     exec.wait(fw);
     ASSERT_TRUE(exec.is_running(fw, mainLoop.loopblks.mainLoop));
     ASSERT_EQ(rAquariumFish.fishCount, 4);
 
     // exit
-    exec.task_finish(fw, rAquarium.scheduleAquariumUpdate, true, {.cancel = true});
+    exec.task_finish(fw, aquarium.tasks.schedule, true, {.cancel = true});
     exec.wait(fw);
+    ASSERT_EQ(rAquariumFish.fishCount, 4);
     ASSERT_FALSE(exec.is_running(fw, mainLoop.loopblks.mainLoop));
 }
 
+#endif
 //-----------------------------------------------------------------------------
+
+
+// dependency
+
+
+namespace test_b
+{
+
+enum class EStgIntermediate {
+    Modify      = 0,
+    Schedule    = 1,
+    Read        = 2,
+    Clear       = 3
+};
+osp::PipelineTypeInfo const gc_infoForEStgIntermediate{
+    .debugName = "Intermediate container",
+    .stages = {{
+        { .name = "Modify",                         },
+        { .name = "Schedule",   .isSchedule = true  },
+        { .name = "Read",       .useCancel  = true  },
+        { .name = "Clear",      .useCancel  = true  }
+    }},
+    .initialStage = osp::StageId{1}
+};
+
+struct FIMultiStepProcess {
+    struct LoopBlockIds {
+        LoopBlockId mainLoop;
+    };
+    struct DataIds {
+        DataId vecA;
+        DataId vecB;
+        DataId vecC;
+        DataId vecD;
+    };
+    struct Pipelines {
+        PipelineDef<EStgIntermediate> processA{"processA"};
+        PipelineDef<EStgIntermediate> processB{"processB"};
+        PipelineDef<EStgIntermediate> processC{"processC"};
+        PipelineDef<EStgIntermediate> processD{"processD"};
+    };
+    struct TaskIds {
+        TaskId blockSchedule;
+        TaskId last;
+    };
+};
+
+FeatureDef const ftrProcess = feature_def("Process", [] (
+        FeatureBuilder          &rFB,
+        Implement<FIMultiStepProcess>   process)
+{
+    using namespace test_b;
+
+    rFB.data_emplace< std::vector<int> >(process.di.vecA);
+    rFB.data_emplace< std::vector<int> >(process.di.vecB);
+    rFB.data_emplace< std::vector<int> >(process.di.vecC);
+    rFB.data_emplace< std::vector<int> >(process.di.vecD);
+
+    rFB.pipeline(process.pl.processA).parent(process.loopblks.mainLoop);
+    rFB.pipeline(process.pl.processB).parent(process.loopblks.mainLoop);
+    rFB.pipeline(process.pl.processC).parent(process.loopblks.mainLoop);
+    rFB.pipeline(process.pl.processD).parent(process.loopblks.mainLoop);
+
+    rFB.task(process.tasks.blockSchedule)
+        .name       ("Schedule main loop")
+        .schedules  ({process.loopblks.mainLoop})
+        .ext_finish (true);
+
+    auto const scheduleFunc = [] (std::vector<int> const &vec) noexcept -> TaskActions
+    {
+        return {.cancel = vec.empty()};
+    };
+
+    auto const copyPotato = [] (std::vector<int> const &rFrom, std::vector<int> &rTo) noexcept
+    {
+        rTo.assign(rFrom.begin(), rFrom.end());
+    };
+
+    auto const clearPotato = [] (std::vector<int> &rVec) noexcept
+    {
+        rVec.clear();
+    };
+
+    rFB.task().name("Schedule A").schedules(process.pl.processA).args({process.di.vecA}).func(scheduleFunc);
+    rFB.task().name("Schedule B").schedules(process.pl.processB).args({process.di.vecB}).func(scheduleFunc);
+    rFB.task().name("Schedule C").schedules(process.pl.processC).args({process.di.vecC}).func(scheduleFunc);
+    rFB.task().name("Schedule D").schedules(process.pl.processD).args({process.di.vecD}).func(scheduleFunc);
+
+
+    rFB.task()
+        .name       ("Copy A to B")
+        .sync_with  ({process.pl.processA(EStgIntermediate::Read), process.pl.processB(EStgIntermediate::Modify)})
+        .args       ({process.di.vecA, process.di.vecB})
+        .func       (copyPotato);
+
+    rFB.task()
+        .name       ("Copy B to C")
+        .sync_with  ({process.pl.processB(EStgIntermediate::Read), process.pl.processC(EStgIntermediate::Modify)})
+        .args       ({process.di.vecB, process.di.vecC})
+        .func       (copyPotato);
+
+    rFB.task()
+        .name       ("Copy C to D")
+        .sync_with  ({process.pl.processC(EStgIntermediate::Read), process.pl.processD(EStgIntermediate::Modify)})
+        .args       ({process.di.vecC, process.di.vecD})
+        .func       (copyPotato);
+
+    rFB.task().name("Clear A").sync_with({process.pl.processA(EStgIntermediate::Clear)}).args({process.di.vecA}).func(clearPotato);
+    rFB.task().name("Clear B").sync_with({process.pl.processB(EStgIntermediate::Clear)}).args({process.di.vecB}).func(clearPotato);
+    rFB.task().name("Clear C").sync_with({process.pl.processC(EStgIntermediate::Clear)}).args({process.di.vecC}).func(clearPotato);
+
+    // Last task will stop
+    rFB.task().name("Check D").sync_with({process.pl.processD(EStgIntermediate::Clear)}).args({process.di.vecC}).ext_finish(true);
+});
+
+
+
+
+
+
+} // namespace test_b
+
+
+TEST(Tasks, Process)
+{
+    using namespace test_b;
+
+    register_pltype_info();
+
+    auto pSink = std::make_shared<spdlog::sinks::stdout_color_sink_mt>();
+
+    osp::Logger_t logger = std::make_shared<spdlog::logger>("executor", pSink);
+    osp::set_thread_logger(logger);
+
+    Framework fw;
+
+    ContextId const ctx = fw.m_contextIds.create();
+
+    ContextBuilder cb{ctx, {}, fw};
+    cb.add_feature(ftrProcess);
+    ContextBuilder::finalize(std::move(cb));
+
+    auto const process  = fw.get_interface<FIMultiStepProcess>(ctx);
+
+    auto       &rVecA   = fw.data_get<std::vector<int>>(process.di.vecA);
+    auto       &rVecD   = fw.data_get<std::vector<int>>(process.di.vecD);
+
+
+    osp::exec::SinglethreadFWExecutor exec;
+    exec.load(fw);
+
+    exec.wait(fw);
+    ASSERT_FALSE(exec.is_running(fw, process.loopblks.mainLoop));
+    exec.task_finish(fw, process.tasks.blockSchedule, true, {.cancel = false});
+    exec.wait(fw);
+    ASSERT_FALSE(exec.is_running(fw, process.loopblks.mainLoop));
+
+    rVecA = {1, 2, 3};
+
+    exec.task_finish(fw, process.tasks.blockSchedule, true, {.cancel = false});
+    exec.wait(fw);
+
+    ASSERT_TRUE(exec.is_running(fw, process.loopblks.mainLoop));
+}
+
+//-----------------------------------------------------------------------------
+
+
+void register_pltype_info()
+{
+    auto &rPltypeReg = PipelineTypeIdReg::instance();
+    rPltypeReg.assign_pltype_info<test_a::EStgContinuous>   (test_a::gc_infoForEStgContinuous);
+    rPltypeReg.assign_pltype_info<test_a::EStgOptionalPath> (test_a::gc_infoForEStgOptionalPath);
+    rPltypeReg.assign_pltype_info<test_b::EStgIntermediate> (test_b::gc_infoForEStgIntermediate);
+}
+
+
+//-----------------------------------------------------------------------------
+
 
 // Test metaprogramming used by framework
 

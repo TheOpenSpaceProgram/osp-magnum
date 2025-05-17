@@ -716,7 +716,7 @@ FeatureDef const ftrTerrainDebugDraw = feature_def("TerrainDebugDraw", [] (
     rFB.task()
         .name       ("Reposition terrain surface mesh")
         .run_on     ({scnRender.pl.render(Run)})
-        .sync_with  ({terrain.pl.terrainFrame(Ready), terrain.pl.chunkMesh(Ready), scnRender.pl.drawEnt(Ready), scnRender.pl.drawTransforms(Modify_), scnRender.pl.drawEntResized(Done)})
+        .sync_with  ({terrain.pl.terrainFrame(Ready), terrain.pl.chunkMesh(Ready), scnRender.pl.drawIds(Ready), scnRender.pl.drawTransforms(Modify), scnRender.pl.drawEntResized(Done)})
         .args       ({    terrainDbgDraw.di.draw,                  terrain.di.terrainFrame,             terrain.di.terrain,                 scnRender.di.scnRender })
         .func       ([] (TerrainDebugDraw& rDraw, ACtxTerrainFrame &rTerrainFrame, ACtxTerrain &rTerrain, ACtxSceneRender &rScnRender) noexcept
     {
@@ -733,7 +733,7 @@ FeatureDef const ftrTerrainDebugDraw = feature_def("TerrainDebugDraw", [] (
     rFB.task()
         .name       ("Create or delete DrawEnts for each SkVrtxId in the terrain skeleton")
         .run_on     ({scnRender.pl.render(Run)})
-        .sync_with  ({terrain.pl.skeleton(Ready), scnRender.pl.drawEnt(Delete), scnRender.pl.entMeshDirty(Modify_), scnRender.pl.materialDirty(Modify_), scnRender.pl.drawEntResized(ModifyOrSignal)})
+        .sync_with  ({terrain.pl.skeleton(Ready), scnRender.pl.drawIds(Delete), scnRender.pl.meshDirty(Modify_), scnRender.pl.materialDirty(Modify_), scnRender.pl.drawEntResized(ModifyOrSignal)})
         .push_to    (out.m_tasks)
         .args       ({        comScn.di.drawing,                 scnRender.di.scnRender,             comScn.di.namedMeshes,                  idTrnDbgDraw,                   terrain.di.terrain,                      terrainIco.di.terrainIco })
         .func([] (ACtxDrawing& rDrawing, ACtxSceneRender& rScnRender, NamedMeshes& rNMesh, TerrainDebugDraw& rTrnDbgDraw, ACtxTerrain const &rTerrain, ACtxTerrainIco const &rTerrainIco) noexcept
@@ -784,7 +784,7 @@ FeatureDef const ftrTerrainDebugDraw = feature_def("TerrainDebugDraw", [] (
     rFB.task()
         .name       ("Arrange SkVrtxId DrawEnts as tiny cubes")
         .run_on     ({scnRender.pl.render(Run)})
-        .sync_with  ({terrain.pl.skeleton(Ready), scnRender.pl.drawEnt(Ready), scnRender.pl.drawTransforms(Modify_), scnRender.pl.entMeshDirty(Modify_), scnRender.pl.materialDirty(Modify_), scnRender.pl.drawEntResized(Done)})
+        .sync_with  ({terrain.pl.skeleton(Ready), scnRender.pl.drawIds(Ready), scnRender.pl.drawTransforms(Modify), scnRender.pl.meshDirty(Modify_), scnRender.pl.materialDirty(Modify_), scnRender.pl.drawEntResized(Done)})
         .push_to    (out.m_tasks)
         .args       ({        comScn.di.drawing,                 scnRender.di.scnRender,             comScn.di.namedMeshes,                        idTrnDbgDraw,                   terrain.di.terrain,                      terrainIco.di.terrainIco })
         .func([] (ACtxDrawing& rDrawing, ACtxSceneRender& rScnRender, NamedMeshes& rNMesh, TerrainDebugDraw const& rTrnDbgDraw, ACtxTerrain const &rTerrain, ACtxTerrainIco const &rTerrainIco) noexcept

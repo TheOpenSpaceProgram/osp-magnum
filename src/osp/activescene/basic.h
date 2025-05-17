@@ -96,21 +96,4 @@ struct ACtxBasic
     ACompTransformStorage_t             m_transform;
 };
 
-template<typename IT_T>
-void update_delete_basic(ACtxBasic &rCtxBasic, IT_T first, IT_T const& last)
-{
-    while (first != last)
-    {
-        ActiveEnt const ent = *first;
-
-        if (rCtxBasic.m_transform.contains(ent))
-        {
-            rCtxBasic.m_transform           .remove(ent);
-
-        }
-
-        std::advance(first, 1);
-    }
-}
-
 } // namespace osp::active

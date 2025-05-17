@@ -101,7 +101,6 @@ static ScenarioMap_t make_scenarios()
     }});
 
 
-/*
 
     static constexpr auto sc_gravityForce = Vector3{0.0f, 0.0f, -9.81f};
 
@@ -113,33 +112,34 @@ static ScenarioMap_t make_scenarios()
                        "* [QE]              - Move camera up/down\n"
                        "* [Drag MouseRight] - Orbit camera\n"
                        "* [Space]           - Throw spheres\n",
-        .loadFunc = [] (TestApp& rTestApp)
+        .loadFunc = [] (ScenarioArgs args)
     {
-        auto        &rFW      = rTestApp.m_framework;
-        auto  const mainApp   = rFW.get_interface<FIMainApp>  (rTestApp.m_mainContext);
+        auto  const mainApp   = args.rFW.get_interface<FIMainApp>  (args.mainContext);
 
-        ContextId const sceneCtx = rFW.m_contextIds.create();
-        rFW.data_get<adera::AppContexts&>(mainApp.di.appContexts).scene = sceneCtx;
+        ContextId const sceneCtx = args.rFW.m_contextIds.create();
+        args.rFW.data_get<adera::AppContexts&>(mainApp.di.appContexts).scene = sceneCtx;
 
-        ContextBuilder  sceneCB { sceneCtx, {rTestApp.m_mainContext}, rFW };
+        ContextBuilder  sceneCB { sceneCtx, {args.mainContext}, args.rFW };
         sceneCB.add_feature(ftrScene);
-        sceneCB.add_feature(ftrCommonScene, rTestApp.m_defaultPkg);
+        sceneCB.add_feature(ftrCleanupCtx);
+        sceneCB.add_feature(ftrCommonScene, args.defaultPkg);
         sceneCB.add_feature(ftrPhysics);
         sceneCB.add_feature(ftrPhysicsShapes, osp::draw::MaterialId{0});
-        sceneCB.add_feature(ftrDroppers);
-        sceneCB.add_feature(ftrBounds);
+        //sceneCB.add_feature(ftrDroppers);
+        //sceneCB.add_feature(ftrBounds);
 
-        sceneCB.add_feature(ftrJolt);
-        sceneCB.add_feature(ftrJoltConstAccel);
-        sceneCB.add_feature(ftrPhysicsShapesJolt);
+        //sceneCB.add_feature(ftrJolt);
+        //sceneCB.add_feature(ftrJoltConstAccel);
+        //sceneCB.add_feature(ftrPhysicsShapesJolt);
         ContextBuilder::finalize(std::move(sceneCB));
 
-        ospjolt::ForceFactors_t const gravity = add_constant_acceleration(sc_gravityForce, rFW, sceneCtx);
-        set_phys_shape_factors(gravity, rFW, sceneCtx);
-        add_floor(rFW, sceneCtx, rTestApp.m_defaultPkg, 4);
+        //ospjolt::ForceFactors_t const gravity = add_constant_acceleration(sc_gravityForce, args.rFW, sceneCtx);
+        //set_phys_shape_factors(gravity, args.rFW, sceneCtx);   z
+        add_floor(args.rFW, sceneCtx, args.defaultPkg, 4);
     }});
 
 
+/*
 
     add_scenario({
         .name        = "vehicles",

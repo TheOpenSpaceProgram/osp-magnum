@@ -42,7 +42,7 @@ using osp::input::EButtonControlIndex;
 
 namespace adera
 {
-#if 0  // SYNCEXEC
+
 
 FeatureDef const ftrCameraFree = feature_def("CameraFree", [] (
         FeatureBuilder              &rFB,
@@ -52,8 +52,7 @@ FeatureDef const ftrCameraFree = feature_def("CameraFree", [] (
 {
     rFB.task()
         .name       ("Move Camera controller")
-        .run_on     ({windowApp.pl.inputs(Run)})
-        .sync_with  ({camCtrl.pl.camCtrl(Modify)})
+        .sync_with  ({windowApp.pl.inputs(Run), camCtrl.pl.camCtrl(Modify)})
         .args       ({                 camCtrl.di.camCtrl,           scn.di.deltaTimeIn })
         .func([] (ACtxCameraController& rCamCtrl, float const deltaTimeIn) noexcept
     {
@@ -61,7 +60,6 @@ FeatureDef const ftrCameraFree = feature_def("CameraFree", [] (
         SysCameraController::update_move(rCamCtrl, deltaTimeIn, true);
     });
 }); // ftrCameraFree
-
 
 
 
@@ -83,7 +81,12 @@ FeatureDef const ftrCursor = feature_def("Cursor", [] (
     auto &rDrawingRes   = rFB.data_get< ACtxDrawingRes >     (comScn.di.drawingRes);
 
     auto const cursorEnt = rFB.data_emplace<DrawEnt>(cursor.di.drawEnt, rScnRender.m_drawIds.create());
-    rScnRender.resize_draw();
+
+    auto const capacity = rScnRender.m_drawIds.capacity();
+    rScnRender.m_mesh   .resize(capacity);
+    rScnRender.m_color  .resize(capacity, {1.0f, 1.0f, 1.0f, 1.0f});
+    rScnRender.m_visible.resize(capacity);
+    rScnRender.m_opaque .resize(capacity);
 
     rScnRender.m_mesh[cursorEnt] = SysRender::add_drawable_mesh(rDrawing, rDrawingRes, rResources, pkg, "cubewire");
     rScnRender.m_color[cursorEnt] = { 0.0f, 1.0f, 0.0f, 1.0f };
@@ -91,12 +94,12 @@ FeatureDef const ftrCursor = feature_def("Cursor", [] (
     rScnRender.m_opaque.insert(cursorEnt);
 
     Material &rMat = rScnRender.m_materials[material];
+    rMat.m_ents.resize(capacity);
     rMat.m_ents.insert(cursorEnt);
 
     rFB.task()
         .name       ("Move cursor")
-        .run_on     ({scnRender.pl.render(Run)})
-        .sync_with  ({camCtrl.pl.camCtrl(Ready), scnRender.pl.drawTransforms(Modify_), scnRender.pl.drawEntResized(Done)})
+        .sync_with  ({scnRender.pl.render(Run), camCtrl.pl.camCtrl(Ready), scnRender.pl.drawTransforms(Modify)})
         .args       ({        cursor.di.drawEnt,                            camCtrl.di.camCtrl,                 scnRender.di.scnRender })
         .func([] (DrawEnt const cursorEnt, ACtxCameraController const& rCamCtrl, ACtxSceneRender& rScnRender) noexcept
     {
@@ -104,6 +107,6 @@ FeatureDef const ftrCursor = feature_def("Cursor", [] (
     });
 
 }); // ftrCursor
-#endif
+
 
 } // namespace adera

@@ -112,8 +112,7 @@ ContextId make_scene_renderer(Framework &rFW, PkgId defaultPkg, ContextId mainCo
         return scnRdrCtx;
     }
 
-    /*
-
+    scnRdrCB.add_feature(ftrCleanupCtx);
     scnRdrCB.add_feature(ftrSceneRenderer);
     scnRdrCB.add_feature(ftrMagnumScene);
 
@@ -129,10 +128,11 @@ ContextId make_scene_renderer(Framework &rFW, PkgId defaultPkg, ContextId mainCo
 
     scnRdrCB.add_feature(ftrCameraControl);
 
+
     if (rFW.get_interface_id<FIPhysShapes>(sceneCtx).has_value())
     {
         scnRdrCB.add_feature(ftrPhysicsShapesDraw, matPhong);
-        scnRdrCB.add_feature(ftrThrower);
+        //scnRdrCB.add_feature(ftrThrower);
     }
 
     scnRdrCB.add_feature(ftrShaderPhong,        matPhong);
@@ -140,7 +140,8 @@ ContextId make_scene_renderer(Framework &rFW, PkgId defaultPkg, ContextId mainCo
     scnRdrCB.add_feature(ftrShaderVisualizer,   matVisualizer);
 
     scnRdrCB.add_feature(ftrCursor, TplPkgIdMaterialId{ defaultPkg, matFlat });
-
+    scnRdrCB.add_feature(ftrCameraFree);
+/*
     if (rFW.get_interface_id<FIPrefabs>(sceneCtx).has_value())
     {
         scnRdrCB.add_feature(ftrPrefabDraw, matPhong);
@@ -257,16 +258,23 @@ void start_magnum_renderer(Framework &rFW, ContextId mainCtx, entt::any userData
     auto       &rMagnumApp      = rFW.data_get<MagnumWindowApp>       (magnum.di.magnumApp);
     rMagnumApp.m_events         = std::make_unique<CommonMagnumApp>();
 
+    auto const windowApp        = rFW.get_interface<FIWindowApp>      (rAppCtxs.window);
+    auto       &rWindowLoopCtrl = rFW.data_get<WindowAppLoopControl>  (windowApp.di.windowAppLoopCtrl);
+
+    rWindowLoopCtrl.doRender = true;
+    rWindowLoopCtrl.doResync = true;
+    rWindowLoopCtrl.doSync   = true;
 
     main_loop_stack().push_back(
-            [windowCtx, init = true] (MainLoopArgs vars) mutable -> bool
+            [init = true] (MainLoopArgs vars) mutable -> bool
     {
-        auto const mainApp        = vars.rFW.get_interface<FIMainApp>(vars.mainCtx);
-        auto const magnum         = vars.rFW.get_interface<FIMagnum>         (windowCtx);
-        auto       &rMainLoopCtrl = vars.rFW.data_get<MainLoopControl&>(mainApp.di.mainLoopCtrl);
-
-        auto       &rFWModify     = vars.rFW.data_get<FrameworkModify&>(mainApp.di.frameworkModify);
-        auto       &rMagnumApp    = vars.rFW.data_get<MagnumWindowApp>       (magnum.di.magnumApp);
+        auto const mainApp        = vars.rFW.get_interface<FIMainApp>   (vars.mainCtx);
+        auto       &appContexts   = vars.rFW.data_get<AppContexts>      (mainApp.di.appContexts);
+        auto const windowApp      = vars.rFW.get_interface<FIWindowApp> (appContexts.window);
+        auto const magnum         = vars.rFW.get_interface<FIMagnum>    (appContexts.window);
+        auto       &rMainLoopCtrl = vars.rFW.data_get<MainLoopControl&> (mainApp.di.mainLoopCtrl);
+        auto       &rFWModify     = vars.rFW.data_get<FrameworkModify&> (mainApp.di.frameworkModify);
+        auto       &rMagnumApp    = vars.rFW.data_get<MagnumWindowApp>  (magnum.di.magnumApp);
 
         bool stopMainLoop = false;
         bool closeRenderer = false;
@@ -294,6 +302,13 @@ void start_magnum_renderer(Framework &rFW, ContextId mainCtx, entt::any userData
 
         if (stopMainLoop)
         {
+
+            auto &rWindowLoopCtrl = vars.rFW.data_get<WindowAppLoopControl>   (windowApp.di.windowAppLoopCtrl);
+
+            rWindowLoopCtrl.doRender = false;
+            rWindowLoopCtrl.doResync = false;
+            rWindowLoopCtrl.doSync   = false;
+
             while (!rMainLoopCtrl.mainScheduleWaiting)
             {
                 vars.rExecutor.wait(vars.rFW);
@@ -312,9 +327,12 @@ void start_magnum_renderer(Framework &rFW, ContextId mainCtx, entt::any userData
                 std::abort();
             }
 
-            run_cleanup(windowCtx, vars.rFW, vars.rExecutor);
-            vars.rFW.close_context(windowCtx);
-            vars.rFW.data_get<AppContexts>(mainApp.di.appContexts).window = {};
+            run_cleanup(appContexts.sceneRender, vars.rFW, vars.rExecutor);
+            run_cleanup(appContexts.window, vars.rFW, vars.rExecutor);
+            vars.rFW.close_context(appContexts.sceneRender);
+            vars.rFW.close_context(appContexts.window);
+            appContexts.sceneRender = {};
+            appContexts.window      = {};
 
             //if ( ! rFWModify.commands.empty() )
             for (FrameworkModify::Command &rCmd : rFWModify.commands)

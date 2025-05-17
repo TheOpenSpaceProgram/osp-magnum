@@ -31,10 +31,10 @@ namespace ftr_inter
 
 enum class EStgOptn : uint8_t
 {
-    ModifyOrSignal,
-    Schedule,
-    Run,
-    Done
+    ModifyOrSignal  = 0,
+    Schedule        = 1,
+    Run             = 2,
+    Done            = 3
 };
 inline osp::PipelineTypeInfo const gc_infoForEStgOptn
 {
@@ -44,7 +44,8 @@ inline osp::PipelineTypeInfo const gc_infoForEStgOptn
         { .name = "Schedule",   .isSchedule = true  },
         { .name = "Run",        .useCancel = true   },
         { .name = "Done",                           }
-    }}
+    }},
+    .initialStage = osp::StageId{0}
 };
 
 /**
@@ -52,11 +53,11 @@ inline osp::PipelineTypeInfo const gc_infoForEStgOptn
  */
 enum class EStgIntr : uint8_t
 {
-    Resize,
-    Modify_,
-    Schedule_,
-    UseOrRun,
-    Clear
+    Resize      = 0,
+    Modify_     = 1,
+    Schedule_   = 2,
+    UseOrRun    = 3,
+    Clear       = 4
 };
 inline osp::PipelineTypeInfo const gc_infoForEStgIntr
 {
@@ -66,8 +67,9 @@ inline osp::PipelineTypeInfo const gc_infoForEStgIntr
         { .name = "Modify"                          },
         { .name = "Schedule",   .isSchedule = true  },
         { .name = "UseOrRun",   .useCancel = true   },
-        { .name = "Clear",                          }
-    }}
+        { .name = "Clear",      .useCancel = true   }
+    }},
+    .initialStage = osp::StageId{0}
 };
 
 
@@ -77,20 +79,23 @@ inline osp::PipelineTypeInfo const gc_infoForEStgIntr
  */
 enum class EStgCont : uint8_t
 {
-    Delete,
+    Delete      = 0,
     ///< Remove elements from a container or mark them for deletion. This often involves reading
     ///< a set of elements to delete. This is run first since it leaves empty spaces for new
     ///< elements to fill directly after
 
-    New,
-    ///< Add new elements. Potentially resize the container to fit more elements
+    Resize_     = 1,
+    ///< Resize the container to fit more elements
 
-    Modify,
+    New         = 2,
+    ///< Add new elements
+
+    Modify      = 3,
     ///< Modify existing elements
 
-    ScheduleC,
+    ScheduleC   = 4,
 
-    Ready
+    Ready       = 5
     ///< Container is ready to use
 };
 inline osp::PipelineTypeInfo const gc_infoForEStgCont
@@ -98,19 +103,21 @@ inline osp::PipelineTypeInfo const gc_infoForEStgCont
     .debugName = "Continuous container",
     .stages = {{
         { .name = "Delete",                         },
+        { .name = "Resize_",                        },
         { .name = "New",                            },
         { .name = "Modify",                         },
         { .name = "Schedule",   .isSchedule = true  },
         { .name = "Ready",                          }
-    }}
+    }},
+    .initialStage = osp::StageId{0}
 };
 
 
 enum class EStgEvnt : uint8_t
 {
-    Schedule__,
-    Run_,
-    Done_
+    Schedule__  = 0,
+    Run_        = 1,
+    Done_       = 2
 };
 inline osp::PipelineTypeInfo const gc_infoForEStgEvnt
 {
@@ -119,7 +126,8 @@ inline osp::PipelineTypeInfo const gc_infoForEStgEvnt
         { .name = "Schedule",   .isSchedule = true  },
         { .name = "Run",        .useCancel = true   },
         { .name = "Done",                           }
-    }}
+    }},
+    .initialStage = osp::StageId{0}
 };
 
 enum class EStgFBO
@@ -137,7 +145,8 @@ inline osp::PipelineTypeInfo const gc_infoForEStgFBO
         { .name = "Bind",                           },
         { .name = "Draw",                           },
         { .name = "Unbind",                         }
-    }}
+    }},
+    .initialStage = osp::StageId{0}
 };
 
 
@@ -154,7 +163,8 @@ inline osp::PipelineTypeInfo const gc_infoForEStgLink
         { .name = "ScheduleLink", .isSchedule = true},
         { .name = "Bind",                           },
         { .name = "Draw",                           }
-    }}
+    }},
+    .initialStage = osp::StageId{0}
 };
 
 namespace stages
@@ -254,7 +264,7 @@ struct FIScene {
     };
 
     struct Pipelines {
-        PipelineDef<EStgCont> loopControl       {"loopControl"};
+        //PipelineDef<EStgCont> loopControl       {"loopControl"};
         PipelineDef<EStgOptn> update            {"update"};
     };
 };
@@ -262,21 +272,30 @@ struct FIScene {
 
 struct FICommonScene {
     struct DataIds {
-        DataId basic;
-        DataId drawing;
-        DataId drawingRes;
-        DataId activeEntDel;
-        DataId drawEntDel;
-        DataId namedMeshes;
+        DataId basic;           ///< osp::active::ACtxBasic
+        DataId drawing;         ///< osp::draw::ACtxDrawing
+        DataId drawingRes;      ///< osp::draw::ACtxDrawingRes
+        DataId activeEntDel;    ///< osp::active::ActiveEntVec_t
+        DataId namedMeshes;     ///< osp::draw::NamedMeshes
     };
 
     struct Pipelines {
         PipelineDef<EStgCont> activeEnt         {"activeEnt         - ACtxBasic::m_activeIds"};
-        PipelineDef<EStgOptn> activeEntResized  {"activeEntResized  - ACtxBasic::m_activeIds option to resize"};
         PipelineDef<EStgIntr> activeEntDelete   {"activeEntDelete   - comScn.di.activeEntDel, vector of ActiveEnts that need to be deleted"};
 
         PipelineDef<EStgCont> transform         {"transform         - ACtxBasic::m_transform"};
         PipelineDef<EStgCont> hierarchy         {"hierarchy         - ACtxBasic::m_scnGraph"};
+
+        /// drawing.m_meshIds
+        PipelineDef<EStgCont> meshIds           {"meshIds"};
+        /// drawing.m_texIds
+        PipelineDef<EStgCont> texIds            {"texIds"};
+
+        /// drawingRes.{m_resToTex, m_texToRes}
+        PipelineDef<EStgCont> texToRes          {"texToRes"};
+        /// drawingRes.{m_meshToRes, m_resToMesh}
+        PipelineDef<EStgCont> meshToRes         {"meshToRes"};
+
     };
 };
 
@@ -303,7 +322,7 @@ struct FIPhysShapes {
     struct Pipelines {
         PipelineDef<EStgIntr> spawnRequest      {"spawnRequest      - Spawned shapes"};
         PipelineDef<EStgIntr> spawnedEnts       {"spawnedEnts"};
-        PipelineDef<EStgIntr> ownedEnts         {"ownedEnts"};
+        PipelineDef<EStgCont> ownedEnts         {"ownedEnts"};
     };
 };
 
@@ -653,35 +672,42 @@ struct FIWindowApp {
 
 struct FISceneRenderer {
     struct DataIds {
-        DataId scnRender;
-        DataId drawTfObservers;
+        DataId scnRender;       ///< osp::draw::ACtxSceneRender
+        DataId drawTfObservers; ///< osp::draw::DrawTfObservers
+        DataId drawEntDel;      ///< osp::draw::DrawEntVec_t
     };
 
     struct Pipelines {
-        PipelineDef<EStgOptn> render            {"render            - "};
+        PipelineDef<EStgOptn> render            {"render"};
 
-        PipelineDef<EStgCont> drawEnt           {"drawEnt           - "};
-        PipelineDef<EStgOptn> drawEntResized    {"drawEntResized    - "};
-        PipelineDef<EStgIntr> drawEntDelete     {"drawEntDelete     - Vector of DrawEnts that need to be deleted"};
+        /// scnRender.m_drawIds
+        PipelineDef<EStgCont> drawEnt           {"drawEnt"};
 
-        PipelineDef<EStgIntr> entTextureDirty   {"entTextureDirty"};
-        PipelineDef<EStgIntr> entMeshDirty      {"entMeshDirty"};
+        /// scnRender.{m_opaque, m_transparent, m_visible, m_color}
+        PipelineDef<EStgCont> misc              {"misc"};
 
+        /// scnRender.m_drawTransform
+        PipelineDef<EStgCont> drawTransforms    {"drawTransforms"};
+
+        /// scnRender.{m_needDrawTf, m_activeToDraw, drawTfObserverEnable}
+        PipelineDef<EStgCont> activeDrawTfs     {"activeDrawTfs"};
+
+        /// scnRender.m_diffuseTex
+        PipelineDef<EStgCont> diffuseTex        {"diffuseTex"};
+        /// scnRender.m_diffuseTexDirty
+        PipelineDef<EStgIntr> diffuseTexDirty   {"diffuseTexDirty"};
+
+        /// scnRender.m_mesh
+        PipelineDef<EStgCont> mesh              {"mesh"};
+        /// scnRender.m_meshDirty
+        PipelineDef<EStgIntr> meshDirty         {"meshDirty"};
+
+        /// scnRender.{m_materialIds, m_materials[#].m_ents}
         PipelineDef<EStgCont> material          {"material"};
+        /// scnRender.m_materials[#].m_dirty
         PipelineDef<EStgIntr> materialDirty     {"materialDirty"};
 
-        PipelineDef<EStgIntr> drawTransforms    {"drawTransforms"};
-
-        PipelineDef<EStgCont> group             {"group"};
-        PipelineDef<EStgCont> groupEnts         {"groupEnts"};
-        PipelineDef<EStgCont> entMesh           {"entMesh"};
-        PipelineDef<EStgCont> entTexture        {"entTexture"};
-
-        PipelineDef<EStgCont> mesh              {"mesh"};
-        PipelineDef<EStgCont> texture           {"texture"};
-
-        PipelineDef<EStgIntr> meshResDirty      {"meshResDirty"};
-        PipelineDef<EStgIntr> textureResDirty   {"textureResDirty"};
+        PipelineDef<EStgIntr> drawEntDelete     {"drawEntDelete"};
     };
 };
 

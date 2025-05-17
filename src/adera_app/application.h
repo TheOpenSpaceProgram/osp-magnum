@@ -33,10 +33,8 @@
 namespace adera
 {
 
-
 struct MainLoopControl
 {
-    //bool doUpdate;
     bool mainScheduleWaiting    {false};
     bool keepOpenWaiting        {false};
 };
