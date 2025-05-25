@@ -37,11 +37,6 @@
 #include <vector>
 
 
-// probably initialized with uninitialized memory
-template<typename ID_T, std::size_t SIZE>
-using StaticIdSet_t = lgrn::BitViewIdSet<lgrn::BitView<std::array<std::uint64_t, SIZE/64>>, ID_T>;
-
-
 using namespace test_graph;
 
 

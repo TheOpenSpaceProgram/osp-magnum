@@ -44,12 +44,8 @@ struct StageLock
     StageId     stageId;
 };
 
-void check_task_order(Tasks const& tasks, TaskOrderReport& rOut, ArrayView<LoopBlockId const> loopblks)
+void check_task_order(Tasks const& tasks, TaskOrderReport& rOut, lgrn::IdSetStl<LoopBlockId> const& loopblks)
 {
-    auto const use_loopblk = [loopblks] (LoopBlockId const loopblk)
-    {
-        return std::find(loopblks.begin(), loopblks.end(), loopblk) != loopblks.end();
-    };
 
     // step 1: add all the tasks
 
@@ -68,7 +64,7 @@ void check_task_order(Tasks const& tasks, TaskOrderReport& rOut, ArrayView<LoopB
     for (PipelineId const pipelineId : tasks.pipelineIds)
     {
         Pipeline const& pipeline = tasks.pipelineInst[pipelineId];
-        if (use_loopblk(pipeline.block))
+        if (loopblks.contains(pipeline.block))
         {
             ++pipelinesNotFinished;
 
@@ -85,7 +81,7 @@ void check_task_order(Tasks const& tasks, TaskOrderReport& rOut, ArrayView<LoopB
 
     for (TaskSyncToPipeline const& syncTo : tasks.syncs)
     {
-        if (use_loopblk(tasks.pipelineInst[syncTo.pipeline].block))
+        if (loopblks.contains(tasks.pipelineInst[syncTo.pipeline].block))
         {
             ++ alignsRemaining[syncTo.task];
         }
@@ -161,7 +157,7 @@ void check_task_order(Tasks const& tasks, TaskOrderReport& rOut, ArrayView<LoopB
         {
             Pipeline const& pipeline = tasks.pipelineInst[pipelineId];
 
-            if ( ! use_loopblk(pipeline.block) ) { continue; }
+            if ( ! loopblks.contains(pipeline.block) ) { continue; }
 
             StageId &rCurrentStage = currentStages[pipelineId];
 

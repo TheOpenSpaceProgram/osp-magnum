@@ -64,10 +64,6 @@ using namespace osp::fw;
 
 void register_pltype_info();
 
-namespace test_a
-{
-
-
 enum class EStgContinuous {
     Modify      = 0,
     Schedule    = 1,
@@ -80,7 +76,7 @@ osp::PipelineTypeInfo const gc_infoForEStgContinuous{
         { .name = "Schedule",   .isSchedule = true  },
         { .name = "Read",                           }
     }},
-    .initialStage = osp::StageId{1}
+    .initialStage = osp::StageId{0}
 };
 
 enum class EStgOptionalPath {
@@ -138,9 +134,7 @@ struct FIMainLoop {
         LoopBlockId mainLoop;
     };
     struct DataIds { };
-    struct Pipelines {
-        //PipelineDef<EStgOptionalPath> mainLoopPL{"Main Loop"};
-    };
+    struct Pipelines { };
     struct TaskIds {
         TaskId schedule;
     };
@@ -151,9 +145,6 @@ struct FIAquarium {
         DataId aquariumDI;
     };
     struct Pipelines {
-        // Controls access to Aquarium
-        //PipelineDef<EStgContinuous> aquariumPL{"aquariumPL"};
-
         /// Boolean decision on whether we want to update the aquarium or not
         PipelineDef<EStgOptionalPath> aquariumUpdatePL{"aquariumUpdatePL"};
     };
@@ -201,10 +192,6 @@ FeatureDef const ftrWorld = feature_def("World", [] (
         .name       ("Schedule main loop")
         .ext_finish (true)
         .schedules  ({mainLoop.loopblks.mainLoop});
-//        .func       ([] (Aquarium const &rAquarium)
-//    {
-//        return TaskActions{ .cancel = !rAquarium.runMainLoop };
-//    });
 
     // Running the aquarium update is optional and controlled with runAquariumUpdate.
     // sync_with also ties aquariumUpdatePL to the main loop
@@ -212,10 +199,6 @@ FeatureDef const ftrWorld = feature_def("World", [] (
         .name       ("Schedule aquarium update")
         .ext_finish (true)
         .schedules  ({aquarium.pl.aquariumUpdatePL});
-//        .func       ([] (Aquarium const &rAquarium)
-//    {
-//        return TaskActions{ .cancel = ! rAquarium.runAquariumUpdate };
-//    });
 });
 
 FeatureDef const ftrFish = feature_def("Fish", [] (
@@ -254,13 +237,8 @@ FeatureDef const ftrSharks = feature_def("Sharks", [] (
     });
 });
 
-} // namespace test_a
-
-#if 0
-TEST(Tasks, Basics)
+TEST(Framework, Basics)
 {
-    using namespace test_a;
-
     register_pltype_info();
 
     auto pSink = std::make_shared<spdlog::sinks::stdout_color_sink_mt>();
@@ -334,15 +312,12 @@ TEST(Tasks, Basics)
     ASSERT_FALSE(exec.is_running(fw, mainLoop.loopblks.mainLoop));
 }
 
-#endif
 //-----------------------------------------------------------------------------
 
 
 // dependency
 
 
-namespace test_b
-{
 
 enum class EStgIntermediate {
     Modify      = 0,
@@ -358,7 +333,7 @@ osp::PipelineTypeInfo const gc_infoForEStgIntermediate{
         { .name = "Read",       .useCancel  = true  },
         { .name = "Clear",      .useCancel  = true  }
     }},
-    .initialStage = osp::StageId{1}
+    .initialStage = osp::StageId{0}
 };
 
 struct FIMultiStepProcess {
@@ -387,8 +362,6 @@ FeatureDef const ftrProcess = feature_def("Process", [] (
         FeatureBuilder          &rFB,
         Implement<FIMultiStepProcess>   process)
 {
-    using namespace test_b;
-
     rFB.data_emplace< std::vector<int> >(process.di.vecA);
     rFB.data_emplace< std::vector<int> >(process.di.vecB);
     rFB.data_emplace< std::vector<int> >(process.di.vecC);
@@ -409,12 +382,12 @@ FeatureDef const ftrProcess = feature_def("Process", [] (
         return {.cancel = vec.empty()};
     };
 
-    auto const copyPotato = [] (std::vector<int> const &rFrom, std::vector<int> &rTo) noexcept
+    auto const copyFunc = [] (std::vector<int> const &rFrom, std::vector<int> &rTo) noexcept
     {
         rTo.assign(rFrom.begin(), rFrom.end());
     };
 
-    auto const clearPotato = [] (std::vector<int> &rVec) noexcept
+    auto const clearFunc = [] (std::vector<int> &rVec) noexcept
     {
         rVec.clear();
     };
@@ -429,40 +402,33 @@ FeatureDef const ftrProcess = feature_def("Process", [] (
         .name       ("Copy A to B")
         .sync_with  ({process.pl.processA(EStgIntermediate::Read), process.pl.processB(EStgIntermediate::Modify)})
         .args       ({process.di.vecA, process.di.vecB})
-        .func       (copyPotato);
+        .func       (copyFunc);
 
     rFB.task()
         .name       ("Copy B to C")
         .sync_with  ({process.pl.processB(EStgIntermediate::Read), process.pl.processC(EStgIntermediate::Modify)})
         .args       ({process.di.vecB, process.di.vecC})
-        .func       (copyPotato);
+        .func       (copyFunc);
 
     rFB.task()
         .name       ("Copy C to D")
         .sync_with  ({process.pl.processC(EStgIntermediate::Read), process.pl.processD(EStgIntermediate::Modify)})
         .args       ({process.di.vecC, process.di.vecD})
-        .func       (copyPotato);
+        .func       (copyFunc);
 
-    rFB.task().name("Clear A").sync_with({process.pl.processA(EStgIntermediate::Clear)}).args({process.di.vecA}).func(clearPotato);
-    rFB.task().name("Clear B").sync_with({process.pl.processB(EStgIntermediate::Clear)}).args({process.di.vecB}).func(clearPotato);
-    rFB.task().name("Clear C").sync_with({process.pl.processC(EStgIntermediate::Clear)}).args({process.di.vecC}).func(clearPotato);
+    rFB.task().name("Clear A").sync_with({process.pl.processA(EStgIntermediate::Clear)}).args({process.di.vecA}).func(clearFunc);
+    rFB.task().name("Clear B").sync_with({process.pl.processB(EStgIntermediate::Clear)}).args({process.di.vecB}).func(clearFunc);
+    rFB.task().name("Clear C").sync_with({process.pl.processC(EStgIntermediate::Clear)}).args({process.di.vecC}).func(clearFunc);
 
     // Last task will stop
     rFB.task().name("Check D").sync_with({process.pl.processD(EStgIntermediate::Clear)}).args({process.di.vecC}).ext_finish(true);
 });
 
 
+//-----------------------------------------------------------------------------
 
-
-
-
-} // namespace test_b
-
-
-TEST(Tasks, Process)
+TEST(Framework, Process)
 {
-    using namespace test_b;
-
     register_pltype_info();
 
     auto pSink = std::make_shared<spdlog::sinks::stdout_color_sink_mt>();
@@ -503,13 +469,165 @@ TEST(Tasks, Process)
 
 //-----------------------------------------------------------------------------
 
+struct NestedLoopData
+{
+
+    int setpoint{0};
+
+    int value{0};
+    int error{0};
+    int command{0}; // possible values: -1, 0, 1
+};
+
+struct FINestedLoop {
+    struct LoopBlockIds {
+        LoopBlockId outer;
+        LoopBlockId inner;
+    };
+    struct DataIds {
+        DataId data;
+    };
+    struct Pipelines {
+
+        PipelineDef<EStgContinuous>     value       {"value"};
+        PipelineDef<EStgContinuous>     setpoint    {"setpoint"};
+
+        PipelineDef<EStgContinuous>     valueInner  {"valueInner"};
+        PipelineDef<EStgContinuous>     error       {"error"};
+        PipelineDef<EStgIntermediate>   command     {"command"};
+    };
+    struct TaskIds {
+        TaskId outerSchedule;
+        TaskId innerSchedule;
+        TaskId last;
+    };
+};
+
+FeatureDef const ftrNestedLoop = feature_def("NestedLoop", [] (
+        FeatureBuilder          &rFB,
+        Implement<FINestedLoop>   nestedLoop)
+{
+    rFB.data_emplace<NestedLoopData>(nestedLoop.di.data);
+
+    rFB.loopblk(nestedLoop.loopblks.inner).parent(nestedLoop.loopblks.outer);
+
+    rFB.pipeline(nestedLoop.pl.value)       .parent(nestedLoop.loopblks.outer);
+    rFB.pipeline(nestedLoop.pl.setpoint)    .parent(nestedLoop.loopblks.outer);
+    rFB.pipeline(nestedLoop.pl.valueInner)  .parent(nestedLoop.loopblks.inner).initial_stage(EStgContinuous::Read);
+    rFB.pipeline(nestedLoop.pl.error)       .parent(nestedLoop.loopblks.inner);
+    rFB.pipeline(nestedLoop.pl.command)     .parent(nestedLoop.loopblks.inner);
+
+    rFB.task(nestedLoop.tasks.outerSchedule)
+        .name       ("Schedule main loop")
+        .schedules  ({nestedLoop.loopblks.outer})
+        .ext_finish (true);
+
+
+    rFB.task(nestedLoop.tasks.innerSchedule)
+        .name       ("Schedule inner loop")
+        .schedules  ({nestedLoop.loopblks.inner})
+        .args       ({      nestedLoop.di.data})
+        .func       ([] (NestedLoopData& rData) -> TaskActions
+    {
+        return {.cancel = rData.setpoint == rData.value};
+    });
+
+    rFB.task()
+        .name       ("Calculate error")
+        .sync_with  ({nestedLoop.pl.value(EStgContinuous::Modify), nestedLoop.pl.valueInner(EStgContinuous::Read), nestedLoop.pl.setpoint(EStgContinuous::Read), nestedLoop.pl.error(EStgContinuous::Modify)})
+        .args       ({      nestedLoop.di.data})
+        .func       ([] (NestedLoopData& rData)
+    {
+        rData.error = rData.setpoint - rData.value;
+    });
+
+    rFB.task()
+        .name       ("Calculate command")
+        .sync_with  ({nestedLoop.pl.error(EStgContinuous::Read), nestedLoop.pl.command(EStgIntermediate::Modify)})
+        .args       ({      nestedLoop.di.data})
+        .func       ([] (NestedLoopData& rData)
+    {
+        rData.command = (0 < rData.error) - (rData.error < 0);
+    });
+
+    rFB.task()
+        .name       ("Schedule command")
+        .schedules  ({nestedLoop.pl.command})
+        .args       ({      nestedLoop.di.data})
+        .func       ([] (NestedLoopData& rData) -> TaskActions
+    {
+        return {.cancel = rData.command == 0};
+    });
+
+    rFB.task()
+        .name       ("Apply command")
+        .sync_with  ({nestedLoop.pl.command(EStgIntermediate::Read), nestedLoop.pl.valueInner(EStgContinuous::Modify), nestedLoop.pl.value(EStgContinuous::Modify)})
+        .args       ({      nestedLoop.di.data})
+        .func       ([] (NestedLoopData& rData)
+    {
+        rData.value += rData.command;
+    });
+});
+
+TEST(Framework, NestedLoop)
+{
+    register_pltype_info();
+
+    auto pSink = std::make_shared<spdlog::sinks::stdout_color_sink_mt>();
+
+    osp::Logger_t logger = std::make_shared<spdlog::logger>("executor", pSink);
+    osp::set_thread_logger(logger);
+
+    Framework fw;
+
+    ContextId const ctx = fw.m_contextIds.create();
+
+    ContextBuilder cb{ctx, {}, fw};
+    cb.add_feature(ftrNestedLoop);
+    ContextBuilder::finalize(std::move(cb));
+
+    auto const nestedLoop = fw.get_interface<FINestedLoop>(ctx);
+    auto       &rData     = fw.data_get<NestedLoopData>(nestedLoop.di.data);
+
+    osp::exec::SinglethreadFWExecutor exec;
+    exec.load(fw);
+
+    exec.wait(fw);
+
+    ASSERT_FALSE(exec.is_running(fw, nestedLoop.loopblks.outer));
+    ASSERT_FALSE(exec.is_running(fw, nestedLoop.loopblks.inner));
+
+    exec.task_finish(fw, nestedLoop.tasks.outerSchedule);
+    exec.wait(fw);
+
+    ASSERT_FALSE(exec.is_running(fw, nestedLoop.loopblks.outer));
+    ASSERT_FALSE(exec.is_running(fw, nestedLoop.loopblks.inner));
+
+    rData.setpoint = 10;
+    exec.task_finish(fw, nestedLoop.tasks.outerSchedule);
+    exec.wait(fw);
+    ASSERT_EQ(rData.value, 10);
+    ASSERT_FALSE(exec.is_running(fw, nestedLoop.loopblks.outer));
+    ASSERT_FALSE(exec.is_running(fw, nestedLoop.loopblks.inner));
+
+    rData.setpoint = -5;
+    exec.task_finish(fw, nestedLoop.tasks.outerSchedule);
+
+    exec.wait(fw);
+    ASSERT_EQ(rData.value, -5);
+    ASSERT_FALSE(exec.is_running(fw, nestedLoop.loopblks.outer));
+    ASSERT_FALSE(exec.is_running(fw, nestedLoop.loopblks.inner));
+}
+
+//-----------------------------------------------------------------------------
+
 
 void register_pltype_info()
 {
     auto &rPltypeReg = PipelineTypeIdReg::instance();
-    rPltypeReg.assign_pltype_info<test_a::EStgContinuous>   (test_a::gc_infoForEStgContinuous);
-    rPltypeReg.assign_pltype_info<test_a::EStgOptionalPath> (test_a::gc_infoForEStgOptionalPath);
-    rPltypeReg.assign_pltype_info<test_b::EStgIntermediate> (test_b::gc_infoForEStgIntermediate);
+    rPltypeReg.assign_pltype_info<EStgContinuous>   (gc_infoForEStgContinuous);
+    rPltypeReg.assign_pltype_info<EStgOptionalPath> (gc_infoForEStgOptionalPath);
+    rPltypeReg.assign_pltype_info<EStgIntermediate> (gc_infoForEStgIntermediate);
 }
 
 

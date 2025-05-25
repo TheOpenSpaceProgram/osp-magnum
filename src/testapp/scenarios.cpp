@@ -125,7 +125,7 @@ static ScenarioMap_t make_scenarios()
         sceneCB.add_feature(ftrCommonScene, args.defaultPkg);
         sceneCB.add_feature(ftrPhysics);
         sceneCB.add_feature(ftrPhysicsShapes, osp::draw::MaterialId{0});
-        //sceneCB.add_feature(ftrDroppers);
+        sceneCB.add_feature(ftrDroppers);
         //sceneCB.add_feature(ftrBounds);
 
         //sceneCB.add_feature(ftrJolt);

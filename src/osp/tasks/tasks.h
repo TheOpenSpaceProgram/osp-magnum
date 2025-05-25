@@ -240,7 +240,7 @@ struct TaskOrderReport
     std::vector<TaskId>     failedNotAdded;
 };
 
-void check_task_order(Tasks const& tasks, TaskOrderReport& rOut, ArrayView<LoopBlockId const> loopblks);
+void check_task_order(Tasks const& tasks, TaskOrderReport& rOut, lgrn::IdSetStl<LoopBlockId> const& loopblks);
 
 
 } // namespace osp

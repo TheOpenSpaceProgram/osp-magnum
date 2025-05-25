@@ -132,7 +132,7 @@ ContextId make_scene_renderer(Framework &rFW, PkgId defaultPkg, ContextId mainCo
     if (rFW.get_interface_id<FIPhysShapes>(sceneCtx).has_value())
     {
         scnRdrCB.add_feature(ftrPhysicsShapesDraw, matPhong);
-        //scnRdrCB.add_feature(ftrThrower);
+        scnRdrCB.add_feature(ftrThrower);
     }
 
     scnRdrCB.add_feature(ftrShaderPhong,        matPhong);
@@ -140,8 +140,7 @@ ContextId make_scene_renderer(Framework &rFW, PkgId defaultPkg, ContextId mainCo
     scnRdrCB.add_feature(ftrShaderVisualizer,   matVisualizer);
 
     scnRdrCB.add_feature(ftrCursor, TplPkgIdMaterialId{ defaultPkg, matFlat });
-    scnRdrCB.add_feature(ftrCameraFree);
-/*
+
     if (rFW.get_interface_id<FIPrefabs>(sceneCtx).has_value())
     {
         scnRdrCB.add_feature(ftrPrefabDraw, matPhong);
@@ -149,15 +148,15 @@ ContextId make_scene_renderer(Framework &rFW, PkgId defaultPkg, ContextId mainCo
 
     if (rFW.get_interface_id<FIVehicleSpawn>(sceneCtx).has_value())
     {
-        scnRdrCB.add_feature(ftrVehicleControl);
-        scnRdrCB.add_feature(ftrVehicleCamera);
-        scnRdrCB.add_feature(ftrVehicleSpawnDraw);
+        //scnRdrCB.add_feature(ftrVehicleControl);
+        //scnRdrCB.add_feature(ftrVehicleCamera);
+        //scnRdrCB.add_feature(ftrVehicleSpawnDraw);
     }
     else
     {
         scnRdrCB.add_feature(ftrCameraFree);
     }
-
+/*
     if (rFW.get_interface_id<FIUniPlanets>(sceneCtx).has_value())
     {
         scnRdrCB.add_feature(ftrUniverseTestPlanetsDraw, PlanetDrawParams{

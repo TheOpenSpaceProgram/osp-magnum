@@ -53,7 +53,9 @@ struct SyncGraphExecutor
     struct PerSubgraph
     {
         LocalCycleId activeCycle;
+        LocalCycleId jumpNextCycle;
         std::uint8_t position;
+        std::uint8_t jumpNextPos;
     };
     struct PerSync
     {
@@ -96,24 +98,27 @@ struct SyncGraphExecutor
 
     bool jump(SubgraphId const subgraphId, LocalCycleId const cycleId, std::uint8_t position, SyncGraph const& graph)
     {
-        Subgraph          const &rSubgraph    = graph.subgraphs[subgraphId];
         PerSubgraph             &rPerSubgraph = perSubgraph[subgraphId];
-        SubgraphType      const &sgtype       = graph.sgtypes[rSubgraph.instanceOf];
+        rPerSubgraph.jumpNextCycle = cycleId;
+        rPerSubgraph.jumpNextPos   = position;
+//        Subgraph          const &rSubgraph    = graph.subgraphs[subgraphId];
+//        PerSubgraph             &rPerSubgraph = perSubgraph[subgraphId];
+//        SubgraphType      const &sgtype       = graph.sgtypes[rSubgraph.instanceOf];
 
-        [[maybe_unused]] auto const is_current_point_syncs_all_disabled = [&] () {
-            LocalPointId const currentPoint  = sgtype.cycles[rPerSubgraph.activeCycle].path[rPerSubgraph.position];
+//        [[maybe_unused]] auto const is_current_point_syncs_all_disabled = [&] () {
+//            LocalPointId const currentPoint  = sgtype.cycles[rPerSubgraph.activeCycle].path[rPerSubgraph.position];
 
-            for (SynchronizerId const syncId : rSubgraph.points[currentPoint].connectedSyncs)
-            {
-                if (perSync[syncId].state != ESyncState::Inactive) { return false; }
-            }
+//            for (SynchronizerId const syncId : rSubgraph.points[currentPoint].connectedSyncs)
+//            {
+//                if (perSync[syncId].state != ESyncState::Inactive) { return false; }
+//            }
 
-            return true;
-        };
-        LGRN_ASSERT(is_current_point_syncs_all_disabled());
+//            return true;
+//        };
+//        LGRN_ASSERT(is_current_point_syncs_all_disabled());
 
-        rPerSubgraph.activeCycle = cycleId;
-        rPerSubgraph.position    = position;
+//        rPerSubgraph.activeCycle = cycleId;
+//        rPerSubgraph.position    = position;
 
         return true;
     }
@@ -427,11 +432,24 @@ bool SyncGraphExecutor::update(std::vector<SynchronizerId> &rJustAlignedOut, Syn
             }
         }
 
-        rExecSubgraph.position ++;
-        if (rExecSubgraph.position == sgtype.cycles[rExecSubgraph.activeCycle].path.size())
+
+        if (rExecSubgraph.jumpNextCycle.has_value())
         {
-            rExecSubgraph.position = 0;
+            rExecSubgraph.activeCycle   = rExecSubgraph.jumpNextCycle;
+            rExecSubgraph.position      = rExecSubgraph.jumpNextPos;
+
+            rExecSubgraph.jumpNextCycle = {};
         }
+        else
+        {
+            rExecSubgraph.position ++;
+            if (rExecSubgraph.position == sgtype.cycles[rExecSubgraph.activeCycle].path.size())
+            {
+                rExecSubgraph.position = 0;
+            }
+        }
+
+
     }
 
     somethingHappened |= !toCycle.empty();
