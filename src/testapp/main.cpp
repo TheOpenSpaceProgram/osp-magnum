@@ -97,7 +97,6 @@ int main(int argc, char** argv)
         .addOption          ("scene", "none")   .setHelp("scene",       "Set the scene to launch")
         .addOption          ("config")          .setHelp("config",      "path to configuration file to use")
         .addBooleanOption   ("norepl")          .setHelp("norepl",      "don't enter read, evaluate, print, loop.")
-        .addBooleanOption   ("log-exec")        .setHelp("log-exec",    "Log Task/Pipeline Execution (Extremely chatty!)")
         // TODO .addBooleanOption('v', "verbose")   .setHelp("verbose",     "log verbosely")
         .setGlobalHelp("Helptext goes here.")
         .parse(argc, argv);
@@ -121,11 +120,9 @@ int main(int argc, char** argv)
 
     // Select SinglethreadFWExecutor
     auto pSingleThreadExecutor = std::make_unique<osp::exec::SinglethreadFWExecutor>();
-    if (args.isSet("log-exec"))
-    {
-        pSingleThreadExecutor->m_log = g_logExecutor;
-    }
+    pSingleThreadExecutor->m_log = g_logExecutor;
     g_pExecutor = pSingleThreadExecutor.get();
+
 
     g_mainContext = g_framework.m_contextIds.create();
     ContextBuilder mainCB { g_mainContext, {}, g_framework };

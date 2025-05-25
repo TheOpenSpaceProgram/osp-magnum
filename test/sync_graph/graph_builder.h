@@ -254,9 +254,6 @@ inline SyncGraph make_test_graph(Args args)
 
     out.debug_verify();
 
-    std::cout << "\n\n" << SyncGraphDOTVisualizer{out} << "\n\n";
-
-
     return out;
 } // make_test_graph
 

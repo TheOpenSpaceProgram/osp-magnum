@@ -150,6 +150,11 @@ struct Pipeline
     StageId initialStage;
 };
 
+struct Task
+{
+    std::string debugName;
+};
+
 struct TaskSyncToPipeline
 {
     TaskId      task;
@@ -164,6 +169,7 @@ struct Tasks
     lgrn::IdRegistryStl<PipelineId>     pipelineIds;
 
     KeyedVec<LoopBlockId, LoopBlock>    loopblkInst;
+    KeyedVec<TaskId, Task>              taskInst;
     KeyedVec<PipelineId, Pipeline>      pipelineInst;
 
     std::vector<TaskSyncToPipeline>     syncs;
@@ -228,19 +234,20 @@ struct TaskOrderReport
 {
     struct Step
     {
-        // union{
         TaskId      taskId;
         PipelineId  pipelineId;
         StageId     stageId;
         int         time;
     };
 
-    std::vector<Step>       steps;
-    std::vector<TaskId>     failedLocked;
-    std::vector<TaskId>     failedNotAdded;
+    lgrn::IdSetStl<LoopBlockId> loopblks;
+    std::vector<Step>           steps;
+    std::vector<TaskId>         failedLocked;
+    std::vector<TaskId>         failedNotAdded;
 };
 
-void check_task_order(Tasks const& tasks, TaskOrderReport& rOut, lgrn::IdSetStl<LoopBlockId> const& loopblks);
+void check_task_order(Tasks const& tasks, TaskOrderReport& rOut, lgrn::IdSetStl<LoopBlockId> loopblks);
 
+std::string visualize_task_order(TaskOrderReport const& report, Tasks const& tasks);
 
 } // namespace osp

@@ -121,9 +121,11 @@ void ContextBuilder::add_feature(FeatureDef const &def, entt::any setupData) noe
                     };
                 }
 
+                // Make TaskIds
                 rFI.tasks.resize(subjectInfo.taskCount);
                 m_rFW.m_tasks.taskIds.create(rFI.tasks.begin(), rFI.tasks.end());
-                m_rFW.m_taskImpl.resize(m_rFW.m_tasks.taskIds.capacity());
+                m_rFW.m_taskImpl        .resize(m_rFW.m_tasks.taskIds.capacity());
+                m_rFW.m_tasks.taskInst  .resize(m_rFW.m_tasks.taskIds.capacity());
                 rFSession.tasks.insert(rFSession.tasks.end(), rFI.tasks.begin(), rFI.tasks.end());
             }
         }

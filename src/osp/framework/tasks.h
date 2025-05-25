@@ -56,7 +56,6 @@ struct TaskImpl
 {
     using Func_t = TaskActions(*)(WorkerContext, ArrayView<entt::any>) noexcept;
 
-    std::string             debugName;
     std::vector<DataId>     args;
     Func_t                  func    { nullptr };
     bool                    externalFinish{false};

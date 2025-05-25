@@ -162,14 +162,12 @@ struct TaskRef
 
     TaskRef& name(std::string_view debugName)
     {
-        m_rFW.m_taskImpl.resize(m_rFW.m_tasks.taskIds.capacity());
-        m_rFW.m_taskImpl[taskId].debugName = debugName;
+        m_rFW.m_tasks.taskInst[taskId].debugName = debugName;
         return *this;
     }
 
     TaskRef& ext_finish(bool value)
     {
-        m_rFW.m_taskImpl.resize(m_rFW.m_tasks.taskIds.capacity());
         m_rFW.m_taskImpl[taskId].externalFinish = value;
         return *this;
     }
@@ -219,14 +217,12 @@ struct TaskRef
     template<typename FUNC_T>
     TaskRef& func(FUNC_T&& funcArg)
     {
-        m_rFW.m_taskImpl.resize(m_rFW.m_tasks.taskIds.capacity());
         m_rFW.m_taskImpl[taskId].func = as_task_impl_v<FUNC_T>;
         return *this;
     }
 
     TaskRef& func_raw(TaskImpl::Func_t func)
     {
-        m_rFW.m_taskImpl.resize(m_rFW.m_tasks.taskIds.capacity());
         m_rFW.m_taskImpl[taskId].func = func;
         return *this;
     }
@@ -290,7 +286,8 @@ struct FeatureBuilder
     TaskRef task()
     {
         TaskId const taskId = m_rFW.m_tasks.taskIds.create();
-        m_rFW.m_taskImpl.resize(m_rFW.m_tasks.taskIds.capacity());
+        m_rFW.m_tasks.taskInst.resize(m_rFW.m_tasks.taskIds.capacity());
+        m_rFW.m_taskImpl      .resize(m_rFW.m_tasks.taskIds.capacity());
         rSession.tasks.push_back(taskId);
         return task(taskId);
     };

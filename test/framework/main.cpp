@@ -64,6 +64,8 @@ using namespace osp::fw;
 
 void register_pltype_info();
 
+// Test 1: Basic functionality of LoopBlocks, Pipeline, Tasks, Feature, Feature Interface, etc...
+
 enum class EStgContinuous {
     Modify      = 0,
     Schedule    = 1,
@@ -97,9 +99,6 @@ osp::PipelineTypeInfo const gc_infoForEStgOptionalPath{
 struct Aquarium
 {
     int dummy = 0;
-//    bool runMainLoop = false;
-//    bool runAquariumUpdate = false;
-    //int waterLevel = 10;
 };
 
 struct AquariumFish
@@ -227,6 +226,7 @@ FeatureDef const ftrSharks = feature_def("Sharks", [] (
     rFB.pipeline(sharks.pl.sharksPL).parent(mainLoop.loopblks.mainLoop);
 
     // Runs every aquarium update
+    // Since this syncs to "aquariumUpdatePL(EStgOptionalPath::Run)",
     rFB.task()
         .name       ("Each shark eats a fish")
         .sync_with  ({aquarium.pl.aquariumUpdatePL(EStgOptionalPath::Run), fish.pl.fishPL(EStgContinuous::Modify), sharks.pl.sharksPL(EStgContinuous::Read)})
@@ -268,6 +268,7 @@ TEST(Framework, Basics)
     auto       &rAquariumFish   = fw.data_get<AquariumFish>(fish.di.fishDI);
 
     osp::exec::SinglethreadFWExecutor exec;
+    exec.m_log = logger;
     exec.load(fw);
 
     exec.wait(fw);
@@ -314,10 +315,8 @@ TEST(Framework, Basics)
 
 //-----------------------------------------------------------------------------
 
-
-// dependency
-
-
+// Test 2: Task order, cases such as "all tasks that write to this container must run BEFORE all
+//         tasks that read it."
 
 enum class EStgIntermediate {
     Modify      = 0,
@@ -397,7 +396,6 @@ FeatureDef const ftrProcess = feature_def("Process", [] (
     rFB.task().name("Schedule C").schedules(process.pl.processC).args({process.di.vecC}).func(scheduleFunc);
     rFB.task().name("Schedule D").schedules(process.pl.processD).args({process.di.vecD}).func(scheduleFunc);
 
-
     rFB.task()
         .name       ("Copy A to B")
         .sync_with  ({process.pl.processA(EStgIntermediate::Read), process.pl.processB(EStgIntermediate::Modify)})
@@ -425,8 +423,6 @@ FeatureDef const ftrProcess = feature_def("Process", [] (
 });
 
 
-//-----------------------------------------------------------------------------
-
 TEST(Framework, Process)
 {
     register_pltype_info();
@@ -449,8 +445,8 @@ TEST(Framework, Process)
     auto       &rVecA   = fw.data_get<std::vector<int>>(process.di.vecA);
     auto       &rVecD   = fw.data_get<std::vector<int>>(process.di.vecD);
 
-
     osp::exec::SinglethreadFWExecutor exec;
+    exec.m_log = logger;
     exec.load(fw);
 
     exec.wait(fw);
@@ -469,14 +465,17 @@ TEST(Framework, Process)
 
 //-----------------------------------------------------------------------------
 
+// Test 3: Nested loop. Keep running an inner loop until a condition is met; in this example, a
+//         process that manipulates a value so it matches a setpoint, like a control system.
+//         Tasks in the inner loop must be able to sync with pipelines in the outer loop.
+
 struct NestedLoopData
 {
+    int setpoint    {0};
 
-    int setpoint{0};
-
-    int value{0};
-    int error{0};
-    int command{0}; // possible values: -1, 0, 1
+    int value       {0};
+    int error       {0};
+    int command     {0}; // possible values: -1, 0, 1
 };
 
 struct FINestedLoop {
@@ -488,7 +487,6 @@ struct FINestedLoop {
         DataId data;
     };
     struct Pipelines {
-
         PipelineDef<EStgContinuous>     value       {"value"};
         PipelineDef<EStgContinuous>     setpoint    {"setpoint"};
 
@@ -590,6 +588,7 @@ TEST(Framework, NestedLoop)
     auto       &rData     = fw.data_get<NestedLoopData>(nestedLoop.di.data);
 
     osp::exec::SinglethreadFWExecutor exec;
+    exec.m_log = logger;
     exec.load(fw);
 
     exec.wait(fw);

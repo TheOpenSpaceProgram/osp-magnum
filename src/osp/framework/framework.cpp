@@ -86,9 +86,10 @@ void Framework::close_context(ContextId ctx)
             deletedTasks.insert(taskId);
 
             TaskImpl &rTaskImpl = m_taskImpl[taskId];
-            rTaskImpl.debugName.clear();
             rTaskImpl.args.clear();
             rTaskImpl.func = nullptr;
+
+            m_tasks.taskInst[taskId].debugName.clear();
         }
     }
 

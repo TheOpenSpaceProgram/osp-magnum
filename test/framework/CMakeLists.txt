@@ -29,8 +29,8 @@ TARGET_LINK_LIBRARIES(${PROJECT_NAME} PRIVATE longeron EnTT::EnTT Magnum::Magnum
 TARGET_SOURCES(${PROJECT_NAME} PRIVATE
     "${CMAKE_SOURCE_DIR}/src/osp/tasks/tasks.cpp"
     "${CMAKE_SOURCE_DIR}/src/osp/executor/sync_graph.cpp"
-    #"${CMAKE_SOURCE_DIR}/src/osp/tasks/execute.cpp"
     "${CMAKE_SOURCE_DIR}/src/osp/framework/builder.cpp"
-    #"${CMAKE_SOURCE_DIR}/src/osp/framework/executor.cpp"
     "${CMAKE_SOURCE_DIR}/src/osp/framework/framework.cpp"
+    "${CMAKE_SOURCE_DIR}/src/osp/executor/singlethread_framework.cpp"
+    "${CMAKE_SOURCE_DIR}/src/osp/executor/singlethread_sync_graph.cpp"
 )
