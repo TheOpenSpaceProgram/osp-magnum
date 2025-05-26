@@ -1,6 +1,6 @@
 /**
  * Open Space Program
- * Copyright © 2019-2021 Open Space Program Project
+ * Copyright © 2019-2025 Open Space Program Project
  *
  * MIT License
  *
@@ -22,35 +22,31 @@
  * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
  * SOFTWARE.
  */
-#pragma once
+#include "application.h"
+#include "feature_interfaces.h"
 
-#include <osp/drawing/drawing.h>
-#include <osp/framework/framework.h>
+#include <osp/util/logging.h>
 
-#include <unordered_map>
-
-namespace testapp
+namespace adera
 {
 
-struct ScenarioArgs
+void run_cleanup(osp::fw::ContextId ctx, osp::fw::Framework &rFW, osp::fw::IExecutor &rExec)
 {
-    osp::fw::Framework  &rFW;
-    osp::fw::ContextId  mainContext;
-    osp::PkgId          defaultPkg;
-};
+    auto const cleanup = rFW.get_interface<ftr_inter::FICleanupContext>(ctx);
+    if ( cleanup.id.has_value() )
+    {
+        // Run cleanup pipeline for the window context
+        rExec.task_finish(rFW, cleanup.tasks.blockSchedule);
+        rExec.wait(rFW);
 
-struct ScenarioOption
-{
-    using Func_t = void(*)(ScenarioArgs);
+        if (rExec.is_running(rFW, cleanup.loopblks.cleanup))
+        {
+            OSP_LOG_CRITICAL("Deadlock in cleanup pipeline");
+            std::abort();
+        }
+    }
+}
 
-    std::string_view    name;
-    std::string_view    brief;
-    std::string_view    description;
-    Func_t              loadFunc;
-};
 
-using ScenarioMap_t = std::unordered_map<std::string_view, ScenarioOption>;
+} // namespace adera
 
-ScenarioMap_t const& scenarios();
-
-} // namespace testapp

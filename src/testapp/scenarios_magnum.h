@@ -24,19 +24,49 @@
  */
 #pragma once
 
+#include <adera_app/application.h>
+
 #include <osp/framework/framework.h>
 #include <osp/core/resourcetypes.h>
 
 namespace testapp
 {
 
-struct MagnumRendererArgs
+class MagnumMainLoop : public adera::IMainLoopFunc
 {
-    int    argc;
-    char** argv;
-    osp::PkgId defaultPkg;
+public:
+    MagnumMainLoop(osp::PkgId defaultPkg, osp::fw::ContextId mainCtx)
+     : m_defaultPkg{defaultPkg}, m_mainCtx{mainCtx} {};
+    IMainLoopFunc::Status run(osp::fw::Framework &rFW, osp::fw::IExecutor &rExecutor) override;
+
+private:
+    osp::PkgId          m_defaultPkg;
+    osp::fw::ContextId  m_mainCtx;
 };
 
-void start_magnum_renderer(osp::fw::Framework &rFW, osp::fw::ContextId ctx, entt::any userData);
+
+
+class FWMCStartMagnumRenderer : public adera::IFrameworkModifyCommand
+{
+public:
+    FWMCStartMagnumRenderer(int argc, char** argv, osp::PkgId defaultPkg, osp::fw::ContextId mainCtx)
+     : m_argc{argc}, m_argv{argv}, m_defaultPkg{defaultPkg}, m_mainCtx{mainCtx} { }
+
+    ~FWMCStartMagnumRenderer() {};
+
+    void run(osp::fw::Framework &rFW) override;
+
+    std::unique_ptr<adera::IMainLoopFunc> main_loop() override
+    {
+        return std::make_unique<MagnumMainLoop>(m_defaultPkg, m_mainCtx);
+    };
+
+private:
+    int                 m_argc;
+    char**              m_argv;
+    osp::PkgId          m_defaultPkg;
+    osp::fw::ContextId  m_mainCtx;
+};
+
 
 } // namespace testapp

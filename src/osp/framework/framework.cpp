@@ -101,6 +101,8 @@ void Framework::close_context(ContextId ctx)
     m_tasks.syncs.erase(newLast, m_tasks.syncs.end());
 
     rFtrCtx.sessions.clear();
+
+    m_contextIds.remove(ctx);
 }
 
 

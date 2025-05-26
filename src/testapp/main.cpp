@@ -26,7 +26,6 @@
 #include "features/console.h"
 #include "scenarios.h"
 #include "scenarios_magnum.h"
-#include "testapp.h"
 
 #include <Corrade/Utility/Arguments.h>
 #include <Magnum/MeshTools/Transform.h>
@@ -69,7 +68,21 @@ void print_help();
 // prefer not to use names like this outside of main/testapp
 void load_a_bunch_of_stuff();
 
-void load_scenario(Framework &rFW, ContextId ctx, entt::any userData);
+class DefaultMainLoop : public IMainLoopFunc
+{
+public:
+    IMainLoopFunc::Status run(osp::fw::Framework &rFW, osp::fw::IExecutor &rExecutor) override;
+};
+
+class FWMCLoadScenario : public IFrameworkModifyCommand
+{
+public:
+    FWMCLoadScenario(ScenarioOption const& option) : m_option{option} {}
+    ~FWMCLoadScenario() {};
+    void run(osp::fw::Framework &rFW) override;
+    std::unique_ptr<IMainLoopFunc> main_loop() override { return nullptr; }
+    ScenarioOption m_option;
+};
 
 extern osp::fw::FeatureDef const ftrMainCommands;
 
@@ -86,6 +99,8 @@ osp::Logger_t   g_logExecutor;
 osp::Logger_t   g_logMagnumApp;
 
 bool            g_autoLaunchMagnum = true;
+
+
 
 //-----------------------------------------------------------------------------
 
@@ -131,7 +146,6 @@ int main(int argc, char** argv)
     {
         mainCB.add_feature(ftrREPL);
         mainCB.add_feature(ftrMainCommands);
-        print_help();
     }
     ContextBuilder::finalize(std::move(mainCB));
 
@@ -164,80 +178,29 @@ int main(int argc, char** argv)
             return 1;
         }
 
-        rFWModify.commands.push_back({
-                .userData = entt::make_any<ScenarioOption const&>(it->second),
-                .func = &load_scenario});
-        rFWModify.commands.push_back({
-                .userData = MagnumRendererArgs{g_argc, g_argv, g_defaultPkg},
-                .mainCtx = g_mainContext,
-                .func =  &start_magnum_renderer });
+        rFWModify.push<FWMCLoadScenario>(it->second);
+        rFWModify.push<FWMCStartMagnumRenderer>(g_argc, g_argv, g_defaultPkg, g_mainContext);
     }
 
-    std::vector<MainLoopFunc_t> &rMainLoopStack = main_loop_stack();
+    std::vector<std::unique_ptr<IMainLoopFunc>> mainLoopStack;
 
-    rMainLoopStack.push_back([] (MainLoopArgs vars) -> bool
-    {
-        auto const mainApp        = vars.rFW.get_interface<FIMainApp>(vars.mainCtx);
-        auto       &rMainLoopCtrl = vars.rFW.data_get<MainLoopControl&>(mainApp.di.mainLoopCtrl);
-        auto       &rFWModify     = vars.rFW.data_get<FrameworkModify&>(mainApp.di.frameworkModify);
+    mainLoopStack.push_back(std::make_unique<DefaultMainLoop>());
 
-        if (rFWModify.commands.empty())
-        {
-            vars.rExecutor.wait(vars.rFW);
-            if (rMainLoopCtrl.keepOpenWaiting)
-            {
-                rMainLoopCtrl.keepOpenWaiting = false;
-                vars.rExecutor.task_finish(vars.rFW, mainApp.tasks.keepOpen, true, {.cancel = false});
-            }
-        }
-        else
-        {
-            // Framework modify commands exist. Stop the main loop
-
-            while (!rMainLoopCtrl.mainScheduleWaiting)
-            {
-                vars.rExecutor.wait(vars.rFW);
-
-                if (rMainLoopCtrl.keepOpenWaiting)
-                {
-                    rMainLoopCtrl.keepOpenWaiting = false;
-                    vars.rExecutor.task_finish(vars.rFW, mainApp.tasks.keepOpen, true, {.cancel = true});
-                    vars.rExecutor.wait(vars.rFW);
-                }
-            }
-
-            if (vars.rExecutor.is_running(vars.rFW, mainApp.loopblks.mainLoop))
-            {
-                OSP_LOG_CRITICAL("something is blocking the framework main loop from exiting. RIP");
-                std::abort();
-            }
-
-            for (FrameworkModify::Command &rCmd : rFWModify.commands)
-            {
-                rCmd.func(vars.rFW, rCmd.mainCtx, std::move(rCmd.userData));
-            }
-            rFWModify.commands.clear();
-
-            // Restart framework main loop
-            vars.rExecutor.load(vars.rFW);
-            LGRN_ASSERT(rMainLoopCtrl.mainScheduleWaiting);
-            vars.rExecutor.task_finish(vars.rFW, mainApp.tasks.schedule, true, {.cancel = false});
-            rMainLoopCtrl.mainScheduleWaiting = false;
-        }
-        std::this_thread::sleep_for (std::chrono::milliseconds(100));
-
-        return true;
-    });
-
+    print_help();
 
     // Main (thread) loop
-    while (!rMainLoopStack.empty())
+    while (!mainLoopStack.empty())
     {
-        MainLoopFunc_t &rFunc = rMainLoopStack.back();
-        bool const keep = rFunc(MainLoopArgs{.rFW = g_framework, .rExecutor = *g_pExecutor, .mainCtx = g_mainContext});
-        if ( ! keep )
+        std::unique_ptr<IMainLoopFunc> &pFunc = mainLoopStack.back();
+        IMainLoopFunc::Status status = pFunc->run(g_framework, *g_pExecutor);
+
+        if (status.exit)
         {
-            rMainLoopStack.pop_back();
+            mainLoopStack.pop_back();
+        }
+        if (status.pushNew)
+        {
+            mainLoopStack.push_back(std::move(status.pushNew));
         }
     }
 
@@ -245,46 +208,98 @@ int main(int argc, char** argv)
     return 0;
 }
 
-
-
-
-void load_scenario(Framework &rFW, ContextId ctx, entt::any userData)
+IMainLoopFunc::Status DefaultMainLoop::run(osp::fw::Framework &rFW, osp::fw::IExecutor &rExecutor)
 {
-    auto      const mainApp    = rFW.get_interface<FIMainApp>(g_mainContext);
-    auto            &rAppCtxs  = rFW.data_get<AppContexts>(mainApp.di.appContexts);
+    IMainLoopFunc::Status status;
 
-    if (rAppCtxs.scene.has_value()) // Close existing scene
+    auto const mainApp        = rFW.get_interface<FIMainApp>(g_mainContext);
+    auto       &rMainLoopCtrl = rFW.data_get<MainLoopControl&>(mainApp.di.mainLoopCtrl);
+    auto       &rFWModify     = rFW.data_get<FrameworkModify&>(mainApp.di.frameworkModify);
+
+    if (rFWModify.commands.empty())
     {
-        auto const cleanup = rFW.get_interface<FICleanupContext>(rAppCtxs.scene);
-        if (cleanup.id.has_value())
+        rExecutor.wait(rFW);
+        if (rMainLoopCtrl.keepOpenWaiting)
         {
+            rMainLoopCtrl.keepOpenWaiting = false;
+            rExecutor.task_finish(rFW, mainApp.tasks.keepOpen, true, {.cancel = false});
+        }
+    }
+    else
+    {
+        // Framework modify commands exist. Stop the main loop
 
-            //g_pExecutor->run(g_framework, cleanup.pl.cleanup);
-            //g_pExecutor->wait(g_framework);
-            if (g_pExecutor->is_running(g_framework, mainApp.loopblks.mainLoop))
+        while (!rMainLoopCtrl.mainScheduleWaiting)
+        {
+            rExecutor.wait(rFW);
+
+            if (rMainLoopCtrl.keepOpenWaiting)
             {
-                OSP_LOG_CRITICAL("Failed to close scene context, something deadlocked.");
-                std::abort();
+                rMainLoopCtrl.keepOpenWaiting = false;
+                rExecutor.task_finish(rFW, mainApp.tasks.keepOpen, true, {.cancel = true});
+                rExecutor.wait(rFW);
             }
         }
 
+        if (rExecutor.is_running(rFW, mainApp.loopblks.mainLoop))
+        {
+            OSP_LOG_CRITICAL("something is blocking the framework main loop from exiting. RIP");
+            std::abort();
+        }
+
+        for (std::unique_ptr<IFrameworkModifyCommand> &pCmd : rFWModify.commands)
+        {
+            pCmd->run(rFW);
+
+            std::unique_ptr<IMainLoopFunc> newMainLoop = pCmd->main_loop();
+
+            if (newMainLoop != nullptr)
+            {
+                LGRN_ASSERTM(status.pushNew == nullptr,
+                             "multiple framework modify are fighting to add main loop function");
+                status.pushNew = std::move(newMainLoop);
+            }
+        }
+        rFWModify.commands.clear();
+
+        // Restart framework main loop
+        rExecutor.load(rFW);
+        LGRN_ASSERT(rMainLoopCtrl.mainScheduleWaiting);
+        rExecutor.task_finish(rFW, mainApp.tasks.schedule, true, {.cancel = false});
+        rMainLoopCtrl.mainScheduleWaiting = false;
+    }
+    std::this_thread::sleep_for (std::chrono::milliseconds(100));
+
+    return status;
+}
+
+
+void FWMCLoadScenario::run(osp::fw::Framework &rFW)
+{
+    auto const mainApp   = rFW.get_interface<FIMainApp>(g_mainContext);
+    auto       &rAppCtxs = rFW.data_get<AppContexts>(mainApp.di.appContexts);
+
+    if (rAppCtxs.scene.has_value()) // Close existing scene
+    {
+        run_cleanup(rAppCtxs.scene, rFW, *g_pExecutor);
         rFW.close_context(rAppCtxs.scene);
 
         rAppCtxs.scene = {};
     }
 
-    auto const& rScenario = entt::any_cast<ScenarioOption const&>(userData);
-    rScenario.loadFunc(ScenarioArgs{
+    m_option.loadFunc(ScenarioArgs{
         .rFW            = g_framework,
         .mainContext    = g_mainContext,
         .defaultPkg     = g_defaultPkg
     });
 
-    std::cout << "Loaded scenario: " << rScenario.name << "\n"
+    std::cout << "Loaded scenario: " << m_option.name << "\n"
               << "--- DESCRIPTION ---\n"
-              << rScenario.description
+              << m_option.description
               << "-------------------\n";
 }
+
+
 
 osp::fw::FeatureDef const ftrMainCommands = feature_def("MainCommands", [] (FeatureBuilder& rFB, DependOn<FIMainApp> mainApp, DependOn<FICinREPL> cinREPL)
 {
@@ -300,16 +315,11 @@ osp::fw::FeatureDef const ftrMainCommands = feature_def("MainCommands", [] (Feat
             auto const it = scenarios().find(cmdStr);
             if (it != std::end(scenarios()))
             {
-                rFrameworkModify.commands.push_back({
-                        .userData = entt::make_any<ScenarioOption const&>(it->second),
-                        .func = &load_scenario});
+                rFrameworkModify.push<FWMCLoadScenario>(it->second);
 
                 if (g_autoLaunchMagnum && ! appContexts.window.has_value())
                 {
-                    rFrameworkModify.commands.push_back({
-                            .userData   = MagnumRendererArgs{g_argc, g_argv, g_defaultPkg},
-                            .mainCtx    = g_mainContext,
-                            .func       = &start_magnum_renderer });
+                    rFrameworkModify.push<FWMCStartMagnumRenderer>(g_argc, g_argv, g_defaultPkg, g_mainContext);
                 }
 
             }
@@ -321,10 +331,7 @@ osp::fw::FeatureDef const ftrMainCommands = feature_def("MainCommands", [] (Feat
             {
                 if ( ! appContexts.window.has_value() )
                 {
-                    rFrameworkModify.commands.push_back({
-                            .userData   = MagnumRendererArgs{g_argc, g_argv, g_defaultPkg},
-                            .mainCtx    = g_mainContext,
-                            .func       =  &start_magnum_renderer });
+                    rFrameworkModify.push<FWMCStartMagnumRenderer>(g_argc, g_argv, g_defaultPkg, g_mainContext);
                 }
                 else
                 {
@@ -346,6 +353,8 @@ osp::fw::FeatureDef const ftrMainCommands = feature_def("MainCommands", [] (Feat
 
 
 //-----------------------------------------------------------------------------
+
+
 
 void print_help()
 {
@@ -372,6 +381,8 @@ void print_help()
         << "* magnum    - Open Magnum Application\n"
         << "* exit      - Deallocate everything and return memory to OS\n";
 }
+
+
 
 void load_a_bunch_of_stuff()
 {
