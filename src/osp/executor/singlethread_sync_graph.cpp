@@ -28,6 +28,7 @@
 #include <fstream>
 #include <iostream>
 #include <optional>
+#include <sstream>
 
 namespace osp::exec
 {
@@ -67,7 +68,7 @@ public:
         {
             std::ostringstream os;
             os << "<NEW_GRAPH>\n" << rExec.startTime.time_since_epoch().count() << "\n" << visualizer << "\n</NEW_GRAPH>\n";
-            *stream << os.view();
+            *stream << os.str();
             stream->flush();
         }
         catch([[maybe_unused]] std::exception const& e)
@@ -85,7 +86,7 @@ public:
         {
             std::ostringstream os;
             os << "<UPDATE_GRAPH>\n" << rExec.startTime.time_since_epoch().count() << "\n" << visualizer << "\n</UPDATE_GRAPH>\n";
-            *stream << os.view();
+            *stream << os.str();
             stream->flush();
         }
         catch([[maybe_unused]] std::exception const& e)

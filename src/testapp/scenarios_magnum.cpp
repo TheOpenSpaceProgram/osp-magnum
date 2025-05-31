@@ -226,9 +226,9 @@ public:
     }
 
     ContextId       mainContext;
-    Framework       *pFW;
-    IExecutor       *pExec;
-    MainLoopControl *pMainLoopCtrl;
+    Framework       *pFW            {nullptr};
+    IExecutor       *pExec          {nullptr};
+    MainLoopControl *pMainLoopCtrl  {nullptr};
 };
 
 

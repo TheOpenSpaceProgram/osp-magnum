@@ -55,7 +55,7 @@ public:
     {
         lgrn::IdSetStl<SubgraphId>  needToAdvance;
         ESyncState                  state           {ESyncState::Inactive};
-        int                         pointsNotAligned;
+        int                         pointsNotAligned{0};
     };
 
     void load(SyncGraph const& graph) noexcept;

@@ -96,7 +96,7 @@ void SyncGraph::debug_verify() const
     LGRN_ASSERT(nothingWentWrong);
 }
 
-constexpr std::initializer_list<std::string_view> sc_colorPalette = {
+std::initializer_list<std::string_view> const sc_colorPalette = {
     "#DAA520", "#8FBC8F", "#800080", "#B03060", "#D2B48C", "#66CDAA", "#9932CC", "#FF0000",
     "#FF8C00", "#FFD700", "#FFFF00", "#C71585", "#0000CD", "#7FFF00", "#00FF00", "#BA55D3",
     "#00FA9A", "#4169E1", "#DC143C", "#00FFFF", "#00BFFF", "#9370DB", "#0000FF", "#A020F0",

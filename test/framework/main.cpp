@@ -197,7 +197,7 @@ FeatureDef const ftrWorld = feature_def("World", [] (
     rFB.task(aquarium.tasks.schedule)
         .name       ("Schedule aquarium update")
         .ext_finish (true)
-        .schedules  ({aquarium.pl.aquariumUpdatePL});
+        .schedules  (aquarium.pl.aquariumUpdatePL);
 });
 
 FeatureDef const ftrFish = feature_def("Fish", [] (

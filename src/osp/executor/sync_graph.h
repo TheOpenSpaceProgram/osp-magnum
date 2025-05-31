@@ -64,7 +64,7 @@ struct SubgraphType
     //std::uint8_t pointCount{0};
 
     LocalCycleId initialCycle;
-    std::uint8_t initialPos;
+    std::uint8_t initialPos{255u};
 };
 
 struct Subgraph
