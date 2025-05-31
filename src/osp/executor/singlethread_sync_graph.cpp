@@ -66,11 +66,11 @@ public:
         try
         {
             std::ostringstream os;
-            os << "<NEW_GRAPH>\n" << rExec.startTime.time_since_epoch() << "\n" << visualizer << "\n</NEW_GRAPH>\n";
+            os << "<NEW_GRAPH>\n" << rExec.startTime.time_since_epoch().count() << "\n" << visualizer << "\n</NEW_GRAPH>\n";
             *stream << os.view();
             stream->flush();
         }
-        catch(const std::exception &e)
+        catch([[maybe_unused]] std::exception const& e)
         {
             std::cerr << "Failed to open file at OSP_FRAMEWORK_DEBUG_FILE\n";
         }
@@ -84,11 +84,11 @@ public:
         try
         {
             std::ostringstream os;
-            os << "<UPDATE_GRAPH>\n" << rExec.startTime.time_since_epoch() << "\n" << visualizer << "\n</UPDATE_GRAPH>\n";
+            os << "<UPDATE_GRAPH>\n" << rExec.startTime.time_since_epoch().count() << "\n" << visualizer << "\n</UPDATE_GRAPH>\n";
             *stream << os.view();
             stream->flush();
         }
-        catch(const std::exception &e)
+        catch([[maybe_unused]] std::exception const& e)
         {
             std::cerr << "Failed to open file at OSP_FRAMEWORK_DEBUG_FILE\n";
         }
@@ -283,7 +283,7 @@ void SyncGraphExecutor::batch(ESyncAction const action, osp::ArrayView<Synchroni
             if (rExecSync.state == ESyncState::Inactive)
             {
                 rExecSync.state            = ESyncState::WaitForAlign;
-                rExecSync.pointsNotAligned = rSync.connectedPoints.size();
+                rExecSync.pointsNotAligned = int(rSync.connectedPoints.size());
 
                 for (SubgraphPointAddr const addr : rSync.connectedPoints)
                 {
@@ -314,27 +314,27 @@ void SyncGraphExecutor::batch(ESyncAction const action, osp::ArrayView<Synchroni
             }
             if (rExecSync.state != ESyncState::Inactive)
             {
-                 rExecSync.state = ESyncState::Inactive;
+                rExecSync.state = ESyncState::Inactive;
 
-                 for (SubgraphPointAddr const& addr : graph.syncs[syncId].connectedPoints)
-                 {
-                     PerSubgraph &rExecSubgraph = perSubgraph[addr.subgraph];
-                     --rExecSubgraph.activeSyncs;
-                     if (rExecSubgraph.activeSyncs == 0)
-                     {
-                         subgraphsMoving.erase(addr.subgraph);
-                     }
-                     else
-                     {
-                         subgraphsMoving.insert(addr.subgraph);
-                     }
-                 }
+                for (SubgraphPointAddr const& addr : graph.syncs[syncId].connectedPoints)
+                {
+                    PerSubgraph &rExecSubgraph = perSubgraph[addr.subgraph];
+                    --rExecSubgraph.activeSyncs;
+                    if (rExecSubgraph.activeSyncs == 0)
+                    {
+                        subgraphsMoving.erase(addr.subgraph);
+                    }
+                    else
+                    {
+                        subgraphsMoving.insert(addr.subgraph);
+                    }
+                }
             }
             break;
         case ESyncAction::Unlock:
             LGRN_ASSERT(rExecSync.state == ESyncState::WaitForUnlock);
             rExecSync.state            = ESyncState::WaitForAdvance;
-            rExecSync.pointsNotAligned = rSync.connectedPoints.size();
+            rExecSync.pointsNotAligned = int(rSync.connectedPoints.size());
 
             for (SubgraphPointAddr const addr : graph.syncs[syncId].connectedPoints)
             {

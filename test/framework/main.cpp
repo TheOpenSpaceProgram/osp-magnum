@@ -190,7 +190,7 @@ FeatureDef const ftrWorld = feature_def("World", [] (
     rFB.task(mainLoop.tasks.schedule)
         .name       ("Schedule main loop")
         .ext_finish (true)
-        .schedules  ({mainLoop.loopblks.mainLoop});
+        .schedules  (mainLoop.loopblks.mainLoop);
 
     // Running the aquarium update is optional and controlled with runAquariumUpdate.
     // sync_with also ties aquariumUpdatePL to the main loop
@@ -373,7 +373,7 @@ FeatureDef const ftrProcess = feature_def("Process", [] (
 
     rFB.task(process.tasks.blockSchedule)
         .name       ("Schedule main loop")
-        .schedules  ({process.loopblks.mainLoop})
+        .schedules  (process.loopblks.mainLoop)
         .ext_finish (true);
 
     auto const scheduleFunc = [] (std::vector<int> const &vec) noexcept -> TaskActions
@@ -517,7 +517,7 @@ FeatureDef const ftrNestedLoop = feature_def("NestedLoop", [] (
 
     rFB.task(nestedLoop.tasks.outerSchedule)
         .name       ("Schedule main loop")
-        .schedules  ({nestedLoop.loopblks.outer})
+        .schedules  (nestedLoop.loopblks.outer)
         .ext_finish (true);
 
     rFB.task()
@@ -540,7 +540,7 @@ FeatureDef const ftrNestedLoop = feature_def("NestedLoop", [] (
 
     rFB.task()
         .name       ("Schedule command")
-        .schedules  ({nestedLoop.pl.command})
+        .schedules  (nestedLoop.pl.command)
         .args       ({      nestedLoop.di.data})
         .func       ([] (NestedLoopData& rData) -> TaskActions
     {

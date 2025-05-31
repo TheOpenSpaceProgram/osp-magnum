@@ -92,7 +92,7 @@ FeatureDef const ftrPrefabs = feature_def("Prefabs", [] (
 
     rFB.task()
         .name       ("Schedule Prefab spawn")
-        .schedules  ({prefabs.pl.spawnRequest})
+        .schedules  (prefabs.pl.spawnRequest)
         .args       ({            prefabs.di.prefabs })
         .func       ([] (ACtxPrefabs const &rPrefabs) noexcept -> TaskActions
     {

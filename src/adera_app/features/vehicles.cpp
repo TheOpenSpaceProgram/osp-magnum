@@ -127,7 +127,7 @@ FeatureDef const ftrParts = feature_def("Parts", [] (
 
     rFB.task()
         .name       ("Schedule Link update")
-        .schedules  ({links.pl.linkLoop})
+        .schedules  (links.pl.linkLoop)
         .sync_with  ({scn.pl.update(Run)})
         .args       ({           links.di.updMach})
         .func       ([] (MachineUpdater& rUpdMach) noexcept -> TaskActions
@@ -163,7 +163,7 @@ FeatureDef const ftrVehicleSpawn = feature_def("VehicleSpawn", [] (
 
     rFB.task()
         .name       ("Schedule Vehicle spawn")
-        .schedules  ({vhclSpawn.pl.spawnRequest})
+        .schedules  (vhclSpawn.pl.spawnRequest)
         .sync_with  ({scn.pl.update(Run)})
         .args       ({                   vhclSpawn.di.vehicleSpawn })
         .func([] (ACtxVehicleSpawn const& rVehicleSpawn) noexcept -> TaskActions

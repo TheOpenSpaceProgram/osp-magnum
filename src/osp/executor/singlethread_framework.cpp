@@ -38,8 +38,8 @@ static constexpr bool vec_contains(VEC_T const& vec, VAL_T const& searchfor)
     return std::find(first, last, searchfor) != last;
 }
 
-static constexpr LocalPointId point(int in) { return LocalPointId::from_index(in); }
-static constexpr LocalCycleId cycle(int in) { return LocalCycleId::from_index(in); }
+static constexpr LocalPointId point(std::size_t index) { return LocalPointId::from_index(index); }
+static constexpr LocalCycleId cycle(std::size_t index) { return LocalCycleId::from_index(index); }
 
 void SinglethreadFWExecutor::load(osp::fw::Framework& rFW)
 {

@@ -87,7 +87,7 @@ struct PipelineTypeIdReg
     static PipelineTypeIdReg& instance();
 
     [[nodiscard]] constexpr lgrn::IdRegistryStl<PipelineTypeId> const& ids() const { return m_ids; }
-    [[nodiscard]] constexpr PipelineTypeInfo const& get(PipelineTypeId id) const { return m_pltypes[id]; }
+    [[nodiscard]] PipelineTypeInfo const& get(PipelineTypeId id) const { return m_pltypes[id]; }
 
     template<typename ENUM_T>
     constexpr PipelineTypeId get_or_register_pltype() { return get_or_register_pltype(std::type_index(typeid(ENUM_T))); }

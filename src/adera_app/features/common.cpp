@@ -57,7 +57,7 @@ FeatureDef const ftrMainApp = feature_def("Main", [] (FeatureBuilder &rFB, Imple
 
     rFB.task(mainApp.tasks.schedule)
         .name       ("Schedule Main Loop")
-        .schedules  ({mainApp.loopblks.mainLoop})
+        .schedules  (mainApp.loopblks.mainLoop)
         .args       ({         mainApp.di.mainLoopCtrl})
         .ext_finish(true)
         .func       ([] (MainLoopControl &rLoopControl) noexcept
@@ -67,7 +67,7 @@ FeatureDef const ftrMainApp = feature_def("Main", [] (FeatureBuilder &rFB, Imple
 
     rFB.task(mainApp.tasks.keepOpen )
         .name       ("Schedule KeepOpen")
-        .schedules  ({mainApp.pl.keepOpen})
+        .schedules  (mainApp.pl.keepOpen)
         .args       ({         mainApp.di.mainLoopCtrl})
         .ext_finish(true)
         .func       ([] (MainLoopControl &rLoopControl) noexcept
@@ -280,7 +280,7 @@ FeatureDef const ftrWindowApp = feature_def("WindowApp", [] (
 
     rFB.task()
         .name       ("Schedule Renderer Resync")
-        .schedules  ({windowApp.pl.resync})
+        .schedules  (windowApp.pl.resync)
         .args       ({             windowApp.di.windowAppLoopCtrl})
         .func       ([] (WindowAppLoopControl &rWindowAppLoopCtrl) noexcept -> osp::TaskActions
     {
@@ -500,7 +500,7 @@ FeatureDef const ftrSceneRenderer = feature_def("SceneRenderer", [] (
 
     rFB.task()
         .name       ("Schedule materialDirty")
-        .schedules  ({scnRender.pl.materialDirty})
+        .schedules  (scnRender.pl.materialDirty)
         .args       ({              scnRender.di.scnRender })
         .func       ([] (ACtxSceneRender const &rScnRender) noexcept -> TaskActions
     {
