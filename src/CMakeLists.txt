@@ -28,7 +28,6 @@ find_package(Magnum REQUIRED
     Shaders
     MeshTools
     Primitives
-    #SceneGraph
     Trade
     Sdl2Application
     AnyImageImporter
@@ -93,13 +92,11 @@ SET(OSP_MAGNUM_DEPS_LIBS
             Magnum::Magnum
             Magnum::MeshTools
             Magnum::Primitives
-            #Magnum::SceneGraph
             Magnum::Shaders
             Magnum::Trade
             Magnum::AnyImageImporter
             MagnumPlugins::TinyGltfImporter
             MagnumPlugins::StbImageImporter
-            dNewton dScene dModel dVehicle
             toml11
             spdlog
             longeron

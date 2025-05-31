@@ -35,7 +35,7 @@ struct FICinREPL {
     };
 
     struct Pipelines {
-        PipelineDef<EStgIntr> cinLines          {"cmdIn"};
+        PipelineDef<EStgIntr> cinLines          {"cinLines"};
     };
 };
 
@@ -48,9 +48,6 @@ struct FIMagnum {
     struct Pipelines {
         PipelineDef<EStgCont> meshGL            {"meshGL"};
         PipelineDef<EStgCont> textureGL         {"textureGL"};
-
-        PipelineDef<EStgCont> entMeshGL         {"entMeshGL"};
-        PipelineDef<EStgCont> entTextureGL      {"entTextureGL"};
     };
 };
 
@@ -65,6 +62,14 @@ struct FIMagnumScene {
     struct Pipelines {
         PipelineDef<EStgFBO>  fbo               {"fboRender"};
         PipelineDef<EStgCont> camera            {"camera"};
+
+        PipelineDef<EStgCont> entMeshGL         {"entMeshGL"};
+
+        /// m_diffuseTexId
+        PipelineDef<EStgCont> entDiffuseGL      {"entTextureGL"};
+
+        PipelineDef<EStgCont> groupFwd          {"groupFwd"};
+        PipelineDef<EStgCont> groupFwdEnts      {"groupFwdEnts"};
     };
 };
 

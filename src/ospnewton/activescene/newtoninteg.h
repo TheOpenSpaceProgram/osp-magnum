@@ -23,7 +23,7 @@
  * SOFTWARE.
  */
 #pragma once
-
+#if 0  // SYNCEXEC
 #include "forcefactors.h"
 
 #include <osp/activescene/basic.h>
@@ -107,3 +107,4 @@ struct ACtxNwtWorld
 
 
 }
+#endif

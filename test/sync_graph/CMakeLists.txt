@@ -1,6 +1,6 @@
 ##
 # Open Space Program
-# Copyright © 2019-2022 Open Space Program Project
+# Copyright © 2019-2025 Open Space Program Project
 #
 # MIT License
 #
@@ -22,8 +22,11 @@
 # OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 # SOFTWARE.
 ##
-PROJECT(test_tasks CXX)
+PROJECT(test_sync_graph CXX)
 ADD_TEST_DIRECTORY(${PROJECT_NAME})
 
-TARGET_LINK_LIBRARIES(test_tasks PRIVATE longeron EnTT::EnTT Magnum::Magnum)
-TARGET_SOURCES(test_tasks PRIVATE "${CMAKE_SOURCE_DIR}/src/osp/tasks/tasks.cpp" "${CMAKE_SOURCE_DIR}/src/osp/tasks/execute.cpp")
+TARGET_LINK_LIBRARIES(${PROJECT_NAME} PRIVATE longeron EnTT::EnTT Magnum::Magnum)
+TARGET_SOURCES(${PROJECT_NAME} PRIVATE
+    "${CMAKE_SOURCE_DIR}/src/osp/executor/sync_graph.cpp"
+    "${CMAKE_SOURCE_DIR}/src/osp/executor/singlethread_sync_graph.cpp"
+)

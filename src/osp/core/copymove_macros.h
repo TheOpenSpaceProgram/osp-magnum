@@ -24,7 +24,7 @@
  */
 #pragma once
 
-#define OSP_MOVE_COPY_CTOR_ASSIGN(type)             \
+#define OSP_MOVE_COPY_CTOR_ASSIGN(Type)             \
     Type            (Type const& copy)  = default;  \
     Type            (Type&& move)       = default;  \
     Type& operator= (Type const& copy)  = default;  \

@@ -24,18 +24,24 @@
  */
 #pragma once
 
-#include "testapp.h"
-
 #include <osp/drawing/drawing.h>
+#include <osp/framework/framework.h>
 
 #include <unordered_map>
 
 namespace testapp
 {
 
+struct ScenarioArgs
+{
+    osp::fw::Framework  &rFW;
+    osp::fw::ContextId  mainContext;
+    osp::PkgId          defaultPkg;
+};
+
 struct ScenarioOption
 {
-    using Func_t = void(*)(TestApp&);
+    using Func_t = void(*)(ScenarioArgs);
 
     std::string_view    name;
     std::string_view    brief;

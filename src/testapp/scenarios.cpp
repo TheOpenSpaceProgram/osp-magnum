@@ -73,7 +73,6 @@ static ScenarioMap_t make_scenarios()
 {   
     ScenarioMap_t scenarioMap;
 
-
     auto const add_scenario = [&scenarioMap] (ScenarioOption scenario)
     {
         scenarioMap.emplace(scenario.name, scenario);
@@ -89,17 +88,15 @@ static ScenarioMap_t make_scenarios()
                        "* [WASD]            - Move camera\n"
                        "* [QE]              - Move camera up/down\n"
                        "* [Drag MouseRight] - Orbit camera\n",
-        .loadFunc = [] (TestApp& rTestApp)
+        .loadFunc = [] (ScenarioArgs args)
     {
-        auto        &rFw      = rTestApp.m_framework;
-        auto  const mainApp   = rFw.get_interface<FIMainApp>  (rTestApp.m_mainContext);
-        auto        &rAppCtxs = rFw.data_get<adera::AppContexts&>(mainApp.di.appContexts);
+        auto  const mainApp   = args.rFW.get_interface<FIMainApp>  (args.mainContext);
+        auto        &rAppCtxs = args.rFW.data_get<adera::AppContexts&>(mainApp.di.appContexts);
 
-
-        rAppCtxs.scene  = rFw.m_contextIds.create();
-        ContextBuilder  sceneCB { rAppCtxs.scene,  {rTestApp.m_mainContext}, rFw };
+        rAppCtxs.scene  = args.rFW.m_contextIds.create();
+        ContextBuilder  sceneCB { rAppCtxs.scene,  {args.mainContext}, args.rFW };
         sceneCB.add_feature(ftrScene);
-        sceneCB.add_feature(ftrEngineTest, rTestApp.m_defaultPkg);
+        sceneCB.add_feature(ftrEngineTest, args.defaultPkg);
         ContextBuilder::finalize(std::move(sceneCB));
     }});
 
@@ -115,17 +112,17 @@ static ScenarioMap_t make_scenarios()
                        "* [QE]              - Move camera up/down\n"
                        "* [Drag MouseRight] - Orbit camera\n"
                        "* [Space]           - Throw spheres\n",
-        .loadFunc = [] (TestApp& rTestApp)
+        .loadFunc = [] (ScenarioArgs args)
     {
-        auto        &rFW      = rTestApp.m_framework;
-        auto  const mainApp   = rFW.get_interface<FIMainApp>  (rTestApp.m_mainContext);
+        auto const mainApp  = args.rFW.get_interface<FIMainApp>(args.mainContext);
 
-        ContextId const sceneCtx = rFW.m_contextIds.create();
-        rFW.data_get<adera::AppContexts&>(mainApp.di.appContexts).scene = sceneCtx;
+        ContextId const sceneCtx = args.rFW.m_contextIds.create();
+        args.rFW.data_get<adera::AppContexts&>(mainApp.di.appContexts).scene = sceneCtx;
 
-        ContextBuilder  sceneCB { sceneCtx, {rTestApp.m_mainContext}, rFW };
+        ContextBuilder  sceneCB { sceneCtx, {args.mainContext}, args.rFW };
         sceneCB.add_feature(ftrScene);
-        sceneCB.add_feature(ftrCommonScene, rTestApp.m_defaultPkg);
+        sceneCB.add_feature(ftrCleanupCtx);
+        sceneCB.add_feature(ftrCommonScene, args.defaultPkg);
         sceneCB.add_feature(ftrPhysics);
         sceneCB.add_feature(ftrPhysicsShapes, osp::draw::MaterialId{0});
         sceneCB.add_feature(ftrDroppers);
@@ -136,9 +133,9 @@ static ScenarioMap_t make_scenarios()
         sceneCB.add_feature(ftrPhysicsShapesJolt);
         ContextBuilder::finalize(std::move(sceneCB));
 
-        ospjolt::ForceFactors_t const gravity = add_constant_acceleration(sc_gravityForce, rFW, sceneCtx);
-        set_phys_shape_factors(gravity, rFW, sceneCtx);
-        add_floor(rFW, sceneCtx, rTestApp.m_defaultPkg, 4);
+        ospjolt::ForceFactors_t const gravity = add_constant_acceleration(sc_gravityForce, args.rFW, sceneCtx);
+        set_phys_shape_factors(gravity, args.rFW, sceneCtx);
+        add_floor(args.rFW, sceneCtx, args.defaultPkg, 4);
     }});
 
 
@@ -161,18 +158,17 @@ static ScenarioMap_t make_scenarios()
                        "* [Drag MouseRight] - Orbit camera\n"
                        "* [Space]           - Throw spheres\n"
                        "* [V]               - Switch vehicles\n",
-        .loadFunc = [] (TestApp& rTestApp)
+        .loadFunc = [] (ScenarioArgs args)
     {
-        auto        &rFW      = rTestApp.m_framework;
-        auto  const mainApp   = rFW.get_interface<FIMainApp>  (rTestApp.m_mainContext);
+        auto const mainApp  = args.rFW.get_interface<FIMainApp>(args.mainContext);
 
+        ContextId const sceneCtx = args.rFW.m_contextIds.create();
+        args.rFW.data_get<adera::AppContexts&>(mainApp.di.appContexts).scene = sceneCtx;
 
-        ContextId const sceneCtx = rFW.m_contextIds.create();
-        rFW.data_get<adera::AppContexts&>(mainApp.di.appContexts).scene = sceneCtx;
-
-        ContextBuilder  sceneCB { sceneCtx, {rTestApp.m_mainContext}, rFW };
+        ContextBuilder  sceneCB { sceneCtx, {args.mainContext}, args.rFW };
         sceneCB.add_feature(ftrScene);
-        sceneCB.add_feature(ftrCommonScene, rTestApp.m_defaultPkg);
+        sceneCB.add_feature(ftrCleanupCtx);
+        sceneCB.add_feature(ftrCommonScene, args.defaultPkg);
         sceneCB.add_feature(ftrPhysics);
         sceneCB.add_feature(ftrPhysicsShapes);
         sceneCB.add_feature(ftrDroppers);
@@ -196,21 +192,19 @@ static ScenarioMap_t make_scenarios()
 
         ContextBuilder::finalize(std::move(sceneCB));
 
+        ospjolt::ForceFactors_t const gravity = add_constant_acceleration(sc_gravityForce, args.rFW, sceneCtx);
+        set_phys_shape_factors     (gravity, args.rFW, sceneCtx);
+        set_vehicle_default_factors(gravity, args.rFW, sceneCtx);
 
+        add_floor(args.rFW, sceneCtx, args.defaultPkg, 4);
 
-        ospjolt::ForceFactors_t const gravity = add_constant_acceleration(sc_gravityForce, rFW, sceneCtx);
-        set_phys_shape_factors     (gravity, rFW, sceneCtx);
-        set_vehicle_default_factors(gravity, rFW, sceneCtx);
+        auto vhclSpawn          = args.rFW.get_interface<FIVehicleSpawn>(sceneCtx);
+        auto vhclSpawnVB        = args.rFW.get_interface<FIVehicleSpawnVB>(sceneCtx);
+        auto testVhcls          = args.rFW.get_interface<FITestVehicles>(sceneCtx);
 
-        add_floor(rFW, sceneCtx, rTestApp.m_defaultPkg, 4);
-
-        auto vhclSpawn          = rFW.get_interface<FIVehicleSpawn>(sceneCtx);
-        auto vhclSpawnVB        = rFW.get_interface<FIVehicleSpawnVB>(sceneCtx);
-        auto testVhcls          = rFW.get_interface<FITestVehicles>(sceneCtx);
-
-        auto &rVehicleSpawn     = rFW.data_get<ACtxVehicleSpawn>     (vhclSpawn.di.vehicleSpawn);
-        auto &rVehicleSpawnVB   = rFW.data_get<ACtxVehicleSpawnVB>   (vhclSpawnVB.di.vehicleSpawnVB);
-        auto &rPrebuiltVehicles = rFW.data_get<PrebuiltVehicles>     (testVhcls.di.prebuiltVehicles);
+        auto &rVehicleSpawn     = args.rFW.data_get<ACtxVehicleSpawn>     (vhclSpawn.di.vehicleSpawn);
+        auto &rVehicleSpawnVB   = args.rFW.data_get<ACtxVehicleSpawnVB>   (vhclSpawnVB.di.vehicleSpawnVB);
+        auto &rPrebuiltVehicles = args.rFW.data_get<PrebuiltVehicles>     (testVhcls.di.prebuiltVehicles);
 
         for (int i = 0; i < 10; ++i)
         {
@@ -222,7 +216,6 @@ static ScenarioMap_t make_scenarios()
             });
             rVehicleSpawnVB.dataVB.push_back(rPrebuiltVehicles[gc_pbvSimpleCommandServiceModule].get());
         }
-
     }});
 
 
@@ -234,30 +227,30 @@ static ScenarioMap_t make_scenarios()
                        "* [WASD]            - Move camera\n"
                        "* [QE]              - Move camera up/down\n"
                        "* [Drag MouseRight] - Orbit camera\n",
-        .loadFunc = [] (TestApp& rTestApp)
+        .loadFunc = [] (ScenarioArgs args)
     {
-        auto        &rFW      = rTestApp.m_framework;
-        auto  const mainApp   = rFW.get_interface<FIMainApp>  (rTestApp.m_mainContext);
+        auto const mainApp = args.rFW.get_interface<FIMainApp>  (args.mainContext);
 
-        ContextId const sceneCtx = rFW.m_contextIds.create();
-        rFW.data_get<adera::AppContexts&>(mainApp.di.appContexts).scene = sceneCtx;
+        ContextId const sceneCtx = args.rFW.m_contextIds.create();
+        args.rFW.data_get<adera::AppContexts&>(mainApp.di.appContexts).scene = sceneCtx;
 
-        ContextBuilder  sceneCB { sceneCtx, {rTestApp.m_mainContext}, rFW };
+        ContextBuilder  sceneCB { sceneCtx, {args.mainContext}, args.rFW };
         sceneCB.add_feature(ftrScene);
-        sceneCB.add_feature(ftrCommonScene, rTestApp.m_defaultPkg);
+        sceneCB.add_feature(ftrCleanupCtx);
+        sceneCB.add_feature(ftrCommonScene, args.defaultPkg);
 
         sceneCB.add_feature(ftrTerrain);
         sceneCB.add_feature(ftrTerrainIcosahedron);
         sceneCB.add_feature(ftrTerrainSubdivDist);
         ContextBuilder::finalize(std::move(sceneCB));
 
-        auto terrain = rFW.get_interface<FITerrain>(sceneCtx);
-        auto &rTerrain = rFW.data_get<ACtxTerrain>(terrain.di.terrain);
-        auto &rTerrainFrame = rFW.data_get<ACtxTerrainFrame>(terrain.di.terrainFrame);
+        auto terrain        = args.rFW.get_interface<FITerrain>(sceneCtx);
+        auto &rTerrain      = args.rFW.data_get<ACtxTerrain>(terrain.di.terrain);
+        auto &rTerrainFrame = args.rFW.data_get<ACtxTerrainFrame>(terrain.di.terrainFrame);
 
         constexpr std::uint64_t c_earthRadius = 6371000;
 
-        initialize_ico_terrain(rFW, sceneCtx, {
+        initialize_ico_terrain(args.rFW, sceneCtx, {
             .radius                 = double(c_earthRadius),
             .height                 = 20000.0,   // Height between Mariana Trench and Mount Everest
             .skelPrecision          = 10,        // 2^10 units = 1024 units = 1 meter
@@ -278,28 +271,28 @@ static ScenarioMap_t make_scenarios()
                        "* [WASD]            - Move camera\n"
                        "* [QE]              - Move camera up/down\n"
                        "* [Drag MouseRight] - Orbit camera\n",
-        .loadFunc = [] (TestApp& rTestApp)
+        .loadFunc = [] (ScenarioArgs args)
     {
-        auto        &rFW      = rTestApp.m_framework;
-        auto  const mainApp   = rFW.get_interface<FIMainApp>  (rTestApp.m_mainContext);
+         auto const mainApp = args.rFW.get_interface<FIMainApp>  (args.mainContext);
 
-        ContextId const sceneCtx = rFW.m_contextIds.create();
-        rFW.data_get<adera::AppContexts&>(mainApp.di.appContexts).scene = sceneCtx;
+         ContextId const sceneCtx = args.rFW.m_contextIds.create();
+         args.rFW.data_get<adera::AppContexts&>(mainApp.di.appContexts).scene = sceneCtx;
 
-        ContextBuilder  sceneCB { sceneCtx, {rTestApp.m_mainContext}, rFW };
-        sceneCB.add_feature(ftrScene);
-        sceneCB.add_feature(ftrCommonScene, rTestApp.m_defaultPkg);
+         ContextBuilder  sceneCB { sceneCtx, {args.mainContext}, args.rFW };
+         sceneCB.add_feature(ftrScene);
+         sceneCB.add_feature(ftrCleanupCtx);
+         sceneCB.add_feature(ftrCommonScene, args.defaultPkg);
 
-        sceneCB.add_feature(ftrTerrain);
-        sceneCB.add_feature(ftrTerrainIcosahedron);
-        sceneCB.add_feature(ftrTerrainSubdivDist);
-        ContextBuilder::finalize(std::move(sceneCB));
+         sceneCB.add_feature(ftrTerrain);
+         sceneCB.add_feature(ftrTerrainIcosahedron);
+         sceneCB.add_feature(ftrTerrainSubdivDist);
+         ContextBuilder::finalize(std::move(sceneCB));
 
-        auto terrain = rFW.get_interface<FITerrain>(sceneCtx);
-        auto &rTerrain = rFW.data_get<ACtxTerrain>(terrain.di.terrain);
-        auto &rTerrainFrame = rFW.data_get<ACtxTerrainFrame>(terrain.di.terrainFrame);
+         auto terrain        = args.rFW.get_interface<FITerrain>(sceneCtx);
+         auto &rTerrain      = args.rFW.data_get<ACtxTerrain>(terrain.di.terrain);
+         auto &rTerrainFrame = args.rFW.data_get<ACtxTerrainFrame>(terrain.di.terrainFrame);
 
-        initialize_ico_terrain(rFW, sceneCtx, {
+        initialize_ico_terrain(args.rFW, sceneCtx, {
             .radius                 = 100.0,
             .height                 = 2.0,
             .skelPrecision          = 10, // 2^10 units = 1024 units = 1 meter
@@ -312,6 +305,7 @@ static ScenarioMap_t make_scenarios()
     }});
 
 
+/*
 
     add_scenario({
         .name        = "universe",
@@ -343,7 +337,7 @@ static ScenarioMap_t make_scenarios()
 
         auto const scene = rFW.get_interface<FIScene>(sceneCtx);
 
-        sceneCB.add_feature(ftrUniverseCore, PipelineId{mainApp.pl.mainLoop});
+        //sceneCB.add_feature(ftrUniverseCore, PipelineId{mainApp.pl.mainLoop});
         sceneCB.add_feature(ftrUniverseSceneFrame);
         sceneCB.add_feature(ftrUniverseTestPlanets);
         ContextBuilder::finalize(std::move(sceneCB));
@@ -381,7 +375,7 @@ static ScenarioMap_t make_scenarios()
         sceneCB.add_feature(ftrSolarSystem);
         ContextBuilder::finalize(std::move(sceneCB));
     }});
-
+*/
     return scenarioMap;
 }
 

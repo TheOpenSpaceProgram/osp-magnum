@@ -23,7 +23,7 @@
  * SOFTWARE.
  */
 #pragma once
-
+#if 0  // SYNCEXEC
 #include "newtoninteg.h"
 
 #include <osp/activescene/basic.h>
@@ -165,4 +165,4 @@ private:
 };
 
 }
-
+#endif

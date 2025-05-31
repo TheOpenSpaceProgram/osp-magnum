@@ -25,9 +25,9 @@
 #pragma once
 
 #include <osp/framework/framework.h>
+#include <osp/core/copymove_macros.h>
 
-#include <entt/core/any.hpp>
-
+#include <memory>
 #include <vector>
 
 namespace adera
@@ -35,7 +35,8 @@ namespace adera
 
 struct MainLoopControl
 {
-    bool doUpdate;
+    bool mainScheduleWaiting    {false};
+    bool keepOpenWaiting        {false};
 };
 
 struct SceneLoopControl
@@ -59,19 +60,45 @@ struct AppContexts
     osp::fw::ContextId scene;
 };
 
-struct FrameworkModify
+class IMainLoopFunc
 {
-    struct Command
+public:
+    struct Status
     {
-        using Func_t = void(*)(osp::fw::Framework &rFW, osp::fw::ContextId ctx, entt::any userData);
-        entt::any           userData;
-        osp::fw::ContextId  ctx;
-        Func_t              func;
+        bool exit{false};
+        std::unique_ptr<IMainLoopFunc> pushNew;
     };
 
-    std::vector<Command> commands;
+    virtual ~IMainLoopFunc() {};
+
+    virtual Status run(osp::fw::Framework &rFW, osp::fw::IExecutor &rExecutor) = 0;
 };
 
+class IFrameworkModifyCommand
+{
+public:
+    virtual ~IFrameworkModifyCommand() {};
+
+    virtual void run(osp::fw::Framework &rFW) = 0;
+
+    virtual std::unique_ptr<IMainLoopFunc> main_loop() = 0;
+};
+
+struct FrameworkModify
+{
+    FrameworkModify() = default;
+    OSP_MOVE_ONLY_CTOR_ASSIGN(FrameworkModify);
+
+    template <typename FWMC_T, typename ... ARGS_T>
+    void push(ARGS_T& ... args)
+    {
+        commands.push_back(std::make_unique<FWMC_T>(std::forward<ARGS_T>(args)...));
+    }
+
+    std::vector<std::unique_ptr<IFrameworkModifyCommand>> commands;
+};
+
+void run_cleanup(osp::fw::ContextId ctx, osp::fw::Framework &rFW, osp::fw::IExecutor &rExec);
 
 
 } // namespace adera

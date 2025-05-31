@@ -52,44 +52,54 @@ using namespace Magnum::Math::Literals;
 namespace adera
 {
 
+
 FeatureDef const ftrParts = feature_def("Parts", [] (
         FeatureBuilder              &rFB,
+        Implement<FILinks>          links,
         Implement<FIParts>          parts,
         DependOn<FICleanupContext>  cleanup,
         DependOn<FIMainApp>         mainApp,
         DependOn<FIScene>           scn)
 {
-    rFB.pipeline(parts.pl.partIds)          .parent(scn.pl.update);
-    rFB.pipeline(parts.pl.partPrefabs)      .parent(scn.pl.update);
-    rFB.pipeline(parts.pl.partTransformWeld).parent(scn.pl.update);
-    rFB.pipeline(parts.pl.partDirty)        .parent(scn.pl.update);
-    rFB.pipeline(parts.pl.weldIds)          .parent(scn.pl.update);
-    rFB.pipeline(parts.pl.weldDirty)        .parent(scn.pl.update);
-    rFB.pipeline(parts.pl.machIds)          .parent(scn.pl.update);
-    rFB.pipeline(parts.pl.nodeIds)          .parent(scn.pl.update);
-    rFB.pipeline(parts.pl.connect)          .parent(scn.pl.update);
-    rFB.pipeline(parts.pl.mapWeldPart)      .parent(scn.pl.update);
-    rFB.pipeline(parts.pl.mapPartMach)      .parent(scn.pl.update);
-    rFB.pipeline(parts.pl.mapPartActive)    .parent(scn.pl.update);
-    rFB.pipeline(parts.pl.mapWeldActive)    .parent(scn.pl.update);
-    rFB.pipeline(parts.pl.machUpdExtIn)     .parent(scn.pl.update);
-    rFB.pipeline(parts.pl.linkLoop)         .parent(scn.pl.update).loops(true);
+    rFB.loopblk(links.loopblks.link)        .parent(mainApp.loopblks.mainLoop);
+    rFB.pipeline(links.pl.linkLoop)         .parent(links.loopblks.link);
+
+    rFB.pipeline(links.pl.machIds)          .parent(mainApp.loopblks.mainLoop);
+    rFB.pipeline(links.pl.nodeIds)          .parent(mainApp.loopblks.mainLoop);
+    rFB.pipeline(links.pl.connect)          .parent(mainApp.loopblks.mainLoop);
+    rFB.pipeline(links.pl.machUpdExtIn)     .parent(mainApp.loopblks.mainLoop);
+
+
+    rFB.pipeline(parts.pl.partIds)          .parent(mainApp.loopblks.mainLoop);
+    rFB.pipeline(parts.pl.partPrefabs)      .parent(mainApp.loopblks.mainLoop);
+    rFB.pipeline(parts.pl.partTransformWeld).parent(mainApp.loopblks.mainLoop);
+    rFB.pipeline(parts.pl.partDirty)        .parent(mainApp.loopblks.mainLoop);
+    rFB.pipeline(parts.pl.weldIds)          .parent(mainApp.loopblks.mainLoop);
+    rFB.pipeline(parts.pl.weldDirty)        .parent(mainApp.loopblks.mainLoop);
+    rFB.pipeline(parts.pl.mapWeldPart)      .parent(mainApp.loopblks.mainLoop);
+    rFB.pipeline(parts.pl.mapPartMach)      .parent(mainApp.loopblks.mainLoop);
+    rFB.pipeline(parts.pl.mapPartActive)    .parent(mainApp.loopblks.mainLoop);
+    rFB.pipeline(parts.pl.mapWeldActive)    .parent(mainApp.loopblks.mainLoop);
+
+    auto &rLinks    = rFB.data_emplace< ACtxLinks >      (links.di.links);
+    auto &rUpdMach  = rFB.data_emplace< MachineUpdater > (links.di.updMach);
 
     auto &rScnParts = rFB.data_emplace< ACtxParts >      (parts.di.scnParts);
-    auto &rUpdMach  = rFB.data_emplace< MachineUpdater > (parts.di.updMach);
+        //                                  machines;
+        //         nodePerType;
 
     // Resize containers to fit all existing MachTypeIds and NodeTypeIds
     // These Global IDs are dynamically initialized just as the program starts
     rUpdMach.machTypesDirty.resize(MachTypeReg_t::size());
     rUpdMach.localDirty       .resize(MachTypeReg_t::size());
-    rScnParts.machines.perType.resize(MachTypeReg_t::size());
-    rScnParts.nodePerType     .resize(NodeTypeReg_t::size());
+    rLinks.machines.perType.resize(MachTypeReg_t::size());
+    rLinks.nodePerType     .resize(NodeTypeReg_t::size());
 
     rFB.task()
         .name       ("Clear Resource owners")
-        .run_on     ({cleanup.pl.cleanup(Run_)})
-        .args       ({      parts.di.scnParts,           mainApp.di.resources})
-        .func([] (ACtxParts& rScnParts, Resources& rResources) noexcept
+        .sync_with  ({cleanup.pl.cleanup(Run_)})
+        .args       ({      parts.di.scnParts,  mainApp.di.resources})
+        .func       ([] (ACtxParts& rScnParts, Resources& rResources) noexcept
     {
         for (osp::PrefabPair &rPrefabPair : rScnParts.partPrefabs)
         {
@@ -99,68 +109,73 @@ FeatureDef const ftrParts = feature_def("Parts", [] (
 
     rFB.task()
         .name       ("Clear Part dirty vectors after use")
-        .run_on     ({parts.pl.partDirty(Clear)})
+        .sync_with  ({parts.pl.partDirty(Clear)})
         .args       ({      parts.di.scnParts})
-        .func([] (ACtxParts& rScnParts) noexcept
+        .func       ([] (ACtxParts& rScnParts) noexcept
     {
         rScnParts.partDirty.clear();
     });
 
     rFB.task()
         .name       ("Clear Weld dirty vectors after use")
-        .run_on     ({parts.pl.weldDirty(Clear)})
+        .sync_with  ({parts.pl.weldDirty(Clear)})
         .args       ({      parts.di.scnParts})
-        .func([] (ACtxParts& rScnParts) noexcept
+        .func       ([] (ACtxParts& rScnParts) noexcept
     {
         rScnParts.weldDirty.clear();
     });
 
     rFB.task()
         .name       ("Schedule Link update")
-        .schedules  ({parts.pl.linkLoop(ScheduleLink)})
+        .schedules  (links.pl.linkLoop)
         .sync_with  ({scn.pl.update(Run)})
-        .args       ({           parts.di.updMach})
-        .func([] (MachineUpdater& rUpdMach) noexcept -> TaskActions
+        .args       ({           links.di.updMach})
+        .func       ([] (MachineUpdater& rUpdMach) noexcept -> TaskActions
     {
         if (rUpdMach.requestMachineUpdateLoop)
         {
             rUpdMach.requestMachineUpdateLoop = false;
-            return TaskActions{};
+            return {};
         }
         else
         {
-            return TaskAction::Cancel;
+            return {.cancel = true};
         }
     });
 }); // ftrParts
 
 
+
+
 FeatureDef const ftrVehicleSpawn = feature_def("VehicleSpawn", [] (
         FeatureBuilder              &rFB,
         Implement<FIVehicleSpawn>   vhclSpawn,
+        DependOn<FIMainApp>         mainApp,
         DependOn<FIScene>           scn)
 {
-    rFB.pipeline(vhclSpawn.pl.spawnRequest)  .parent(scn.pl.update);
-    rFB.pipeline(vhclSpawn.pl.spawnedParts)  .parent(scn.pl.update);
-    rFB.pipeline(vhclSpawn.pl.spawnedWelds)  .parent(scn.pl.update);
-    rFB.pipeline(vhclSpawn.pl.rootEnts)      .parent(scn.pl.update);
-    rFB.pipeline(vhclSpawn.pl.spawnedMachs)     .parent(scn.pl.update);
+    rFB.pipeline(vhclSpawn.pl.spawnRequest)  .parent(mainApp.loopblks.mainLoop);
+    rFB.pipeline(vhclSpawn.pl.spawnedParts)  .parent(mainApp.loopblks.mainLoop);
+    rFB.pipeline(vhclSpawn.pl.spawnedWelds)  .parent(mainApp.loopblks.mainLoop);
+    rFB.pipeline(vhclSpawn.pl.rootEnts)      .parent(mainApp.loopblks.mainLoop);
+    rFB.pipeline(vhclSpawn.pl.spawnedMachs)  .parent(mainApp.loopblks.mainLoop);
 
     rFB.data_emplace< ACtxVehicleSpawn >     (vhclSpawn.di.vehicleSpawn);
 
     rFB.task()
         .name       ("Schedule Vehicle spawn")
-        .schedules  ({vhclSpawn.pl.spawnRequest(Schedule_)})
+        .schedules  (vhclSpawn.pl.spawnRequest)
         .sync_with  ({scn.pl.update(Run)})
         .args       ({                   vhclSpawn.di.vehicleSpawn })
         .func([] (ACtxVehicleSpawn const& rVehicleSpawn) noexcept -> TaskActions
     {
-        return rVehicleSpawn.spawnRequest.empty() ? TaskAction::Cancel : TaskActions{};
+        return {.cancel = rVehicleSpawn.spawnRequest.empty()};
     });
+
+
 
     rFB.task()
         .name       ("Clear Vehicle Spawning vector after use")
-        .run_on     ({vhclSpawn.pl.spawnRequest(Clear)})
+        .sync_with  ({vhclSpawn.pl.spawnRequest(Clear)})
         .args       ({             vhclSpawn.di.vehicleSpawn})
         .func([] (ACtxVehicleSpawn& rVehicleSpawn) noexcept
     {
@@ -172,6 +187,7 @@ FeatureDef const ftrVehicleSpawn = feature_def("VehicleSpawn", [] (
 FeatureDef const ftrVehicleSpawnVBData = feature_def("VehicleSpawnVBData", [] (
         FeatureBuilder              &rFB,
         Implement<FIVehicleSpawnVB> vhclSpawnVB,
+        DependOn<FILinks>           links,
         DependOn<FIMainApp>         mainApp,
         DependOn<FIScene>           scn,
         DependOn<FICommonScene>     comScn,
@@ -180,18 +196,17 @@ FeatureDef const ftrVehicleSpawnVBData = feature_def("VehicleSpawnVBData", [] (
         DependOn<FIVehicleSpawn>    vhclSpawn,
         DependOn<FISignalsFloat>    sigFloat)
 {
-    rFB.pipeline(vhclSpawnVB.pl.dataVB)      .parent(scn.pl.update);
-    rFB.pipeline(vhclSpawnVB.pl.remapParts)  .parent(scn.pl.update);
-    rFB.pipeline(vhclSpawnVB.pl.remapWelds)  .parent(scn.pl.update);
-    rFB.pipeline(vhclSpawnVB.pl.remapMachs)  .parent(scn.pl.update);
-    rFB.pipeline(vhclSpawnVB.pl.remapNodes)  .parent(scn.pl.update);
+    rFB.pipeline(vhclSpawnVB.pl.dataVB)      .parent(mainApp.loopblks.mainLoop);
+    rFB.pipeline(vhclSpawnVB.pl.remapParts)  .parent(mainApp.loopblks.mainLoop);
+    rFB.pipeline(vhclSpawnVB.pl.remapWelds)  .parent(mainApp.loopblks.mainLoop);
+    rFB.pipeline(vhclSpawnVB.pl.remapMachs)  .parent(mainApp.loopblks.mainLoop);
+    rFB.pipeline(vhclSpawnVB.pl.remapNodes)  .parent(mainApp.loopblks.mainLoop);
 
     rFB.data_emplace< ACtxVehicleSpawnVB >(vhclSpawnVB.di.vehicleSpawnVB);
 
     rFB.task()
         .name       ("Create PartIds and WeldIds for vehicles to spawn from VehicleData")
-        .run_on     ({vhclSpawn.pl.spawnRequest(UseOrRun)})
-        .sync_with  ({vhclSpawn.pl.spawnedParts(Resize), vhclSpawnVB.pl.remapParts(Modify_), vhclSpawnVB.pl.remapWelds(Modify_), parts.pl.partIds(New), parts.pl.weldIds(New), parts.pl.mapWeldActive(New)})
+        .sync_with  ({vhclSpawn.pl.spawnRequest(UseOrRun), vhclSpawn.pl.spawnedParts(Resize), vhclSpawnVB.pl.remapParts(Modify_), vhclSpawnVB.pl.remapWelds(Modify_), parts.pl.partIds(New), parts.pl.weldIds(New), parts.pl.mapWeldActive(New)})
         .args       ({             vhclSpawn.di.vehicleSpawn,                    vhclSpawnVB.di.vehicleSpawnVB,           parts.di.scnParts})
         .func([] (ACtxVehicleSpawn& rVehicleSpawn, ACtxVehicleSpawnVB& rVehicleSpawnVB, ACtxParts& rScnParts) noexcept
     {
@@ -200,8 +215,7 @@ FeatureDef const ftrVehicleSpawnVBData = feature_def("VehicleSpawnVBData", [] (
 
     rFB.task()
         .name       ("Request prefabs for vehicle parts from VehicleBuilder")
-        .run_on     ({vhclSpawn.pl.spawnRequest(UseOrRun)})
-        .sync_with  ({prefabs.pl.spawnRequest(Modify_), vhclSpawn.pl.spawnedParts(UseOrRun)})
+        .sync_with  ({vhclSpawn.pl.spawnRequest(UseOrRun), prefabs.pl.spawnRequest(Modify_), vhclSpawn.pl.spawnedParts(UseOrRun)})
         .args       ({             vhclSpawn.di.vehicleSpawn,                          vhclSpawnVB.di.vehicleSpawnVB,           parts.di.scnParts,             prefabs.di.prefabs,           mainApp.di.resources})
         .func([] (ACtxVehicleSpawn& rVehicleSpawn, ACtxVehicleSpawnVB const& rVehicleSpawnVB, ACtxParts& rScnParts, ACtxPrefabs& rPrefabs, Resources& rResources) noexcept
     {
@@ -210,10 +224,9 @@ FeatureDef const ftrVehicleSpawnVBData = feature_def("VehicleSpawnVBData", [] (
 
     rFB.task()
         .name       ("Create Machine IDs copied from VehicleData")
-        .run_on     ({vhclSpawn.pl.spawnRequest(UseOrRun)})
-        .sync_with  ({vhclSpawnVB.pl.dataVB(UseOrRun), vhclSpawnVB.pl.remapMachs(Modify_), vhclSpawn.pl.spawnedMachs(Resize), parts.pl.machIds(New)})
-        .args       ({             vhclSpawn.di.vehicleSpawn,                    vhclSpawnVB.di.vehicleSpawnVB,           parts.di.scnParts})
-        .func([] (ACtxVehicleSpawn& rVehicleSpawn, ACtxVehicleSpawnVB& rVehicleSpawnVB, ACtxParts& rScnParts) noexcept
+        .sync_with  ({vhclSpawn.pl.spawnRequest(UseOrRun), vhclSpawnVB.pl.dataVB(UseOrRun), vhclSpawnVB.pl.remapMachs(Modify_), vhclSpawn.pl.spawnedMachs(Resize), links.pl.machIds(New)})
+        .args       ({         vhclSpawn.di.vehicleSpawn,       vhclSpawnVB.di.vehicleSpawnVB,    parts.di.scnParts,    links.di.links})
+        .func       ([] (ACtxVehicleSpawn& rVehicleSpawn, ACtxVehicleSpawnVB& rVehicleSpawnVB, ACtxParts& rScnParts, ACtxLinks &rLinks) noexcept
     {
         std::size_t const newVehicleCount = rVehicleSpawn.new_vehicle_count();
         ACtxVehicleSpawnVB &rVSVB = rVehicleSpawnVB;
@@ -256,10 +269,10 @@ FeatureDef const ftrVehicleSpawnVBData = feature_def("VehicleSpawnVBData", [] (
         // Create ACtxParts MachAny/LocalIDs and populate remaps
 
         // MachAnyIDs created here
-        rScnParts.machines.ids.create(rVehicleSpawn.spawnedMachs.begin(),
-                                      rVehicleSpawn.spawnedMachs.end());
+        rLinks.machines.ids.create(rVehicleSpawn.spawnedMachs.begin(),
+                                   rVehicleSpawn.spawnedMachs.end());
 
-        rScnParts.machines.machToLocal.resize(rScnParts.machines.ids.capacity());
+        rLinks.machines.machToLocal.resize(rLinks.machines.ids.capacity());
 
         auto itDstMachIds = rVehicleSpawn.spawnedMachs.cbegin();
 
@@ -290,23 +303,22 @@ FeatureDef const ftrVehicleSpawnVBData = feature_def("VehicleSpawnVBData", [] (
                 //       created at once with ids.create(first, last), and make
                 //       resize(..) called once per type too
                 MachTypeId const    type            = srcMachines.machTypes[srcMach];
-                PerMachType&        rDstPerType     = rScnParts.machines.perType[type];
+                PerMachType&        rDstPerType     = rLinks.machines.perType[type];
 
                 MachLocalId const dstLocal = rDstPerType.localIds.create();
                 rDstPerType.localToAny.resize(rDstPerType.localIds.capacity());
 
                 rDstPerType.localToAny[dstLocal] = dstMach;
-                rScnParts.machines.machToLocal[dstMach] = dstLocal;
+                rLinks.machines.machToLocal[dstMach] = dstLocal;
             }
         }
     });
 
     rFB.task()
         .name       ("Update Part<->Machine maps")
-        .run_on     ({vhclSpawn.pl.spawnRequest(UseOrRun)})
-        .sync_with  ({vhclSpawnVB.pl.dataVB(UseOrRun), vhclSpawnVB.pl.remapMachs(UseOrRun), vhclSpawnVB.pl.remapParts(UseOrRun), parts.pl.mapPartMach(New)})
-        .args       ({             vhclSpawn.di.vehicleSpawn,                          vhclSpawnVB.di.vehicleSpawnVB,           parts.di.scnParts,             prefabs.di.prefabs,           mainApp.di.resources})
-        .func([] (ACtxVehicleSpawn& rVehicleSpawn, ACtxVehicleSpawnVB const& rVehicleSpawnVB, ACtxParts& rScnParts, ACtxPrefabs& rPrefabs, Resources& rResources) noexcept
+        .sync_with  ({vhclSpawn.pl.spawnRequest(UseOrRun), vhclSpawnVB.pl.dataVB(UseOrRun), vhclSpawnVB.pl.remapMachs(UseOrRun), vhclSpawnVB.pl.remapParts(UseOrRun), parts.pl.mapPartMach(New)})
+        .args       ({         vhclSpawn.di.vehicleSpawn,             vhclSpawnVB.di.vehicleSpawnVB,   parts.di.scnParts,     links.di.links,    prefabs.di.prefabs,  mainApp.di.resources})
+        .func       ([] (ACtxVehicleSpawn& rVehicleSpawn, ACtxVehicleSpawnVB const& rVehicleSpawnVB, ACtxParts& rScnParts, ACtxLinks &rLinks, ACtxPrefabs& rPrefabs, Resources& rResources) noexcept
     {
         std::size_t const newVehicleCount = rVehicleSpawn.new_vehicle_count();
         ACtxVehicleSpawnVB const& rVSVB = rVehicleSpawnVB;
@@ -319,9 +331,9 @@ FeatureDef const ftrVehicleSpawnVBData = feature_def("VehicleSpawnVBData", [] (
                 continue;
             }
 
-            rScnParts.machineToPart.resize(rScnParts.machines.ids.capacity());
+            rScnParts.machineToPart.resize(rLinks.machines.ids.capacity());
             rScnParts.partToMachines.ids_reserve(rScnParts.partIds.capacity());
-            rScnParts.partToMachines.data_reserve(rScnParts.machines.ids.capacity());
+            rScnParts.partToMachines.data_reserve(rLinks.machines.ids.capacity());
 
             std::size_t const remapMachOffset = rVSVB.remapMachOffsets[vhId];
             std::size_t const remapPartOffset = rVSVB.remapPartOffsets[vhId];
@@ -353,7 +365,7 @@ FeatureDef const ftrVehicleSpawnVBData = feature_def("VehicleSpawnVBData", [] (
                     MachAnyId const     srcMach  = pVData->m_machines.perType[srcPair.type].localToAny[srcPair.local];
                     MachAnyId const     dstMach  = rVSVB.remapMachs[remapMachOffset + srcMach];
                     MachTypeId const    dstType  = srcPair.type;
-                    MachLocalId const   dstLocal = rScnParts.machines.machToLocal[dstMach];
+                    MachLocalId const   dstLocal = rLinks.machines.machToLocal[dstMach];
 
                     rDstPair = { .local = dstLocal, .type = dstType };
                 }
@@ -363,10 +375,10 @@ FeatureDef const ftrVehicleSpawnVBData = feature_def("VehicleSpawnVBData", [] (
 
     rFB.task()
         .name       ("Create (and connect) Node IDs copied from VehicleBuilder")
-        .run_on     ({vhclSpawn.pl.spawnRequest(UseOrRun)})
-        .sync_with  ({vhclSpawnVB.pl.dataVB(UseOrRun), vhclSpawnVB.pl.remapMachs(UseOrRun), vhclSpawnVB.pl.remapNodes(Modify_), parts.pl.nodeIds(New), parts.pl.connect(New)})
-        .args       ({             vhclSpawn.di.vehicleSpawn,                    vhclSpawnVB.di.vehicleSpawnVB,           parts.di.scnParts})
-        .func([] (ACtxVehicleSpawn& rVehicleSpawn, ACtxVehicleSpawnVB& rVehicleSpawnVB, ACtxParts& rScnParts) noexcept
+        .sync_with  ({vhclSpawn.pl.spawnRequest(UseOrRun), vhclSpawnVB.pl.dataVB(UseOrRun), vhclSpawnVB.pl.remapMachs(UseOrRun), vhclSpawnVB.pl.remapNodes(Modify_),
+                      links.pl.nodeIds(New), links.pl.connect(New)})
+        .args       ({         vhclSpawn.di.vehicleSpawn,       vhclSpawnVB.di.vehicleSpawnVB,    parts.di.scnParts,    links.di.links})
+        .func       ([] (ACtxVehicleSpawn& rVehicleSpawn, ACtxVehicleSpawnVB& rVehicleSpawnVB, ACtxParts& rScnParts, ACtxLinks &rLinks) noexcept
     {
         std::size_t const newVehicleCount = rVehicleSpawn.new_vehicle_count();
         ACtxVehicleSpawnVB &rVSVB = rVehicleSpawnVB;
@@ -410,17 +422,16 @@ FeatureDef const ftrVehicleSpawnVBData = feature_def("VehicleSpawnVBData", [] (
                 remapNodeOffsets2d[vhId.value][nodeType] = nodeRemapUsed;
                 nodeRemapUsed += remapSize;
                 copy_nodes(rSrcNodeType, pVData->m_machines, machRemap,
-                           rScnParts.nodePerType[nodeType], rScnParts.machines, nodeRemapOut);
+                           rLinks.nodePerType[nodeType], rLinks.machines, nodeRemapOut);
             }
         }
     });
 
     rFB.task()
         .name       ("Update PartId<->ActiveEnt mapping")
-        .run_on     ({vhclSpawn.pl.spawnRequest(UseOrRun)})
-        .sync_with  ({vhclSpawn.pl.spawnedParts(UseOrRun), prefabs.pl.spawnedEnts(UseOrRun), parts.pl.mapPartActive(Modify)})
-        .args       ({             vhclSpawn.di.vehicleSpawn,                 comScn.di.basic,           parts.di.scnParts,              prefabs.di.prefabs})
-        .func([] (ACtxVehicleSpawn& rVehicleSpawn, ACtxBasic const& rBasic, ACtxParts& rScnParts,  ACtxPrefabs& rPrefabs) noexcept
+        .sync_with  ({vhclSpawn.pl.spawnRequest(UseOrRun), vhclSpawn.pl.spawnedParts(UseOrRun), prefabs.pl.spawnedEnts(UseOrRun), parts.pl.mapPartActive(Modify)})
+        .args       ({         vhclSpawn.di.vehicleSpawn,         comScn.di.basic,    parts.di.scnParts,     prefabs.di.prefabs})
+        .func       ([] (ACtxVehicleSpawn& rVehicleSpawn, ACtxBasic const& rBasic, ACtxParts& rScnParts,  ACtxPrefabs& rPrefabs) noexcept
     {
         rScnParts.partToActive.resize(rScnParts.partIds.capacity());
         rScnParts.activeToPart.resize(rBasic.m_activeIds.capacity());
@@ -441,12 +452,11 @@ FeatureDef const ftrVehicleSpawnVBData = feature_def("VehicleSpawnVBData", [] (
 
     rFB.task()
         .name       ("Copy float signal values from VehicleBuilder")
-        .run_on     ({vhclSpawn.pl.spawnRequest(UseOrRun)})
-        .sync_with  ({vhclSpawn.pl.spawnedParts(UseOrRun), vhclSpawnVB.pl.remapNodes(UseOrRun), sigFloat.pl.sigFloatValues(New), sigFloat.pl.sigFloatUpdExtIn(New)})
-        .args       ({             vhclSpawn.di.vehicleSpawn,                          vhclSpawnVB.di.vehicleSpawnVB,           parts.di.scnParts,                       sigFloat.di.sigValFloat,                    sigFloat.di.sigUpdFloat})
-        .func([] (ACtxVehicleSpawn& rVehicleSpawn, ACtxVehicleSpawnVB const& rVehicleSpawnVB, ACtxParts& rScnParts, SignalValues_t<float>& rSigValFloat, UpdateNodes<float>& rSigUpdFloat) noexcept
+        .sync_with  ({vhclSpawn.pl.spawnRequest(UseOrRun), vhclSpawn.pl.spawnedParts(UseOrRun), vhclSpawnVB.pl.remapNodes(UseOrRun), sigFloat.pl.sigFloatValues(New), sigFloat.pl.sigFloatUpdExtIn(New)})
+        .args       ({         vhclSpawn.di.vehicleSpawn,             vhclSpawnVB.di.vehicleSpawnVB,    parts.di.scnParts,    links.di.links,             sigFloat.di.sigValFloat,          sigFloat.di.sigUpdFloat})
+        .func       ([] (ACtxVehicleSpawn& rVehicleSpawn, ACtxVehicleSpawnVB const& rVehicleSpawnVB, ACtxParts& rScnParts, ACtxLinks &rLinks, SignalValues_t<float>& rSigValFloat, UpdateNodes<float>& rSigUpdFloat) noexcept
     {
-        Nodes const         &rFloatNodes    = rScnParts.nodePerType[gc_ntSigFloat];
+        Nodes const         &rFloatNodes    = rLinks.nodePerType[gc_ntSigFloat];
         std::size_t const   maxNodes        = rFloatNodes.nodeIds.capacity();
         rSigUpdFloat.nodeNewValues.resize(maxNodes);
         rSigUpdFloat.nodeDirty.resize(maxNodes);
@@ -487,8 +497,7 @@ FeatureDef const ftrVehicleSpawnDraw = feature_def("VehicleSpawnDraw", [] (
 {
     rFB.task()
         .name       ("Enable Draw Transforms for spawned vehicle root entities")
-        .run_on     ({vhclSpawn.pl.spawnRequest(UseOrRun)})
-        .sync_with  ({vhclSpawn.pl.rootEnts(UseOrRun), scnRender.pl.drawEntResized(Done)})
+        .sync_with  ({vhclSpawn.pl.spawnRequest(UseOrRun), vhclSpawn.pl.rootEnts(UseOrRun), scnRender.pl.drawEnt(Ready)})
         .args       ({            scnRender.di.scnRender,                        vhclSpawn.di.vehicleSpawn})
         .func([] (ACtxSceneRender& rScnRender, ACtxVehicleSpawn const& rVehicleSpawn) noexcept
     {
@@ -504,12 +513,15 @@ FeatureDef const ftrVehicleSpawnDraw = feature_def("VehicleSpawnDraw", [] (
 FeatureDef const ftrSignalsFloat = feature_def("SignalsFloat", [] (
         FeatureBuilder              &rFB,
         Implement<FISignalsFloat>   sigFloat,
+        DependOn<FIMainApp>         mainApp,
         DependOn<FIScene>           scn,
-        DependOn<FIParts>           parts)
+        DependOn<FILinks>           links)
 {
-    rFB.pipeline(sigFloat.pl.sigFloatValues)   .parent(scn.pl.update);
-    rFB.pipeline(sigFloat.pl.sigFloatUpdExtIn) .parent(scn.pl.update);
-    rFB.pipeline(sigFloat.pl.sigFloatUpdLoop)  .parent(parts.pl.linkLoop);
+
+    rFB.pipeline(sigFloat.pl.sigFloatValues)   .parent(mainApp.loopblks.mainLoop);
+    rFB.pipeline(sigFloat.pl.sigFloatUpdExtIn) .parent(mainApp.loopblks.mainLoop);
+    rFB.pipeline(sigFloat.pl.sigFloatUpdLoop)  .parent(links.loopblks.link);
+
 
     rFB.data_emplace< SignalValues_t<float> >    (sigFloat.di.sigValFloat);
     rFB.data_emplace< UpdateNodes<float> >       (sigFloat.di.sigUpdFloat);
@@ -519,17 +531,16 @@ FeatureDef const ftrSignalsFloat = feature_def("SignalsFloat", [] (
 
     rFB.task()
         .name       ("Update Signal<float> Nodes")
-        .run_on     ({parts.pl.linkLoop(EStgLink::NodeUpd)})
-        .sync_with  ({sigFloat.pl.sigFloatUpdExtIn(Ready), parts.pl.machUpdExtIn(Ready), sigFloat.pl.sigFloatUpdLoop(Modify), sigFloat.pl.sigFloatValues(Modify)})
-        .args       ({               sigFloat.di.sigUpdFloat,                       sigFloat.di.sigValFloat,                parts.di.updMach,                 parts.di.scnParts})
-        .func([] (UpdateNodes<float>& rSigUpdFloat, SignalValues_t<float>& rSigValFloat, MachineUpdater& rUpdMach, ACtxParts const& rScnParts) noexcept
+        .sync_with  ({links.pl.linkLoop(EStgLink::NodeUpd), sigFloat.pl.sigFloatUpdExtIn(Ready), links.pl.machUpdExtIn(Ready), sigFloat.pl.sigFloatUpdLoop(Modify), sigFloat.pl.sigFloatValues(Modify)})
+        .args       ({            sigFloat.di.sigUpdFloat,             sigFloat.di.sigValFloat,         links.di.updMach,          links.di.links})
+        .func       ([] (UpdateNodes<float>& rSigUpdFloat, SignalValues_t<float>& rSigValFloat, MachineUpdater& rUpdMach, ACtxLinks const& rLinks) noexcept
     {
         if ( ! rSigUpdFloat.dirty )
         {
             return; // Not dirty, nothing to do
         }
 
-        Nodes const &rFloatNodes = rScnParts.nodePerType[gc_ntSigFloat];
+        Nodes const &rFloatNodes = rLinks.nodePerType[gc_ntSigFloat];
 
         // NOTE: The various use of reset() clear entire bit arrays, which may or may
         //       not be expensive. They likely optimize to memset
@@ -545,7 +556,7 @@ FeatureDef const ftrSignalsFloat = feature_def("SignalsFloat", [] (
         update_signal_nodes<float>(
                 rSigUpdFloat.nodeDirty,
                 rFloatNodes.nodeToMach,
-                rScnParts.machines,
+                rLinks.machines,
                 arrayView(rSigUpdFloat.nodeNewValues),
                 rSigValFloat,
                 rUpdMach);

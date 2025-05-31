@@ -26,358 +26,361 @@
 
 #include <longeron/id_management/id_set_stl.hpp>
 
-#include <array>
+#include <sstream>
 
 namespace osp
 {
 
-struct TaskCounts
+PipelineTypeIdReg& PipelineTypeIdReg::instance()
 {
-    uint16_t requiresStages     {0};
-    uint16_t requiredByStages   {0};
+    static PipelineTypeIdReg instance;
+    return instance;
+}
+
+struct StageLock
+{
+    TaskId      taskId;
+    PipelineId  pipelineId;
+    StageId     stageId;
 };
 
-struct StageCounts
+void check_task_order(Tasks const& tasks, TaskOrderReport& rOut, lgrn::IdSetStl<LoopBlockId> loopblks)
 {
-    uint16_t runTasks           {0};
-    uint16_t requiresTasks      {0};
-    uint16_t requiredByTasks    {0};
-};
+    std::vector<StageLock> locks;
 
-struct PipelineCounts
-{
-    std::array<StageCounts, gc_maxStages> stageCounts;
+    osp::KeyedVec<PipelineId, StageId> currentStages;
+    currentStages.resize(tasks.pipelineIds.capacity());
+    lgrn::IdSetStl<PipelineId> stageJustChanged;
+    stageJustChanged.resize(tasks.pipelineIds.capacity());
 
-    uint8_t  stages             { 0 };
+    osp::KeyedVec<TaskId, std::uint8_t> alignsRemaining;
+    alignsRemaining.resize(tasks.taskIds.capacity());
 
-    PipelineId firstChild       { lgrn::id_null<PipelineId>() };
-    PipelineId sibling          { lgrn::id_null<PipelineId>() };
-};
-
-
-TaskGraph make_exec_graph(Tasks const& tasks)
-{
-    TaskGraph out;
-
-    std::size_t const maxPipelines  = tasks.m_pipelineIds.capacity();
-    std::size_t const maxTasks      = tasks.m_taskIds.capacity();
-
-    KeyedVec<PipelineId, PipelineCounts>    plCounts;
-    KeyedVec<TaskId, TaskCounts>            taskCounts;
-    lgrn::IdSetStl<PipelineId>              plInTree;
-
-    out.pipelineToFirstAnystg .resize(maxPipelines);
-    plInTree.resize(maxPipelines);
-    plCounts        .resize(maxPipelines+1);
-    taskCounts      .resize(maxTasks+1);
-
-    std::size_t totalTasksReqStage  = 0;
-    std::size_t totalStageReqTasks  = 0;
-    std::size_t totalRunTasks       = 0;
-    std::size_t totalStages         = 0;
-
-    // 1. Count total number of stages
-
-    auto const count_stage = [&plCounts] (PipelineId const pipeline, StageId const stage)
+    int pipelinesNotFinished = 0;
+    for (PipelineId const pipelineId : tasks.pipelineIds)
     {
-        uint8_t &rStageCount = plCounts[pipeline].stages;
-        rStageCount = std::max(rStageCount, uint8_t(uint8_t(stage) + 1));
-    };
-
-    // Max 1 stage for each valid pipeline. Supporting 0-stage pipelines take more effort
-    for (PipelineId const plId : tasks.m_pipelineIds)
-    {
-        plCounts[PipelineId(plId)].stages = 1;
-    }
-
-    // Count stages from task run-ons
-    for (TaskId const task : tasks.m_taskIds)
-    {
-        auto const [runPipeline, runStage]  = tasks.m_taskRunOn[task];
-
-        count_stage(runPipeline, runStage);
-
-        ++ plCounts[runPipeline].stageCounts[std::size_t(runStage)].runTasks;
-        ++ totalRunTasks;
-    }
-
-    // Count stages from syncs
-    for (auto const [task, pipeline, stage] : tasks.m_syncWith)
-    {
-        count_stage(pipeline, stage);
-    }
-
-    for (PipelineId const plId : tasks.m_pipelineIds)
-    {
-        totalStages += plCounts[plId].stages;
-    }
-
-    // 2. Count TaskRequiresStages and StageRequiresTasks
-
-    for (auto const [task, pipeline, stage] : tasks.m_syncWith)
-    {
-        StageCounts &rStageCounts = plCounts[pipeline].stageCounts[std::size_t(stage)];
-        TaskCounts  &rTaskCounts  = taskCounts[task];
-
-        // TaskRequiresStage makes task require pipeline to be on stage to be allowed to run
-        ++ rTaskCounts .requiresStages;
-        ++ rStageCounts.requiredByTasks;
-
-
-        // StageRequiresTask for stage to wait for task to complete
-        ++ rStageCounts.requiresTasks;
-        ++ rTaskCounts .requiredByStages;
-
-    }
-    totalTasksReqStage += tasks.m_syncWith.size();
-    totalStageReqTasks += tasks.m_syncWith.size();
-
-    // 3. Map out children and siblings in tree
-
-    for (PipelineId const child : tasks.m_pipelineIds)
-    {
-        PipelineId const parent = tasks.m_pipelineParents[child];
-
-        if (parent != lgrn::id_null<PipelineId>())
+        Pipeline const& pipeline = tasks.pipelineInst[pipelineId];
+        if (loopblks.contains(pipeline.block))
         {
-            plInTree.insert(parent);
-            plInTree.insert(child);
+            ++pipelinesNotFinished;
 
-            PipelineCounts &rChildCounts  = plCounts[child];
-            PipelineCounts &rParentCounts = plCounts[parent];
-
-            if (rParentCounts.firstChild != lgrn::id_null<PipelineId>())
+            currentStages[pipelineId] = pipeline.initialStage;
+            stageJustChanged.insert(pipelineId);
+            rOut.steps.push_back({.pipelineId = pipelineId, .stageId = pipeline.initialStage, .time = 0});
+            if (pipeline.scheduleCondition.has_value())
             {
-                rChildCounts.sibling = rParentCounts.firstChild;
+                ++ alignsRemaining[pipeline.scheduleCondition];
             }
-
-            rParentCounts.firstChild = child;
         }
     }
 
-    std::size_t const treeSize = plInTree.size();
 
-    // 4. Allocate
-
-    // The +1 is needed for 1-to-many connections to store the total number of other elements they
-    // index. This also simplifies logic in fanout_view(...)
-
-    out.pipelineToFirstAnystg       .resize(maxPipelines+1,     lgrn::id_null<AnyStageId>());
-    out.anystgToPipeline            .resize(totalStages+1,      lgrn::id_null<PipelineId>());
-    out.anystgToFirstRuntask        .resize(totalStages+1,      lgrn::id_null<RunTaskId>());
-    out.runtaskToTask               .resize(totalRunTasks,      lgrn::id_null<TaskId>());
-    out.anystgToFirstStgreqtask     .resize(totalStages+1,      lgrn::id_null<StageReqTaskId>());
-    out.stgreqtaskData              .resize(totalStageReqTasks, {});
-    out.taskToFirstRevStgreqtask    .resize(maxTasks+1,         lgrn::id_null<ReverseStageReqTaskId>());
-    out.revStgreqtaskToStage        .resize(totalStageReqTasks, lgrn::id_null<AnyStageId>());
-    out.taskToFirstTaskreqstg       .resize(maxTasks+1,         lgrn::id_null<TaskReqStageId>());
-    out.taskreqstgData              .resize(totalTasksReqStage, {});
-    out.anystgToFirstRevTaskreqstg  .resize(totalStages+1,      lgrn::id_null<ReverseTaskReqStageId>());
-    out.revTaskreqstgToTask         .resize(totalTasksReqStage, lgrn::id_null<TaskId>());
-    out.pltreeDescendantCounts      .resize(treeSize,           0);
-    out.pltreeToPipeline            .resize(treeSize,           lgrn::id_null<PipelineId>());
-    out.pipelineToPltree            .resize(maxPipelines,       lgrn::id_null<PipelineTreePos_t>());
-    out.pipelineToLoopScope         .resize(maxPipelines,       lgrn::id_null<PipelineTreePos_t>());
-
-    // 5. Calculate one-to-many partitions
-
-    fanout_partition(
-        out.pipelineToFirstAnystg,
-        [&plCounts] (PipelineId pl)                { return plCounts[pl].stages; },
-        [&out] (PipelineId pl, AnyStageId claimed) { out.anystgToPipeline[claimed] = pl; });
-
-    fanout_partition(
-        out.anystgToFirstRuntask,
-        [&plCounts, &out] (AnyStageId stg)
-        {
-            PipelineId const pl = out.anystgToPipeline[stg];
-            if (pl == lgrn::id_null<PipelineId>())
-            {
-                return uint16_t(0);
-            }
-            StageId const stgLocal = stage_from(out, pl, stg);
-            return plCounts[pl].stageCounts[std::size_t(stgLocal)].runTasks;
-        },
-        [] (AnyStageId, RunTaskId) { });
-
-    fanout_partition(
-        out.anystgToFirstStgreqtask,
-        [&plCounts, &out] (AnyStageId stg)
-        {
-            PipelineId const    pl          = out.anystgToPipeline[stg];
-            if (pl == lgrn::id_null<PipelineId>())
-            {
-                return uint16_t(0);
-            }
-            StageId const       stgLocal    = stage_from(out, pl, stg);
-            return plCounts[pl].stageCounts[std::size_t(stgLocal)].requiresTasks;
-        },
-        [&out] (AnyStageId stg, StageReqTaskId claimed) { out.stgreqtaskData[claimed].ownStage = stg; });
-    fanout_partition(
-        out.taskToFirstRevStgreqtask,
-        [&taskCounts] (TaskId task)                         { return taskCounts[task].requiredByStages; },
-        [&out] (TaskId, ReverseStageReqTaskId) { });
-
-    fanout_partition(
-        out.taskToFirstTaskreqstg,
-        [&taskCounts] (TaskId task)                     { return taskCounts[task].requiresStages; },
-        [&out] (TaskId task, TaskReqStageId claimed)    { out.taskreqstgData[claimed].ownTask = task; });
-    fanout_partition(
-        out.anystgToFirstRevTaskreqstg,
-        [&plCounts, &out] (AnyStageId stg)
-        {
-            PipelineId const    pl          = out.anystgToPipeline[stg];
-            if (pl == lgrn::id_null<PipelineId>())
-            {
-                return uint16_t(0);
-            }
-            StageId const       stgLocal    = stage_from(out, pl, stg);
-            return plCounts[pl].stageCounts[std::size_t(stgLocal)].requiredByTasks;
-        },
-        [&out] (AnyStageId, ReverseTaskReqStageId) { });
-
-    // 6. Push
-
-    for (TaskId const task : tasks.m_taskIds)
+    for (TaskSyncToPipeline const& syncTo : tasks.syncs)
     {
-        auto const      run             = tasks.m_taskRunOn[task];
-        auto const      anystg          = anystg_from(out, run.pipeline, run.stage);
-        StageCounts     &rStageCounts   = plCounts[run.pipeline].stageCounts[std::size_t(run.stage)];
-        RunTaskId const runtask         = id_from_count(out.anystgToFirstRuntask, anystg, rStageCounts.runTasks);
-
-        out.runtaskToTask[runtask] = task;
-
-        -- rStageCounts.runTasks;
-    }
-
-    for (auto const [task, pipeline, stage] : tasks.m_syncWith)
-    {
-        AnyStageId const            anystg          = anystg_from(out, pipeline, stage);
-        StageCounts                 &rStageCounts   = plCounts[pipeline].stageCounts[std::size_t(stage)];
-        TaskCounts                  &rTaskCounts    = taskCounts[task];
-
-        auto const [taskPipeline, taskStage] = tasks.m_taskRunOn[task];
-
-        // Add StageReqTask (pipeline, stage) requires task
-        StageReqTaskId const        stgReqTaskId    = id_from_count(out.anystgToFirstStgreqtask, anystg, rStageCounts.requiresTasks);
-        ReverseStageReqTaskId const revStgReqTaskId = id_from_count(out.taskToFirstRevStgreqtask, task, rTaskCounts.requiredByStages);
-
-        StageRequiresTask &rStgReqTask = out.stgreqtaskData[stgReqTaskId];
-
-        // rTaskReqStage.ownStage set previously
-        rStgReqTask.reqTask     = task;
-        rStgReqTask.reqPipeline = taskPipeline;
-        rStgReqTask.reqStage    = taskStage;
-        out.revStgreqtaskToStage[revStgReqTaskId] = anystg;
-
-        -- rStageCounts.requiresTasks;
-        -- rTaskCounts.requiredByStages;
-        -- totalStageReqTasks;
-
-        // Add TaskReqStage task requires (pipeline, stage)
-        TaskReqStageId const        taskReqStgId    = id_from_count(out.taskToFirstTaskreqstg, task, rTaskCounts.requiresStages);
-        ReverseTaskReqStageId const revTaskReqStgId = id_from_count(out.anystgToFirstRevTaskreqstg, anystg, rStageCounts.requiredByTasks);
-
-        TaskRequiresStage &rTaskReqStage = out.taskreqstgData[taskReqStgId];
-
-        // rTaskReqStage.ownTask set previously
-        rTaskReqStage.reqStage      = stage;
-        rTaskReqStage.reqPipeline   = pipeline;
-        out.revTaskreqstgToTask[revTaskReqStgId] = task;
-
-        -- rTaskCounts.requiresStages;
-        -- rStageCounts.requiredByTasks;
-        -- totalTasksReqStage;
-    }
-
-
-    // NOLINTBEGIN(readability-use-anyofallof)
-    [[maybe_unused]] auto const all_counts_zero = [&] ()
-    {
-        if (   totalStageReqTasks   != 0
-            || totalTasksReqStage   != 0 )
+        if (loopblks.contains(tasks.pipelineInst[syncTo.pipeline].block))
         {
-            return false;
+            ++ alignsRemaining[syncTo.task];
         }
-        for (PipelineCounts const& plCount : plCounts)
+    }
+
+    int time = 0;
+
+    auto &rPltypeinfo = PipelineTypeIdReg::instance();
+
+    auto const task_aligned = [&] (TaskId const taskId, PipelineId const pipelineId, StageId stageId)
+    {
+        LGRN_ASSERT(alignsRemaining[taskId] != 0);
+        -- alignsRemaining[taskId];
+        if (alignsRemaining[taskId] == 0)
         {
-            for (StageCounts const& stgCount : plCount.stageCounts)
+            rOut.steps.push_back({.taskId = taskId, .time = time});
+
+            // remove all locks assiciated with this task
+            for (StageLock &rLock : locks)
             {
-                if (   stgCount.requiredByTasks != 0
-                    || stgCount.requiresTasks   != 0 )
+                if (rLock.taskId == taskId)
                 {
-                    return false;
+                    rLock = {};
                 }
             }
         }
-        for (TaskCounts const& taskCount : taskCounts)
+        else
         {
-            if (   taskCount.requiredByStages != 0
-                || taskCount.requiresStages != 0 )
+            locks.push_back({taskId, pipelineId, stageId});
+        }
+    };
+
+    bool nothingMoved = true;
+
+    do
+    {
+        // any points connected to current stages?
+        for (TaskSyncToPipeline const& syncTo : tasks.syncs)
+        {
+            if (stageJustChanged.contains(syncTo.pipeline) && currentStages[syncTo.pipeline] == syncTo.stage)
             {
-                return false;
+                task_aligned(syncTo.task, syncTo.pipeline, syncTo.stage);
+            }
+        }
+        for (PipelineId const pipelineId : tasks.pipelineIds)
+        {
+            if (stageJustChanged.contains(pipelineId))
+            {
+                Pipeline const &inst = tasks.pipelineInst[pipelineId];
+                if (inst.scheduleCondition.has_value() && rPltypeinfo.get(inst.type).stages[currentStages[pipelineId]].isSchedule)
+                {
+                    task_aligned(inst.scheduleCondition, pipelineId, currentStages[pipelineId]);
+                }
             }
         }
 
-        return true;
-    };
-    // NOLINTEND(readability-use-anyofallof)
+        if (pipelinesNotFinished == 0) { break; }
 
-    LGRN_ASSERTM(all_counts_zero(), "Counts repurposed as items remaining, and must all be zero by the end here");
+        ++ time;
 
+        auto const &locksFirst = locks.begin();
+        auto const &locksLast  = locks.end();
 
-    // 7. Build Pipeline Tree
+        stageJustChanged.clear();
 
-    auto const add_subtree = [&] (auto const& self, PipelineId const root, PipelineId const firstChild, PipelineTreePos_t const loopScope, PipelineTreePos_t const pos) -> uint32_t
-    {
-        bool const        rootLoops    = tasks.m_pipelineControl[root].isLoopScope;
-        PipelineTreePos_t newLoopScope = rootLoops ? pos : loopScope;
+        nothingMoved = true;
 
-        out.pltreeToPipeline[pos]     = root;
-        out.pipelineToPltree[root]    = pos;
-        out.pipelineToLoopScope[root] = newLoopScope;
-
-        uint32_t descendantCount = 0;
-
-        PipelineId child = firstChild;
-
-        PipelineTreePos_t childPos = pos + 1;
-
-        while (child != lgrn::id_null<PipelineId>())
+        // move points
+        for (PipelineId const pipelineId : tasks.pipelineIds)
         {
-            PipelineCounts const&   rChildCounts    = plCounts[child];
+            Pipeline const& pipeline = tasks.pipelineInst[pipelineId];
 
-            uint32_t const childDescendantCount = self(self, child, rChildCounts.firstChild, newLoopScope, childPos);
-            descendantCount += 1 + childDescendantCount;
+            if ( ! loopblks.contains(pipeline.block) ) { continue; }
 
-            child = rChildCounts.sibling;
-            childPos += 1 + childDescendantCount;
+            StageId &rCurrentStage = currentStages[pipelineId];
+
+            // stages set to null means it's done
+            if ( ! rCurrentStage.has_value() ) { continue; }
+
+            // don't advance stages when a lock exists on it
+            auto const findLock = [rCurrentStage, pipelineId] (StageLock const& lock)
+            {
+                return (lock.pipelineId == pipelineId) && (lock.stageId == rCurrentStage);
+            };
+            if (std::find_if(locksFirst, locksLast, findLock) != locksLast) { continue; }
+
+            nothingMoved = false;
+            rCurrentStage.value++;
+            if (rCurrentStage.value == rPltypeinfo.get(pipeline.type).stages.size())
+            {
+                rCurrentStage.value = 0; // loop around back to zero
+            }
+            if (rCurrentStage == pipeline.initialStage)
+            {
+                // looped around
+                rCurrentStage = {};
+                --pipelinesNotFinished;
+            }
+            else
+            {
+                rOut.steps.push_back({.pipelineId = pipelineId, .stageId = rCurrentStage, .time = time});
+                stageJustChanged.insert(pipelineId);
+            }
         }
 
-        out.pltreeDescendantCounts[pos] = descendantCount;
+    } while (!nothingMoved);
 
-        return descendantCount;
-    };
-
-    PipelineTreePos_t rootPos = 0;
-
-    for (PipelineId const pipeline : tasks.m_pipelineIds)
+    for (TaskId const taskId : tasks.taskIds)
     {
-        if ( ! plInTree.contains(pipeline) || tasks.m_pipelineParents[pipeline] != lgrn::id_null<PipelineId>())
+        if (alignsRemaining[taskId] != 0)
         {
-            continue; // Not in tree or not a root
+            if (std::find_if(locks.begin(), locks.end(),
+                             [taskId] (StageLock const& lock) { return lock.taskId == taskId; })
+                != locks.end())
+            {
+                rOut.failedLocked.push_back(taskId);
+            }
+            else
+            {
+                rOut.failedNotAdded.push_back(taskId);
+            }
         }
-
-        // For each root pipeline
-
-        PipelineCounts const& rRootCounts = plCounts[pipeline];
-
-        uint32_t const rootDescendantCount = add_subtree(add_subtree, pipeline, rRootCounts.firstChild, lgrn::id_null<PipelineTreePos_t>(), rootPos);
-
-        rootPos += 1 + rootDescendantCount;
     }
 
-    return out;
+    rOut.loopblks = std::move(loopblks);
+}
+
+std::string visualize_task_order(TaskOrderReport const& report, Tasks const& tasks)
+{
+    std::ostringstream os;
+    auto        it    = report.steps.begin();
+    auto const  &last = report.steps.end();
+    int         time  = 0;
+
+    int count = 0;
+    for(PipelineId const pipelineId : tasks.pipelineIds)
+    {
+        Pipeline const& pipeline = tasks.pipelineInst[pipelineId];
+        if (report.loopblks.contains(pipeline.block))
+        {
+            for (int i = 0; i < count; ++i)
+            {
+                os << "\U00002502 ";
+            }
+
+            os << "\U0000250D" << pipeline.name << "\n";
+            ++count;
+        }
+
+    }
+
+    osp::KeyedVec<PipelineId, StageId> stageChanges;
+
+    while(it != last)
+    {
+        stageChanges.clear();
+        stageChanges.resize(tasks.pipelineIds.capacity());
+        while(it != last && it->pipelineId.has_value() && it->time == time)
+        {
+            stageChanges[it->pipelineId] = it->stageId;
+            ++it;
+        }
+
+        for(PipelineId const pipelineId : tasks.pipelineIds)
+        {
+            if (report.loopblks.contains(tasks.pipelineInst[pipelineId].block))
+            {
+                StageId const stageChange = stageChanges[pipelineId];
+                if (stageChange.has_value())
+                {
+                    os << int(stageChange.value) << " ";
+                }
+                else
+                {
+                    os << "\U00002502 ";
+                }
+            }
+
+        }
+
+        os << "\n";
+
+        while(it != last && it->taskId.has_value() && it->time == time)
+        {
+            for(PipelineId const pipelineId : tasks.pipelineIds)
+            {
+                if (report.loopblks.contains(tasks.pipelineInst[pipelineId].block))
+                {
+                    if (tasks.pipelineInst[pipelineId].scheduleCondition == it->taskId)
+                    {
+                        os << "\U000025C9\U00002500";
+                    }
+                    else if (std::find_if(
+                                    tasks.syncs.begin(), tasks.syncs.end(),
+                                    [taskId = it->taskId, pipelineId] (TaskSyncToPipeline const& sync)
+                                    { return sync.task == taskId && sync.pipeline == pipelineId; })
+                             != tasks.syncs.end())
+                    {
+                        os << "\U000025CF\U00002500";
+                    }
+                    else
+                    {
+                        os << "\U0000253C\U00002500";
+                    }
+                }
+            }
+            os << "" <<  tasks.taskInst[it->taskId].debugName << "\n";
+            ++it;
+        }
+
+        ++time;
+
+    }
+
+    bool noError = report.failedLocked.empty() && report.failedNotAdded.empty();
+
+    if ( ! noError )
+    {
+        auto  const &pltypereg  = PipelineTypeIdReg::instance();
+
+        os << "Deadlocked tasks:\n";
+        for (TaskId const taskId : report.failedLocked)
+        {
+            for(PipelineId const pipelineId : tasks.pipelineIds)
+            {
+                if (report.loopblks.contains(tasks.pipelineInst[pipelineId].block))
+                {
+                    Pipeline const& pipeline = tasks.pipelineInst[pipelineId];
+                    if (pipeline.scheduleCondition == taskId)
+                    {
+                        auto const &pltype = pltypereg.get(pipeline.type);
+                        auto stageIndex = std::distance(
+                                std::find_if(pltype.stages.begin(), pltype.stages.end(),
+                                             [] (PipelineTypeInfo::StageInfo const &stage) { return stage.isSchedule; } ),
+                                pltype.stages.end());
+                        os << stageIndex << "\U00002500";
+                    }
+                    else if (auto const syncIt = std::find_if(
+                                    tasks.syncs.begin(), tasks.syncs.end(),
+                                    [taskId, pipelineId] (TaskSyncToPipeline const& sync)
+                                    { return sync.task == taskId && sync.pipeline == pipelineId; });
+                            syncIt != tasks.syncs.end())
+                    {
+                        StageId const lastStage = std::find_if(
+                                report.steps.rbegin(), report.steps.rend(),
+                                [pipelineId] (TaskOrderReport::Step const& step)
+                                { return step.pipelineId == pipelineId; })->stageId;
+                        if (lastStage == syncIt->stage)
+                        {
+                            os << "\U000025CF\U00002500";
+                        }
+                        else
+                        {
+                            os << int(syncIt->stage.value) << "\U00002500";
+                        }
+                    }
+                    else
+                    {
+                        os << "\U00002534\U00002500";
+                    }
+                }
+            }
+            os << tasks.taskInst[taskId].debugName << "\n";
+        }
+
+        os << "Not reached:\n";
+
+        for (TaskId const taskId : report.failedNotAdded)
+        {
+            for(PipelineId const pipelineId : tasks.pipelineIds)
+            {
+                if (report.loopblks.contains(tasks.pipelineInst[pipelineId].block))
+                {
+                    Pipeline const& pipeline = tasks.pipelineInst[pipelineId];
+                    if (pipeline.scheduleCondition == taskId)
+                    {
+                        auto const &pltype = pltypereg.get(pipeline.type);
+                        auto stageIndex = std::distance(
+                                std::find_if(pltype.stages.begin(), pltype.stages.end(),
+                                             [] (PipelineTypeInfo::StageInfo const &stage) { return stage.isSchedule; } ),
+                                pltype.stages.end());
+                        os << stageIndex << "\U00002500";
+                    }
+                    else if (auto const syncIt = std::find_if(
+                                    tasks.syncs.begin(), tasks.syncs.end(),
+                                    [taskId, pipelineId] (TaskSyncToPipeline const& sync)
+                                    { return sync.task == taskId && sync.pipeline == pipelineId; });
+                            syncIt != tasks.syncs.end())
+                    {
+                        os << int(syncIt->stage.value) << "\U00002500";
+                    }
+                    else
+                    {
+                        os << "\U00002534\U00002500";
+                    }
+                }
+            }
+            os << "" <<  tasks.taskInst[taskId].debugName << "\n";
+        }
+
+    }
+
+    return os.str();
 }
 
 } // namespace osp

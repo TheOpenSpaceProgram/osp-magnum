@@ -120,32 +120,6 @@ struct ACtxSceneRender
     ACtxSceneRender() = default;
     OSP_MOVE_ONLY_CTOR_ASSIGN(ACtxSceneRender);
 
-    void resize_draw()
-    {
-        std::size_t const size = m_drawIds.capacity();
-
-        m_opaque.resize(size);
-        m_transparent.resize(size);
-        m_visible.resize(size);
-
-        m_drawTransform .resize(size);
-        m_color         .resize(size, {1.0f, 1.0f, 1.0f, 1.0f}); // Default white
-        m_diffuseTex    .resize(size);
-        m_mesh          .resize(size);
-
-        for (MaterialId matId : m_materialIds)
-        {
-            m_materials[matId].m_ents.resize(size);
-        }
-    }
-
-    void resize_active(std::size_t const size)
-    {
-        m_needDrawTf.resize(size);
-        m_activeToDraw      .resize(size, lgrn::id_null<DrawEnt>());
-        drawTfObserverEnable.resize(size, 0);
-    }
-
     lgrn::IdRegistryStl<DrawEnt>            m_drawIds;
 
     DrawEntSet_t                            m_opaque;
@@ -153,15 +127,15 @@ struct ACtxSceneRender
     DrawEntSet_t                            m_visible;
     DrawEntColors_t                         m_color;
 
+    DrawTransforms_t                        m_drawTransform;
+
     active::ActiveEntSet_t                  m_needDrawTf;
     KeyedVec<active::ActiveEnt, DrawEnt>    m_activeToDraw;
-
     KeyedVec<active::ActiveEnt, uint16_t>   drawTfObserverEnable;
-    DrawTransforms_t                        m_drawTransform;
 
     // Meshes and textures assigned to DrawEnts
     KeyedVec<DrawEnt, TexIdOwner_t>         m_diffuseTex;
-    DrawEntVec_t                            m_diffuseDirty;
+    DrawEntVec_t                            m_diffuseTexDirty;
 
     KeyedVec<DrawEnt, MeshIdOwner_t>        m_mesh;
     DrawEntVec_t                            m_meshDirty;

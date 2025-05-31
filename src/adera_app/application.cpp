@@ -1,6 +1,6 @@
 /**
  * Open Space Program
- * Copyright © 2019-2024 Open Space Program Project
+ * Copyright © 2019-2025 Open Space Program Project
  *
  * MIT License
  *
@@ -22,43 +22,31 @@
  * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
  * SOFTWARE.
  */
- /**
- * @file
- * @brief Details about tasks used by the framework
- */
-#pragma once
+#include "application.h"
+#include "feature_interfaces.h"
 
-#include "../tasks/worker.h"
-#include "../core/strong_id.h"
-#include "../core/array_view.h"
+#include <osp/util/logging.h>
 
-#include <entt/core/any.hpp>
-
-#include <cstdint>
-#include <string>
-#include <vector>
-
-namespace osp::fw
+namespace adera
 {
 
-using DataId = osp::StrongId<std::uint32_t, struct DummyForDataId>;
-
-
-struct WorkerContext
+void run_cleanup(osp::fw::ContextId ctx, osp::fw::Framework &rFW, osp::fw::IExecutor &rExec)
 {
-    // TODO: maybe put something here? Thread info?
-};
+    auto const cleanup = rFW.get_interface<ftr_inter::FICleanupContext>(ctx);
+    if ( cleanup.id.has_value() )
+    {
+        // Run cleanup pipeline for the window context
+        rExec.task_finish(rFW, cleanup.tasks.blockSchedule);
+        rExec.wait(rFW);
 
-/**
- * @brief Task Implementation associated with each TaskId within the Framework.
- */
-struct TaskImpl
-{
-    using Func_t = TaskActions(*)(WorkerContext, ArrayView<entt::any>) noexcept;
+        if (rExec.is_running(rFW, cleanup.loopblks.cleanup))
+        {
+            OSP_LOG_CRITICAL("Deadlock in cleanup pipeline");
+            std::abort();
+        }
+    }
+}
 
-    std::vector<DataId>     args;
-    Func_t                  func    { nullptr };
-    bool                    externalFinish{false};
-};
 
-} // namespace osp
+} // namespace adera
+

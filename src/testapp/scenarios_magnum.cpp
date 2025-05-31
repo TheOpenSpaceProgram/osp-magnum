@@ -23,7 +23,6 @@
  * SOFTWARE.
  */
 #include "scenarios_magnum.h"
-#include "testapp.h"
 #include "MagnumWindowApp.h"
 #include "enginetest.h"
 #include "feature_interfaces.h"
@@ -42,6 +41,7 @@
 
 #include <adera/drawing/CameraController.h>
 
+#include <osp/util/logging.h>
 #include <osp/util/UserInputHandler.h>
 
 #include <Magnum/GL/DefaultFramebuffer.h>
@@ -77,7 +77,7 @@ FeatureDef const ftrEngineTestRenderer = feature_def("EngineTestRenderer", [] (
 
     rFB.task()
         .name       ("Update & Render Engine Test Scene")
-        .run_on     ({scn.pl.update(Run)})
+        .sync_with  ({scn.pl.update(Run)})
         .args       ({                   engineTest.di.bigStruct,                engineTestRndr.di.renderer,  magnum.di.renderGl,         magnum.di.magnumApp,      scn.di.deltaTimeIn  })
         .func       ([] (enginetest::EngineTestScene &rBigStruct, enginetest::EngineTestRenderer &rRenderer, RenderGL &rRenderGl, MagnumWindowApp &rMagnumApp, float const deltaTimeIn) noexcept
     {
@@ -86,9 +86,8 @@ FeatureDef const ftrEngineTestRenderer = feature_def("EngineTestRenderer", [] (
 });
 
 
-ContextId make_scene_renderer(TestApp &rTestApp, ContextId sceneCtx, ContextId windowCtx)
+ContextId make_scene_renderer(Framework &rFW, PkgId defaultPkg, ContextId mainContext, ContextId sceneCtx, ContextId windowCtx)
 {
-    Framework &rFW              = rTestApp.m_framework;
     auto const magnum           = rFW.get_interface<FIMagnum>         (windowCtx);
     auto       &rMagnumApp      = rFW.data_get<MagnumWindowApp>       (magnum.di.magnumApp);
 
@@ -97,7 +96,7 @@ ContextId make_scene_renderer(TestApp &rTestApp, ContextId sceneCtx, ContextId w
     // Choose which renderer features to use based on information on which features the scene
     // context contains.
 
-    ContextBuilder  scnRdrCB { scnRdrCtx, { rTestApp.m_mainContext, windowCtx, sceneCtx }, rFW };
+    ContextBuilder  scnRdrCB { scnRdrCtx, { mainContext, windowCtx, sceneCtx }, rFW };
 
     auto const engineTest = rFW.get_interface<FIEngineTest>(sceneCtx);
     if (engineTest.id.has_value())
@@ -113,6 +112,7 @@ ContextId make_scene_renderer(TestApp &rTestApp, ContextId sceneCtx, ContextId w
         return scnRdrCtx;
     }
 
+    scnRdrCB.add_feature(ftrCleanupCtx);
     scnRdrCB.add_feature(ftrSceneRenderer);
     scnRdrCB.add_feature(ftrMagnumScene);
 
@@ -128,6 +128,7 @@ ContextId make_scene_renderer(TestApp &rTestApp, ContextId sceneCtx, ContextId w
 
     scnRdrCB.add_feature(ftrCameraControl);
 
+
     if (rFW.get_interface_id<FIPhysShapes>(sceneCtx).has_value())
     {
         scnRdrCB.add_feature(ftrPhysicsShapesDraw, matPhong);
@@ -138,7 +139,7 @@ ContextId make_scene_renderer(TestApp &rTestApp, ContextId sceneCtx, ContextId w
     scnRdrCB.add_feature(ftrShaderFlat,         matFlat);
     scnRdrCB.add_feature(ftrShaderVisualizer,   matVisualizer);
 
-    scnRdrCB.add_feature(ftrCursor, TplPkgIdMaterialId{ rTestApp.m_defaultPkg, matFlat });
+    scnRdrCB.add_feature(ftrCursor, TplPkgIdMaterialId{ defaultPkg, matFlat });
 
     if (rFW.get_interface_id<FIPrefabs>(sceneCtx).has_value())
     {
@@ -150,12 +151,31 @@ ContextId make_scene_renderer(TestApp &rTestApp, ContextId sceneCtx, ContextId w
         scnRdrCB.add_feature(ftrVehicleControl);
         scnRdrCB.add_feature(ftrVehicleCamera);
         scnRdrCB.add_feature(ftrVehicleSpawnDraw);
+        scnRdrCB.add_feature(ftrCameraFree);
     }
     else
     {
         scnRdrCB.add_feature(ftrCameraFree);
     }
 
+    if (rFW.get_interface_id<FIRocketsJolt>(sceneCtx).has_value())
+    {
+        scnRdrCB.add_feature(ftrMagicRocketThrustIndicator, TplPkgIdMaterialId{ defaultPkg, matFlat });
+    }
+
+    if ( ! scnRdrCB.has_error() && rFW.get_interface_id<FITerrain>(sceneCtx).has_value() )
+    {
+        scnRdrCB.add_feature(ftrTerrainDebugDraw, matVisualizer);
+        scnRdrCB.add_feature(ftrTerrainDrawMagnum);
+
+        auto scnRender      = rFW.get_interface<FICameraControl>    (scnRdrCB.m_ctx);
+        auto &rCamCtrl      = rFW.data_get<ACtxCameraController>    (scnRender.di.camCtrl);
+
+        rCamCtrl.m_target = Vector3(0.0f, 0.0f, 0.0f);
+        rCamCtrl.m_orbitDistanceMin = 1.0f;
+        rCamCtrl.m_moveSpeed = 0.5f;
+    }
+/*
     if (rFW.get_interface_id<FIUniPlanets>(sceneCtx).has_value())
     {
         scnRdrCB.add_feature(ftrUniverseTestPlanetsDraw, PlanetDrawParams{
@@ -175,23 +195,7 @@ ContextId make_scene_renderer(TestApp &rTestApp, ContextId sceneCtx, ContextId w
         rCamCtrl.m_orbitDistance += 75000;
     }
 
-    if (rFW.get_interface_id<FIRocketsJolt>(sceneCtx).has_value())
-    {
-        scnRdrCB.add_feature(ftrMagicRocketThrustIndicator, TplPkgIdMaterialId{ rTestApp.m_defaultPkg, matFlat });
-    }
-
-    if ( ! scnRdrCB.has_error() && rFW.get_interface_id<FITerrain>(sceneCtx).has_value() )
-    {
-        scnRdrCB.add_feature(ftrTerrainDebugDraw, matVisualizer);
-        scnRdrCB.add_feature(ftrTerrainDrawMagnum);
-
-        auto scnRender      = rFW.get_interface<FICameraControl>    (scnRdrCB.m_ctx);
-        auto &rCamCtrl      = rFW.data_get<ACtxCameraController>    (scnRender.di.camCtrl);
-
-        rCamCtrl.m_target = Vector3(0.0f, 0.0f, 0.0f);
-        rCamCtrl.m_orbitDistanceMin = 1.0f;
-        rCamCtrl.m_moveSpeed = 0.5f;
-    }
+*/
 
     ContextBuilder::finalize(std::move(scnRdrCB));
     return scnRdrCtx;
@@ -206,40 +210,45 @@ class CommonMagnumApp : public MagnumWindowApp::IEvents
 {
 public:
 
-    CommonMagnumApp(TestApp &rTestApp) noexcept : m_rTestApp{rTestApp} { }
+    CommonMagnumApp() noexcept { }
 
+    // Called repeatedly by Magnum's main loop
     void draw(MagnumWindowApp& rApp, float delta) override
     {
-        // Called repeatedly by Magnum's main loop
-        m_rTestApp.drive_scene_cycle({.deltaTimeIn = 1.0f/60.0f,
-                          .update      = true,
-                          .sceneUpdate = true,
-                          .resync      = false,
-                          .sync        = true,
-                          .render      = true });
+        pExec->wait(*pFW);
+
+        if (pMainLoopCtrl->keepOpenWaiting)
+        {
+            auto const mainApp        = pFW->get_interface<FIMainApp>(mainContext);
+            pMainLoopCtrl->keepOpenWaiting = false;
+            pExec->task_finish(*pFW, mainApp.tasks.keepOpen, true, {.cancel = false});
+        }
     }
 
-private:
-    TestApp &m_rTestApp;
+    ContextId       mainContext;
+    Framework       *pFW            {nullptr};
+    IExecutor       *pExec          {nullptr};
+    MainLoopControl *pMainLoopCtrl  {nullptr};
 };
 
-void start_magnum_renderer(Framework &rFW, ContextId ctx, entt::any userData)
+
+void FWMCStartMagnumRenderer::run(Framework &rFW)
 {
-    TestApp    &rTestApp = entt::any_cast<TestApp&>(userData);
-    auto const mainApp   = rFW.get_interface<FIMainApp>(ctx);
+    auto const mainApp   = rFW.get_interface<FIMainApp>(m_mainCtx);
 
     ContextId const sceneCtx  = rFW.data_get<AppContexts>(mainApp.di.appContexts).scene;
     ContextId const windowCtx = rFW.m_contextIds.create();
 
-    ContextBuilder  windowCB { windowCtx, { ctx, sceneCtx }, rFW };
+    ContextBuilder  windowCB { windowCtx, { m_mainCtx, sceneCtx }, rFW };
+    windowCB.add_feature(adera::ftrCleanupCtx);
     windowCB.add_feature(adera::ftrWindowApp);
 
     // Adding this feature will open the GUI window
-    windowCB.add_feature(ftrMagnum, MagnumWindowApp::Arguments{rTestApp.m_argc, rTestApp.m_argv});
+    windowCB.add_feature(ftrMagnum, MagnumWindowApp::Arguments{m_argc, m_argv});
 
     ContextBuilder::finalize(std::move(windowCB));
 
-    ContextId const sceneRenderCtx = make_scene_renderer(rTestApp, sceneCtx, windowCtx);
+    ContextId const sceneRenderCtx = make_scene_renderer(rFW, m_defaultPkg, m_mainCtx, sceneCtx, windowCtx);
 
     auto &rAppCtxs = rFW.data_get<AppContexts>(mainApp.di.appContexts);
 
@@ -248,142 +257,129 @@ void start_magnum_renderer(Framework &rFW, ContextId ctx, entt::any userData)
 
     auto const magnum           = rFW.get_interface<FIMagnum>         (windowCtx);
     auto       &rMagnumApp      = rFW.data_get<MagnumWindowApp>       (magnum.di.magnumApp);
-    rMagnumApp.m_events = std::make_unique<CommonMagnumApp>(rTestApp);
+    rMagnumApp.m_events         = std::make_unique<CommonMagnumApp>();
 
-    main_loop_stack().push_back(
-            [&rTestApp, windowCtx, init = true] () mutable -> bool
-    {
-        Framework &rFW              = rTestApp.m_framework;
-        auto const mainApp          = rFW.get_interface<FIMainApp>        (rTestApp.m_mainContext);
+    auto const windowApp        = rFW.get_interface<FIWindowApp>      (rAppCtxs.window);
+    auto       &rWindowLoopCtrl = rFW.data_get<WindowAppLoopControl>  (windowApp.di.windowAppLoopCtrl);
 
-        ContextId const sceneRenderCtx = rFW.data_get<AppContexts>(mainApp.di.appContexts).sceneRender;
-
-        auto &rFWModify = rFW.data_get<FrameworkModify>(mainApp.di.frameworkModify);
-        if (init)
-        {
-            init = false;
-            // Resynchronize renderer; Resync+Sync without stepping through time.
-            // This makes sure meshes, textures, shaders, and other GPU-related resources specified by
-            // the scene are properly loaded and assigned to entities within the renderer.
-            rTestApp.drive_scene_cycle({.deltaTimeIn = 0.0f,
-                                  .update      = true,
-                                  .sceneUpdate = false,
-                                  .resync      = true,
-                                  .sync        = true,
-                                  .render      = false });
-        }
-        else if ( rFWModify.commands.empty() )
-        {
-            // calls CommonMagnumApp::draw()
-            auto const magnum           = rFW.get_interface<FIMagnum>         (windowCtx);
-            auto       &rMagnumApp      = rFW.data_get<MagnumWindowApp>       (magnum.di.magnumApp);
-
-            bool stayOpen = rMagnumApp.mainLoopIteration();
-
-            if ( ! stayOpen )
-            {
-                // Clear up some queues and stuff by update a few times without time
-                for (int i = 0; i < 2; ++i)
-                {
-                    rTestApp.drive_scene_cycle({.deltaTimeIn = 0.0f,
-                                      .update      = true,
-                                      .sceneUpdate = true,
-                                      .resync      = false,
-                                      .sync        = false,
-                                      .render      = false });
-                }
-
-                // Stops the pipeline loop
-                rTestApp.drive_scene_cycle({.deltaTimeIn = 0.0f,
-                                  .update      = false,
-                                  .sceneUpdate = false,
-                                  .resync      = false,
-                                  .sync        = false,
-                                  .render      = false });
-
-
-                if (rTestApp.m_pExecutor->is_running(rTestApp.m_framework))
-                {
-                    OSP_LOG_CRITICAL("Expected main loop to stop, but something is blocking it and cannot exit");
-                    std::abort();
-                }
-
-                rTestApp.run_context_cleanup(sceneRenderCtx);
-                rTestApp.run_context_cleanup(windowCtx);
-                rTestApp.m_framework.close_context(sceneRenderCtx);
-                rTestApp.m_framework.close_context(windowCtx);
-
-                // Reload and restart the main loop for the CLI
-                rTestApp.m_pExecutor->load(rTestApp.m_framework);
-                rTestApp.m_pExecutor->run(rTestApp.m_framework, mainApp.pl.mainLoop);
-
-                rFW.data_get<AppContexts>(mainApp.di.appContexts).window = {};
-
-                return false;
-            }
-        }
-        else
-        {
-            // Clear up some queues and stuff by update a few times without time
-            for (int i = 0; i < 2; ++i)
-            {
-                rTestApp.drive_scene_cycle({.deltaTimeIn = 0.0f,
-                                  .update      = true,
-                                  .sceneUpdate = true,
-                                  .resync      = false,
-                                  .sync        = false,
-                                  .render      = false });
-            }
-
-            // Stops the pipeline loop
-            rTestApp.drive_scene_cycle({.deltaTimeIn = 0.0f,
-                              .update      = false,
-                              .sceneUpdate = false,
-                              .resync      = false,
-                              .sync        = false,
-                              .render      = false });
-
-            rTestApp.run_context_cleanup(sceneRenderCtx);
-            rTestApp.m_framework.close_context(sceneRenderCtx);
-
-            // run commands
-            if (rTestApp.m_pExecutor->is_running(rFW))
-            {
-                OSP_LOG_CRITICAL("something is blocking the framework main loop from exiting. RIP");
-                std::abort();
-            }
-
-            for (FrameworkModify::Command &rCmd : rFWModify.commands)
-            {
-                rCmd.func(rFW, rCmd.ctx, std::move(rCmd.userData));
-            }
-            rFWModify.commands.clear();
-
-
-            ContextId const newSceneCtx = rFW.data_get<AppContexts>(mainApp.di.appContexts).scene;
-
-            ContextId const newSceneRenderCtx = make_scene_renderer(rTestApp, newSceneCtx, windowCtx);
-
-            rFW.data_get<AppContexts>(mainApp.di.appContexts).sceneRender = newSceneRenderCtx;
-
-            // Restart framework main loop
-            rTestApp.m_pExecutor->load(rFW);
-            rTestApp.m_pExecutor->run(rFW, mainApp.pl.mainLoop);
-
-            // Resync renderer
-            rTestApp.drive_scene_cycle({.deltaTimeIn = 0.0f,
-                      .update      = true,
-                      .sceneUpdate = false,
-                      .resync      = true,
-                      .sync        = true,
-                      .render      = false });
-        }
-
-
-        return true;
-    });
+    rWindowLoopCtrl.doRender = true;
+    rWindowLoopCtrl.doResync = true;
+    rWindowLoopCtrl.doSync   = true;
 }
 
 
+IMainLoopFunc::Status MagnumMainLoop::run(osp::fw::Framework &rFW, osp::fw::IExecutor &rExecutor)
+{
+    IMainLoopFunc::Status status;
+
+    auto const mainApp        = rFW.get_interface<FIMainApp>   (m_mainCtx);
+    auto       &appContexts   = rFW.data_get<AppContexts>      (mainApp.di.appContexts);
+    auto const windowApp      = rFW.get_interface<FIWindowApp> (appContexts.window);
+    auto const magnum         = rFW.get_interface<FIMagnum>    (appContexts.window);
+    auto       &rMainLoopCtrl = rFW.data_get<MainLoopControl&> (mainApp.di.mainLoopCtrl);
+    auto       &rWindowLoopCtrl = rFW.data_get<WindowAppLoopControl>  (windowApp.di.windowAppLoopCtrl);
+    auto       &rFWModify     = rFW.data_get<FrameworkModify&> (mainApp.di.frameworkModify);
+    auto       &rMagnumApp    = rFW.data_get<MagnumWindowApp>  (magnum.di.magnumApp);
+
+    bool stopMainLoop = false;
+    bool closeWindow  = false;
+
+    if (rFWModify.commands.empty())
+    {
+        CommonMagnumApp &rCommonMagnumApp = *static_cast<CommonMagnumApp*>(rMagnumApp.m_events.get());
+        rCommonMagnumApp.mainContext    = m_mainCtx;
+        rCommonMagnumApp.pFW            = &rFW;
+        rCommonMagnumApp.pExec          = &rExecutor;
+        rCommonMagnumApp.pMainLoopCtrl  = &rMainLoopCtrl;
+
+        bool const stayOpen = rMagnumApp.mainLoopIteration();
+
+        if (!stayOpen)
+        {
+            stopMainLoop  = true;
+            closeWindow  = true;
+        }
+    }
+    else
+    {
+        stopMainLoop = true;
+    }
+
+    if (stopMainLoop)
+    {
+        auto &rWindowLoopCtrl = rFW.data_get<WindowAppLoopControl>   (windowApp.di.windowAppLoopCtrl);
+
+        rWindowLoopCtrl.doRender = false;
+        rWindowLoopCtrl.doResync = false;
+        rWindowLoopCtrl.doSync   = false;
+
+        while (!rMainLoopCtrl.mainScheduleWaiting)
+        {
+            rExecutor.wait(rFW);
+
+            if (rMainLoopCtrl.keepOpenWaiting)
+            {
+                rMainLoopCtrl.keepOpenWaiting = false;
+                rExecutor.task_finish(rFW, mainApp.tasks.keepOpen, true, {.cancel = true});
+                rExecutor.wait(rFW);
+            }
+        }
+
+        if (rExecutor.is_running(rFW, mainApp.loopblks.mainLoop))
+        {
+            OSP_LOG_CRITICAL("something is blocking the framework main loop from exiting. RIP");
+            std::abort();
+        }
+
+        run_cleanup(appContexts.sceneRender, rFW, rExecutor);
+        rFW.close_context(appContexts.sceneRender);
+        appContexts.sceneRender = {};
+    }
+
+    if (closeWindow)
+    {
+        run_cleanup(appContexts.window, rFW, rExecutor);
+        rFW.close_context(appContexts.window);
+        appContexts.window = {};
+
+        status.exit = true;
+    }
+
+    if (stopMainLoop)
+    {
+        for (std::unique_ptr<IFrameworkModifyCommand> &pCmd : rFWModify.commands)
+        {
+            pCmd->run(rFW);
+
+            std::unique_ptr<IMainLoopFunc> newMainLoop = pCmd->main_loop();
+
+            if (newMainLoop != nullptr)
+            {
+                LGRN_ASSERTM(status.pushNew == nullptr,
+                             "multiple framework modify are fighting to add main loop function");
+                status.pushNew = std::move(newMainLoop);
+            }
+        }
+        rFWModify.commands.clear();
+
+        if ( ! closeWindow )
+        {
+            appContexts.sceneRender = make_scene_renderer(rFW, m_defaultPkg, m_mainCtx, appContexts.scene, appContexts.window);
+        }
+
+        // Restart framework main loop
+        rExecutor.load(rFW);
+        LGRN_ASSERT(rMainLoopCtrl.mainScheduleWaiting);
+        rExecutor.task_finish(rFW, mainApp.tasks.schedule, true, {.cancel = false});
+        rMainLoopCtrl.mainScheduleWaiting = false;
+
+        rWindowLoopCtrl.doRender = true;
+        rWindowLoopCtrl.doResync = true;
+        rWindowLoopCtrl.doSync   = true;
+    }
+
+
+    return status;
+}
 
 } // namespace testapp

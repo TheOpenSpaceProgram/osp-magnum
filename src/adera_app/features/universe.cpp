@@ -46,6 +46,7 @@ using namespace osp;
 
 namespace adera
 {
+#if 0  // SYNCEXEC
 
 // Universe Scenario
 
@@ -362,7 +363,7 @@ FeatureDef const ftrUniverseTestPlanetsDraw = feature_def("UniverseTestPlanetsDr
     rFB.task()
         .name       ("Resync test planets, add mesh and material")
         .run_on     ({windowApp.pl.resync(Run)})
-        .sync_with  ({scnRender.pl.drawEntResized(Done), scnRender.pl.materialDirty(Modify_), scnRender.pl.entMeshDirty(Modify_)})
+        .sync_with  ({scnRender.pl.drawEntResized(Done), scnRender.pl.materialDirty(Modify_), scnRender.pl.meshDirty(Modify_)})
         .args       ({       comScn.di.drawing,      scnRender.di.scnRender,     comScn.di.namedMeshes, uniPlanetsDraw.di.planetDraw, uniCore.di.universe,   uniPlanets.di.planetMainSpace})
         .func       ([] (ACtxDrawing& rDrawing, ACtxSceneRender& rScnRender, NamedMeshes& rNamedMeshes,      PlanetDraw& rPlanetDraw, Universe& rUniverse, CoSpaceId const planetMainSpace) noexcept
     {
@@ -411,7 +412,7 @@ FeatureDef const ftrUniverseTestPlanetsDraw = feature_def("UniverseTestPlanetsDr
     rFB.task()
         .name       ("Reposition test planet DrawEnts")
         .run_on     ({scnRender.pl.render(Run)})
-        .sync_with  ({scnRender.pl.drawTransforms(Modify_), scnRender.pl.drawEntResized(Done), camCtrl.pl.camCtrl(Ready), uniScnFrame.pl.sceneFrame(Modify)})
+        .sync_with  ({scnRender.pl.drawTransforms(Modify), scnRender.pl.drawEntResized(Done), camCtrl.pl.camCtrl(Ready), uniScnFrame.pl.sceneFrame(Modify)})
         .args       ({       comScn.di.drawing,      scnRender.di.scnRender, uniPlanetsDraw.di.planetDraw, uniCore.di.universe,     uniScnFrame.di.scnFrame,   uniPlanets.di.planetMainSpace})
         .func       ([] (ACtxDrawing& rDrawing, ACtxSceneRender& rScnRender,      PlanetDraw& rPlanetDraw, Universe& rUniverse, SceneFrame const& rScnFrame, CoSpaceId const planetMainSpace) noexcept
     {
@@ -756,7 +757,7 @@ FeatureDef const ftrSolarSystemDraw = feature_def("SolarSystemDraw", [] (
     rFB.task()
         .name       ("Resync test planets, add mesh and material")
         .run_on     ({ windowApp.pl.resync(Run) })
-        .sync_with  ({ scnRender.pl.drawEntResized(Done), scnRender.pl.materialDirty(Modify_), scnRender.pl.entMeshDirty(Modify_) })
+        .sync_with  ({ scnRender.pl.drawEntResized(Done), scnRender.pl.materialDirty(Modify_), scnRender.pl.meshDirty(Modify_) })
         .args       ({      comScn.di.drawing,      scnRender.di.scnRender,     comScn.di.namedMeshes, uniPlanetsDraw.di.planetDraw, uniCore.di.universe,     solarSys.di.planetMainSpace,                              solarSys.di.coordNBody })
         .func       ([](ACtxDrawing& rDrawing, ACtxSceneRender& rScnRender, NamedMeshes& rNamedMeshes,      PlanetDraw& rPlanetDraw, Universe& rUniverse, CoSpaceId const planetMainSpace, osp::KeyedVec<CoSpaceId, CoSpaceNBody>& rCoordNBody) noexcept
     {
@@ -787,7 +788,7 @@ FeatureDef const ftrSolarSystemDraw = feature_def("SolarSystemDraw", [] (
     rFB.task()
         .name       ("Reposition test planet DrawEnts")
         .run_on     ({ scnRender.pl.render(Run) })
-        .sync_with  ({ scnRender.pl.drawTransforms(Modify_), scnRender.pl.drawEntResized(Done), camCtrl.pl.camCtrl(Ready), uniScnFrame.pl.sceneFrame(Modify) })
+        .sync_with  ({ scnRender.pl.drawTransforms(Modify), scnRender.pl.drawEntResized(Done), camCtrl.pl.camCtrl(Ready), uniScnFrame.pl.sceneFrame(Modify) })
         .args       ({       comScn.di.drawing,      scnRender.di.scnRender, uniPlanetsDraw.di.planetDraw, uniCore.di.universe,     uniScnFrame.di.scnFrame,     solarSys.di.planetMainSpace,                              solarSys.di.coordNBody })
         .func       ([] (ACtxDrawing& rDrawing, ACtxSceneRender& rScnRender,      PlanetDraw& rPlanetDraw, Universe& rUniverse, SceneFrame const& rScnFrame, CoSpaceId const planetMainSpace, osp::KeyedVec<CoSpaceId, CoSpaceNBody>& rCoordNBody) noexcept
     {
@@ -841,5 +842,5 @@ FeatureDef const ftrSolarSystemDraw = feature_def("SolarSystemDraw", [] (
     });
 }); // ftrSolarSystemDraw
 
-
+#endif
 } // namespace adera

@@ -42,21 +42,17 @@ public:
     static void init_drawents(
             ACtxPrefabs&                rPrefabs,
             Resources&                  rResources,
-            ACtxBasic const&            rBasic,
-            ACtxDrawing&                rDrawing,
             ACtxSceneRender&            rScnRender);
 
     static void resync_drawents(
             ACtxPrefabs&                rPrefabs,
             Resources&                  rResources,
             ACtxBasic const&            rBasic,
-            ACtxDrawing&                rDrawing,
             ACtxSceneRender&            rScnRender);
 
     static void init_mesh_texture_material(
             ACtxPrefabs&                rPrefabs,
             Resources&                  rResources,
-            ACtxBasic const&            rBasic,
             ACtxDrawing&                rDrawing,
             ACtxDrawingRes&             rDrawingRes,
             ACtxSceneRender&            rScnRender,
