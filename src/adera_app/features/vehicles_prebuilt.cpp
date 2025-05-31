@@ -43,7 +43,6 @@ using osp::restypes::gc_importer;
 namespace adera
 {
 
-#if 0  // SYNCEXEC
 
 Matrix4 quick_transform(Vector3 const pos, Quaternion const rot) noexcept
 {
@@ -203,7 +202,7 @@ FeatureDef const ftrPrebuiltVehicles = feature_def("PrebuiltVehicles", [] (
 
     rFB.task()
         .name       ("Clean up prebuilt vehicles")
-        .run_on     ({cleanup.pl.cleanup(Run_)})
+        .sync_with  ({cleanup.pl.cleanup(Run_)})
         .args       ({         testVhcls.di.prebuiltVehicles,  mainApp.di.resources})
         .func       ([] (PrebuiltVehicles &rPrebuildVehicles, Resources& rResources) noexcept
     {
@@ -222,6 +221,5 @@ FeatureDef const ftrPrebuiltVehicles = feature_def("PrebuiltVehicles", [] (
 
 }); // setup_prebuilt_vehicles
 
-#endif
 
 } // namespace adera

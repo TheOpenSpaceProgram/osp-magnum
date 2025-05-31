@@ -90,12 +90,13 @@ void SysJolt::update_world(
     BodyInterface &bodyInterface = pJoltWorld->GetBodyInterface();
 
     // Apply changed velocities
-    for (auto const& [ent, vel] : std::exchange(rCtxPhys.m_setVelocity, {}))
+    for (auto const& [ent, vel] : rCtxPhys.m_setVelocity)
     {
         JPH::BodyID const bodyId     = BToJolt(rCtxWorld.m_entToBody.at(ent));
 
         bodyInterface.SetLinearVelocity(bodyId, Vec3MagnumToJolt(vel));
     }
+    rCtxPhys.m_setVelocity.clear();
 
     rCtxWorld.m_pTransform = std::addressof(rTf);
 

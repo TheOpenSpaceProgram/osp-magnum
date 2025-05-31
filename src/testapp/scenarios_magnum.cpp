@@ -148,13 +148,32 @@ ContextId make_scene_renderer(Framework &rFW, PkgId defaultPkg, ContextId mainCo
 
     if (rFW.get_interface_id<FIVehicleSpawn>(sceneCtx).has_value())
     {
-        //scnRdrCB.add_feature(ftrVehicleControl);
-        //scnRdrCB.add_feature(ftrVehicleCamera);
-        //scnRdrCB.add_feature(ftrVehicleSpawnDraw);
+        scnRdrCB.add_feature(ftrVehicleControl);
+        scnRdrCB.add_feature(ftrVehicleCamera);
+        scnRdrCB.add_feature(ftrVehicleSpawnDraw);
+        scnRdrCB.add_feature(ftrCameraFree);
     }
     else
     {
         scnRdrCB.add_feature(ftrCameraFree);
+    }
+
+    if (rFW.get_interface_id<FIRocketsJolt>(sceneCtx).has_value())
+    {
+        scnRdrCB.add_feature(ftrMagicRocketThrustIndicator, TplPkgIdMaterialId{ defaultPkg, matFlat });
+    }
+
+    if ( ! scnRdrCB.has_error() && rFW.get_interface_id<FITerrain>(sceneCtx).has_value() )
+    {
+        scnRdrCB.add_feature(ftrTerrainDebugDraw, matVisualizer);
+        scnRdrCB.add_feature(ftrTerrainDrawMagnum);
+
+        auto scnRender      = rFW.get_interface<FICameraControl>    (scnRdrCB.m_ctx);
+        auto &rCamCtrl      = rFW.data_get<ACtxCameraController>    (scnRender.di.camCtrl);
+
+        rCamCtrl.m_target = Vector3(0.0f, 0.0f, 0.0f);
+        rCamCtrl.m_orbitDistanceMin = 1.0f;
+        rCamCtrl.m_moveSpeed = 0.5f;
     }
 /*
     if (rFW.get_interface_id<FIUniPlanets>(sceneCtx).has_value())
@@ -176,23 +195,7 @@ ContextId make_scene_renderer(Framework &rFW, PkgId defaultPkg, ContextId mainCo
         rCamCtrl.m_orbitDistance += 75000;
     }
 
-    if (rFW.get_interface_id<FIRocketsJolt>(sceneCtx).has_value())
-    {
-        scnRdrCB.add_feature(ftrMagicRocketThrustIndicator, TplPkgIdMaterialId{ defaultPkg, matFlat });
-    }
-
-    if ( ! scnRdrCB.has_error() && rFW.get_interface_id<FITerrain>(sceneCtx).has_value() )
-    {
-        scnRdrCB.add_feature(ftrTerrainDebugDraw, matVisualizer);
-        scnRdrCB.add_feature(ftrTerrainDrawMagnum);
-
-        auto scnRender      = rFW.get_interface<FICameraControl>    (scnRdrCB.m_ctx);
-        auto &rCamCtrl      = rFW.data_get<ACtxCameraController>    (scnRender.di.camCtrl);
-
-        rCamCtrl.m_target = Vector3(0.0f, 0.0f, 0.0f);
-        rCamCtrl.m_orbitDistanceMin = 1.0f;
-        rCamCtrl.m_moveSpeed = 0.5f;
-    }*/
+*/
 
     ContextBuilder::finalize(std::move(scnRdrCB));
     return scnRdrCtx;

@@ -93,8 +93,6 @@ FeatureDef const ftrPhysicsShapes = feature_def("PhysicsShapes", [] (
 
     rFB.data_emplace< ACtxPhysShapes > (physShapes.di.physShapes);
 
-    // TODO: format after framework changes
-
     rFB.task()
         .name       ("Schedule Shape spawn")
         .schedules  (physShapes.pl.spawnRequest)
@@ -183,6 +181,18 @@ FeatureDef const ftrPhysicsShapes = feature_def("PhysicsShapes", [] (
     });
 
     rFB.task()
+        .name       ("Remove deleted ActiveEnts from ACtxPhysShapes")
+        .sync_with  ({comScn.pl.activeEntDelete(UseOrRun), physShapes.pl.ownedEnts(Delete)})
+        .args       ({      physShapes.di.physShapes,              comScn.di.activeEntDel })
+        .func       ([] (ACtxPhysShapes &rPhysShapes, ActiveEntVec_t const &rActiveEntDel) noexcept
+    {
+        for (ActiveEnt const deleted : rActiveEntDel)
+        {
+            rPhysShapes.ownedEnts.erase(deleted);
+        }
+    });
+
+    rFB.task()
         .name       ("Clear Shape Spawning vector after use")
         .sync_with  ({physShapes.pl.spawnRequest(Clear)})
         .args       ({      physShapes.di.physShapes })
@@ -233,7 +243,8 @@ FeatureDef const ftrPhysicsShapesDraw = feature_def("PhysicsShapesDraw", [] (
 
     rFB.task()
         .name       ("Add mesh and material to spawned shapes")
-        .sync_with  ({physShapes.pl.spawnRequest(UseOrRun), physShapes.pl.spawnedEnts(UseOrRun),
+        .sync_with  ({physShapes.pl.spawnRequest(UseOrRun),  physShapes.pl.spawnedEnts(UseOrRun),
+                      comScn.pl.meshToRes(New),
                       scnRender.pl.mesh(New), scnRender.pl.material(New), scnRender.pl.activeDrawTfs(New),
                       scnRender.pl.materialDirty(Modify_), scnRender.pl.meshDirty(Modify_)})
         .args       ({           comScn.di.basic,     comScn.di.drawing,      scnRender.di.scnRender,    physShapes.di.physShapes,     comScn.di.namedMeshes, physShapesDraw.di.material })
@@ -285,6 +296,7 @@ FeatureDef const ftrPhysicsShapesDraw = feature_def("PhysicsShapesDraw", [] (
     rFB.task()
         .name       ("Resync spawned shapes mesh and material")
         .sync_with  ({windowApp.pl.resync(Run), physShapes.pl.ownedEnts(Ready),
+                      comScn.pl.meshToRes(New),
                       scnRender.pl.activeDrawTfs(Modify),
                       scnRender.pl.material(New),          scnRender.pl.mesh(New),
                       scnRender.pl.materialDirty(Modify_), scnRender.pl.meshDirty(Modify_)})
@@ -315,18 +327,6 @@ FeatureDef const ftrPhysicsShapesDraw = feature_def("PhysicsShapesDraw", [] (
 
             rScnRender.m_visible.insert(drawEnt);
             rScnRender.m_opaque.insert(drawEnt);
-        }
-    });
-
-    rFB.task()
-        .name       ("Remove deleted ActiveEnts from ACtxPhysShapes")
-        .sync_with  ({comScn.pl.activeEntDelete(UseOrRun), physShapes.pl.ownedEnts(Modify)})
-        .args       ({      physShapes.di.physShapes,              comScn.di.activeEntDel })
-        .func       ([] (ACtxPhysShapes &rPhysShapes, ActiveEntVec_t const &rActiveEntDel) noexcept
-    {
-        for (ActiveEnt const deleted : rActiveEntDel)
-        {
-            rPhysShapes.ownedEnts.erase(deleted);
         }
     });
 }); // setup_phys_shapes_draw
@@ -441,8 +441,8 @@ FeatureDef const ftrBounds = feature_def("Bounds", [] (
         DependOn<FICommonScene>     comScn,
         DependOn<FIPhysShapes>      physShapes)
 {
-    rFB.pipeline(bounds.pl.boundsSet)     .parent(mainApp.loopblks.mainLoop);
-    rFB.pipeline(bounds.pl.outOfBounds)   .parent(mainApp.loopblks.mainLoop);
+    rFB.pipeline(bounds.pl.boundsSet)     .parent(mainApp.loopblks.mainLoop).initial_stage(Delete);
+    rFB.pipeline(bounds.pl.outOfBounds)   .parent(mainApp.loopblks.mainLoop);//.initial_stage(UseOrRun);
 
     rFB.data_emplace< ActiveEntSet_t >       (bounds.di.bounds);
     rFB.data_emplace< ActiveEntVec_t >       (bounds.di.outOfBounds);
@@ -464,12 +464,20 @@ FeatureDef const ftrBounds = feature_def("Bounds", [] (
     });
 
     rFB.task()
-        .name       ("Queue-Delete out-of-bounds entities")
-        .sync_with  ({bounds.pl.outOfBounds(UseOrRun), comScn.pl.activeEntDelete(Modify_), comScn.pl.hierarchy(Delete)})
-        .args       ({     comScn.di.basic,        comScn.di.activeEntDel,        bounds.di.outOfBounds })
-        .func       ([] (ACtxBasic &rBasic, ActiveEntVec_t &rActiveEntDel, ActiveEntVec_t &rOutOfBounds) noexcept
+        .name       ("Delete out-of-bounds entities")
+        .sync_with  ({bounds.pl.outOfBounds(UseOrRun), comScn.pl.activeEntDelete(Modify_), comScn.pl.subtreeRootDel(Modify_), comScn.pl.hierarchy(Ready)})
+        .args       ({     comScn.di.basic,        comScn.di.activeEntDel,        comScn.di.subtreeRootDel,         bounds.di.outOfBounds })
+        .func       ([] (ACtxBasic &rBasic, ActiveEntVec_t &rActiveEntDel, ActiveEntVec_t &rSubtreeRootDel,  ActiveEntVec_t &rOutOfBounds) noexcept
     {
-        SysSceneGraph::queue_delete_entities(rBasic.m_scnGraph, rActiveEntDel, rOutOfBounds.begin(), rOutOfBounds.end());
+        for (ActiveEnt const root : rOutOfBounds)
+        {
+            rActiveEntDel  .push_back(root);
+            rSubtreeRootDel.push_back(root);
+            for (ActiveEnt const descendent : SysSceneGraph::descendants(rBasic.m_scnGraph, root))
+            {
+                rActiveEntDel.push_back(descendent);
+            }
+        }
     });
 
     rFB.task()

@@ -53,21 +53,21 @@ using namespace planeta;
 namespace adera
 {
 
-#if 0  // SYNCEXEC
 
 FeatureDef const ftrTerrain = feature_def("Terrain", [] (
         FeatureBuilder              &rFB,
         Implement<FITerrain>        terrain,
         DependOn<FICleanupContext>  cleanup,
+        DependOn<FIMainApp>         mainApp,
         DependOn<FIScene>           scn,
         DependOn<FICommonScene>     comScn)
 {
     auto &rDrawing = rFB.data_get<ACtxDrawing>(comScn.di.drawing);
 
-    rFB.pipeline(terrain.pl.skeleton)       .parent(scn.pl.update);
-    rFB.pipeline(terrain.pl.surfaceChanges) .parent(scn.pl.update);
-    rFB.pipeline(terrain.pl.terrainFrame)   .parent(scn.pl.update);
-    rFB.pipeline(terrain.pl.chunkMesh)      .parent(scn.pl.update);
+    rFB.pipeline(terrain.pl.skeleton)       .parent(mainApp.loopblks.mainLoop);
+    rFB.pipeline(terrain.pl.surfaceChanges) .parent(mainApp.loopblks.mainLoop);
+    rFB.pipeline(terrain.pl.terrainFrame)   .parent(mainApp.loopblks.mainLoop);
+    rFB.pipeline(terrain.pl.chunkMesh)      .parent(mainApp.loopblks.mainLoop);
 
     auto &rTerrainFrame = rFB.data_emplace< ACtxTerrainFrame >(terrain.di.terrainFrame);
     auto &rTerrain      = rFB.data_emplace< ACtxTerrain >     (terrain.di.terrain);
@@ -76,9 +76,9 @@ FeatureDef const ftrTerrain = feature_def("Terrain", [] (
 
     rFB.task()
         .name       ("Clear surfaceAdded & surfaceRemoved once we're done with it")
-        .run_on     ({terrain.pl.surfaceChanges(Clear)})
-        .args({               terrain.di.terrain })
-        .func([] (ACtxTerrain &rTerrain) noexcept
+        .sync_with  ({terrain.pl.surfaceChanges(Clear)})
+        .args       ({      terrain.di.terrain })
+        .func       ([] (ACtxTerrain &rTerrain) noexcept
     {
         rTerrain.scratchpad.surfaceAdded  .clear();
         rTerrain.scratchpad.surfaceRemoved.clear();
@@ -86,9 +86,9 @@ FeatureDef const ftrTerrain = feature_def("Terrain", [] (
 
     rFB.task()
         .name       ("Clean up terrain-related IdOwners")
-        .run_on     ({cleanup.pl.cleanup(Run_)})
-        .args       ({        terrain.di.terrain,             comScn.di.drawing})
-        .func([] (ACtxTerrain &rTerrain, ACtxDrawing &rDrawing) noexcept
+        .sync_with  ({cleanup.pl.cleanup(Run_)})
+        .args       ({      terrain.di.terrain,     comScn.di.drawing})
+        .func       ([] (ACtxTerrain &rTerrain, ACtxDrawing &rDrawing) noexcept
     {
         // rTerrain.skChunks has owners referring to rTerrain.skeleton. A reference to
         // rTerrain.skeleton can't be obtained during destruction, we must clear it separately.
@@ -120,10 +120,9 @@ FeatureDef const ftrTerrainSubdivDist = feature_def("TerrainSubdivDist", [] (
 {
     rFB.task()
         .name       ("Subdivide triangle skeleton")
-        .run_on     ({scn.pl.update(Run)})
         .sync_with  ({terrain.pl.terrainFrame(Ready), terrain.pl.skeleton(New), terrain.pl.surfaceChanges(Resize)})
-        .args({                    terrain.di.terrainFrame,             terrain.di.terrain,                terrainIco.di.terrainIco })
-        .func([] (ACtxTerrainFrame &rTerrainFrame, ACtxTerrain &rTerrain, ACtxTerrainIco &rTerrainIco) noexcept
+        .args       ({           terrain.di.terrainFrame,    terrain.di.terrain,    terrainIco.di.terrainIco })
+        .func       ([] (ACtxTerrainFrame &rTerrainFrame, ACtxTerrain &rTerrain, ACtxTerrainIco &rTerrainIco) noexcept
     {
         if ( ! rTerrainFrame.active )
         {
@@ -184,10 +183,9 @@ FeatureDef const ftrTerrainSubdivDist = feature_def("TerrainSubdivDist", [] (
 
     rFB.task()
         .name       ("Update Terrain Chunks")
-        .run_on     ({scn.pl.update(Run)})
         .sync_with  ({terrain.pl.terrainFrame(Ready), terrain.pl.skeleton(Ready), terrain.pl.surfaceChanges(UseOrRun), terrain.pl.chunkMesh(Modify)})
-        .args({                    terrain.di.terrainFrame,             terrain.di.terrain,                terrainIco.di.terrainIco })
-        .func([] (ACtxTerrainFrame &rTerrainFrame, ACtxTerrain &rTerrain, ACtxTerrainIco &rTerrainIco) noexcept
+        .args       ({           terrain.di.terrainFrame,    terrain.di.terrain,    terrainIco.di.terrainIco })
+        .func       ([] (ACtxTerrainFrame &rTerrainFrame, ACtxTerrain &rTerrain, ACtxTerrainIco &rTerrainIco) noexcept
     {
         if ( ! rTerrainFrame.active )
         {
@@ -625,7 +623,12 @@ FeatureDef const ftrTerrainDebugDraw = feature_def("TerrainDebugDraw", [] (
     auto &rTerrain   = rFB.data_get< ACtxTerrain >       (terrain.di.terrain);
 
     rTrnDbgDraw.surface = rScnRender.m_drawIds.create();
-    rScnRender.resize_draw();
+
+    auto const drawEntCapacity = rScnRender.m_drawIds.capacity();
+    rScnRender.m_visible              .resize(drawEntCapacity);
+    rScnRender.m_opaque               .resize(drawEntCapacity);
+    rScnRender.m_materials[mat].m_ents.resize(drawEntCapacity);
+    rScnRender.m_mesh                 .resize(drawEntCapacity);
 
     rScnRender.m_visible.insert(rTrnDbgDraw.surface);
     rScnRender.m_opaque .insert(rTrnDbgDraw.surface);
@@ -635,10 +638,9 @@ FeatureDef const ftrTerrainDebugDraw = feature_def("TerrainDebugDraw", [] (
 
     rFB.task()
         .name       ("Handle Scene<-->Terrain positioning and floating origin")
-        .run_on     ({scn.pl.update(Run)})
         .sync_with  ({camCtrl.pl.camCtrl(Modify), terrain.pl.terrainFrame(Modify)})
-        .args       ({                 camCtrl.di.camCtrl,           scn.di.deltaTimeIn,                  terrain.di.terrainFrame,             terrain.di.terrain,                terrainIco.di.terrainIco })
-        .func([] (ACtxCameraController& rCamCtrl, float const deltaTimeIn, ACtxTerrainFrame &rTerrainFrame, ACtxTerrain &rTerrain, ACtxTerrainIco &rTerrainIco) noexcept
+        .args       ({               camCtrl.di.camCtrl,      scn.di.deltaTimeIn,         terrain.di.terrainFrame,    terrain.di.terrain,    terrainIco.di.terrainIco })
+        .func       ([] (ACtxCameraController& rCamCtrl, float const deltaTimeIn, ACtxTerrainFrame &rTerrainFrame, ACtxTerrain &rTerrain, ACtxTerrainIco &rTerrainIco) noexcept
     {
         using Magnum::Math::abs;
         using Magnum::Math::cross;
@@ -715,9 +717,8 @@ FeatureDef const ftrTerrainDebugDraw = feature_def("TerrainDebugDraw", [] (
 
     rFB.task()
         .name       ("Reposition terrain surface mesh")
-        .run_on     ({scnRender.pl.render(Run)})
-        .sync_with  ({terrain.pl.terrainFrame(Ready), terrain.pl.chunkMesh(Ready), scnRender.pl.drawIds(Ready), scnRender.pl.drawTransforms(Modify), scnRender.pl.drawEntResized(Done)})
-        .args       ({    terrainDbgDraw.di.draw,                  terrain.di.terrainFrame,             terrain.di.terrain,                 scnRender.di.scnRender })
+        .sync_with  ({scnRender.pl.render(Run), terrain.pl.terrainFrame(Ready), terrain.pl.chunkMesh(Ready), scnRender.pl.drawEnt(Ready), scnRender.pl.drawTransforms(Modify)})
+        .args       ({    terrainDbgDraw.di.draw,         terrain.di.terrainFrame,    terrain.di.terrain,     scnRender.di.scnRender })
         .func       ([] (TerrainDebugDraw& rDraw, ACtxTerrainFrame &rTerrainFrame, ACtxTerrain &rTerrain, ACtxSceneRender &rScnRender) noexcept
     {
         float const scale = std::exp2(float(rTerrain.skData.precision));
@@ -816,7 +817,5 @@ FeatureDef const ftrTerrainDebugDraw = feature_def("TerrainDebugDraw", [] (
 
 }); // ftrTerrainDebugDraw
 
-
-#endif
 
 } // namespace adera

@@ -25,8 +25,10 @@
 #pragma once
 
 #include "../core/array_view.h"
+#include "../core/copymove_macros.h"
 #include "../core/global_id.h"
 #include "../core/keyed_vector.h"
+
 
 #include <longeron/containers/intarray_multimap.hpp>
 #include <longeron/containers/bit_view.hpp>

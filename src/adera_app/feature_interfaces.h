@@ -95,8 +95,10 @@ enum class EStgCont : uint8_t
 
     ScheduleC   = 4,
 
-    Ready       = 5
+    Ready       = 5,
     ///< Container is ready to use
+
+    ReadyWorkaround = 6,
 };
 inline osp::PipelineTypeInfo const gc_infoForEStgCont
 {
@@ -107,9 +109,10 @@ inline osp::PipelineTypeInfo const gc_infoForEStgCont
         { .name = "New",                            },
         { .name = "Modify",                         },
         { .name = "Schedule",   .isSchedule = true  },
-        { .name = "Ready",                          }
+        { .name = "Ready",                          },
+        { .name = "ReadyWorkaround",                }
     }},
-    .initialStage = osp::StageId{0}
+    .initialStage = osp::StageId{6}
 };
 
 
@@ -161,8 +164,8 @@ inline osp::PipelineTypeInfo const gc_infoForEStgLink
     .debugName = "osp::link Nested update loop",
     .stages = {{
         { .name = "ScheduleLink", .isSchedule = true},
-        { .name = "Bind",                           },
-        { .name = "Draw",                           }
+        { .name = "NodeUpd",      .useCancel = true },
+        { .name = "MachUpd",      .useCancel = true }
     }},
     .initialStage = osp::StageId{0}
 };
@@ -233,7 +236,7 @@ struct FICleanupContext {
     };
 
     struct Pipelines {
-        PipelineDef<EStgEvnt> cleanup           {"cleanup           - Scene cleanup before destruction"};
+        PipelineDef<EStgEvnt> cleanup           {"cleanup"};
     };
 };
 
@@ -276,12 +279,15 @@ struct FICommonScene {
         DataId drawing;         ///< osp::draw::ACtxDrawing
         DataId drawingRes;      ///< osp::draw::ACtxDrawingRes
         DataId activeEntDel;    ///< osp::active::ActiveEntVec_t
+        DataId subtreeRootDel;  ///< osp::active::ActiveEntVec_t
         DataId namedMeshes;     ///< osp::draw::NamedMeshes
     };
 
     struct Pipelines {
-        PipelineDef<EStgCont> activeEnt         {"activeEnt         - ACtxBasic::m_activeIds"};
-        PipelineDef<EStgIntr> activeEntDelete   {"activeEntDelete   - comScn.di.activeEntDel, vector of ActiveEnts that need to be deleted"};
+        /// ACtxBasic::m_activeIds
+        PipelineDef<EStgCont> activeEnt         {"activeEnt"};
+        PipelineDef<EStgIntr> activeEntDelete   {"activeEntDelete"};
+        PipelineDef<EStgIntr> subtreeRootDel    {"subtreeRootDel"};
 
         PipelineDef<EStgCont> transform         {"transform         - ACtxBasic::m_transform"};
         PipelineDef<EStgCont> hierarchy         {"hierarchy         - ACtxBasic::m_scnGraph"};
@@ -393,10 +399,33 @@ struct FIBounds {
 };
 
 
+struct FILinks {
+
+    struct LoopBlockIds {
+        LoopBlockId link;
+    };
+
+    struct DataIds {
+        DataId links;
+        DataId updMach;
+    };
+
+    struct Pipelines {
+        PipelineDef<EStgLink> linkLoop          {"linkLoop"};
+
+        PipelineDef<EStgCont> machIds           {"machIds"};
+        PipelineDef<EStgCont> nodeIds           {"nodeIds"};
+        PipelineDef<EStgCont> connect           {"connect"};
+        PipelineDef<EStgCont> machUpdExtIn      {"machUpdExtIn"};
+    };
+};
+
+
 struct FIParts {
+
+
     struct DataIds {
         DataId scnParts;
-        DataId updMach;
     };
 
     struct Pipelines {
@@ -408,18 +437,12 @@ struct FIParts {
         PipelineDef<EStgCont> weldIds           {"weldIds           - ACtxParts::weldIds"};
         PipelineDef<EStgIntr> weldDirty         {"weldDirty         - ACtxParts::weldDirty"};
 
-        PipelineDef<EStgCont> machIds           {"machIds           - ACtxParts::machines.ids"};
-        PipelineDef<EStgCont> nodeIds           {"nodeIds           - ACtxParts::nodePerType[*].nodeIds"};
-        PipelineDef<EStgCont> connect           {"connect           - ACtxParts::nodePerType[*].nodeToMach/machToNode"};
-
         PipelineDef<EStgCont> mapWeldPart       {"mapPartWeld       - ACtxParts::weldToParts/partToWeld"};
         PipelineDef<EStgCont> mapPartMach       {"mapPartMach       - ACtxParts::partToMachines/machineToPart"};
         PipelineDef<EStgCont> mapPartActive     {"mapPartActive     - ACtxParts::partToActive/activeToPart"};
         PipelineDef<EStgCont> mapWeldActive     {"mapWeldActive     - ACtxParts::weldToActive"};
 
-        PipelineDef<EStgCont> machUpdExtIn      {"machUpdExtIn      -"};
 
-        PipelineDef<EStgLink> linkLoop          {"linkLoop          - Link update loop"};
     };
 };
 
@@ -515,7 +538,9 @@ struct FIVhclSpawnJolt {
         DataId factors;
     };
 
-    struct Pipelines { };
+    struct Pipelines {
+        PipelineDef<EStgCont> addedToHierarchy {"addedToHierarchy"};
+    };
 };
 
 struct FIJoltConstAccel {

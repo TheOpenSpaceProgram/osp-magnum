@@ -520,16 +520,6 @@ FeatureDef const ftrNestedLoop = feature_def("NestedLoop", [] (
         .schedules  ({nestedLoop.loopblks.outer})
         .ext_finish (true);
 
-
-    rFB.task(nestedLoop.tasks.innerSchedule)
-        .name       ("Schedule inner loop")
-        .schedules  ({nestedLoop.loopblks.inner})
-        .args       ({      nestedLoop.di.data})
-        .func       ([] (NestedLoopData& rData) -> TaskActions
-    {
-        return {.cancel = rData.setpoint == rData.value};
-    });
-
     rFB.task()
         .name       ("Calculate error")
         .sync_with  ({nestedLoop.pl.value(EStgContinuous::Modify), nestedLoop.pl.valueInner(EStgContinuous::Read), nestedLoop.pl.setpoint(EStgContinuous::Read), nestedLoop.pl.error(EStgContinuous::Modify)})

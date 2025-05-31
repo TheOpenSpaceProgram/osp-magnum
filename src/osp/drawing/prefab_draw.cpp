@@ -95,8 +95,10 @@ void SysPrefabDraw::resync_drawents(
                 continue;
             }
 
-            LGRN_ASSERT(rScnRender.m_activeToDraw[ent] == lgrn::id_null<DrawEnt>());
-            rScnRender.m_activeToDraw[ent] = rScnRender.m_drawIds.create();
+            if ( ! rScnRender.m_activeToDraw[ent].has_value() )
+            {
+                rScnRender.m_activeToDraw[ent] = rScnRender.m_drawIds.create();
+            }
         }
     }
 }
@@ -148,6 +150,8 @@ void SysPrefabDraw::init_mesh_texture_material(
             needs_draw_transform(needs_draw_transform, objects[i], ent);
 
             DrawEnt const drawEnt = rScnRender.m_activeToDraw[ent];
+
+            if (rScnRender.m_mesh[drawEnt].has_value()) { continue; };
 
             osp::ResId const meshRes = rImportData.m_meshes[meshImportId];
             MeshId const meshId = SysRender::own_mesh_resource(rDrawing, rDrawingRes, rResources, meshRes);
@@ -218,6 +222,8 @@ void SysPrefabDraw::resync_mesh_texture_material(
             SysRender::needs_draw_transforms(rBasic.m_scnGraph, rScnRender.m_needDrawTf, ent);
 
             DrawEnt const drawEnt = rScnRender.m_activeToDraw[ent];
+
+            if (rScnRender.m_mesh[drawEnt].has_value()) { continue; };
 
             osp::ResId const meshRes = rImportData.m_meshes[meshImportId];
             MeshId const meshId = SysRender::own_mesh_resource(rDrawing, rDrawingRes, rResources, meshRes);

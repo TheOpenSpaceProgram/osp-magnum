@@ -43,6 +43,14 @@ namespace osp::active
 using PartId = uint32_t;
 using WeldId = uint32_t;
 
+struct ACtxLinks
+{
+    ACtxLinks() = default;
+    OSP_MOVE_ONLY_CTOR_ASSIGN(ACtxLinks);
+    link::Machines                                  machines;
+    KeyedVec<link::NodeTypeId, link::Nodes>         nodePerType;
+};
+
 struct ACtxParts
 {
     using MapPartToMachines_t = lgrn::IntArrayMultiMap<PartId, link::MachinePair>;
@@ -54,9 +62,6 @@ struct ACtxParts
 
     lgrn::IdRegistryStl<WeldId>                     weldIds;
     std::vector<WeldId>                             weldDirty;
-
-    link::Machines                                  machines;
-    KeyedVec<link::NodeTypeId, link::Nodes>         nodePerType;
 
     lgrn::IntArrayMultiMap<WeldId, PartId>          weldToParts;
     KeyedVec<PartId, WeldId>                        partToWeld;

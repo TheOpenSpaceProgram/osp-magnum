@@ -388,8 +388,6 @@ FeatureDef const ftrShaderFlat = feature_def("ShaderFlat", [] (
         return;
     }
 
-    // TODO: format after framework changes
-
     rFB.task()
         .name       ("Sync Flat shader DrawEnts")
         .sync_with  ({windowApp.pl.sync(Run), magnumScn.pl.groupFwdEnts(Modify), magnumScn.pl.groupFwd(Modify), scnRender.pl.materialDirty(UseOrRun)})
@@ -532,11 +530,9 @@ FeatureDef const ftrTerrainDrawMagnum = feature_def("ShaderPhong", [] (
     rDrawTerrainGl.terrainMeshGl = rRenderGl.m_meshIds.create();
     rRenderGl.m_meshGl.emplace(rDrawTerrainGl.terrainMeshGl, Magnum::GL::Mesh{Corrade::NoCreate});
 
-    // TODO: format after framework changes
-#if 0 // SYNCEXEC
     rFB.task()
         .name       ("Sync terrainMeshGl to entities with terrainMesh")
-        .sync_with  ({scnRender.pl.meshDirty(UseOrRun), scnRender.pl.mesh(Ready), scnRender.pl.entMesh(Ready), magnum.pl.meshGL(Ready), magnum.pl.entMeshGL(Modify), scnRender.pl.drawEntResized(Done)})
+        .sync_with  ({windowApp.pl.sync(Run), scnRender.pl.meshDirty(UseOrRun), scnRender.pl.mesh(Ready), magnum.pl.meshGL(Modify)})
         .args       ({         terrainMgn.di.drawTerrainGL,    terrain.di.terrain,      scnRender.di.scnRender,        magnumScn.di.scnRenderGl,  magnum.di.renderGl })
         .func       ([] (ACtxDrawTerrainGL &rDrawTerrainGl, ACtxTerrain &rTerrain, ACtxSceneRender &rScnRender, ACtxSceneRenderGL &rScnRenderGl, RenderGL &rRenderGl) noexcept
     {
@@ -556,7 +552,7 @@ FeatureDef const ftrTerrainDrawMagnum = feature_def("ShaderPhong", [] (
 
     rFB.task()
         .name       ("Resync terrainMeshGl to entities with terrainMesh")
-        .sync_with  ({windowApp.pl.resync(Run), scnRender.pl.mesh(Ready), magnum.pl.meshGL(Ready), magnum.pl.entMeshGL(Modify), scnRender.pl.drawEntResized(Done)})
+        .sync_with  ({windowApp.pl.resync(Run), scnRender.pl.mesh(Ready), magnum.pl.meshGL(Modify)})
         .args       ({         terrainMgn.di.drawTerrainGL,    terrain.di.terrain,      scnRender.di.scnRender,        magnumScn.di.scnRenderGl,  magnum.di.renderGl })
         .func       ([] (ACtxDrawTerrainGL &rDrawTerrainGl, ACtxTerrain &rTerrain, ACtxSceneRender &rScnRender, ACtxSceneRenderGL &rScnRenderGl, RenderGL &rRenderGl) noexcept
     {
@@ -614,7 +610,6 @@ FeatureDef const ftrTerrainDrawMagnum = feature_def("ShaderPhong", [] (
         rDrawTerrainGl.vrtxBufGL.setData({nullptr, vrtxBuffer.size()});
         rDrawTerrainGl.vrtxBufGL.setData(vrtxBuffer);
     });
-#endif
 }); // ftrShaderPhong
 
 

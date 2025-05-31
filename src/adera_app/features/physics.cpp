@@ -56,7 +56,7 @@ FeatureDef const ftrPhysics = feature_def("Physics", [] (
         DependOn<FICommonScene> comScn)
 {
     rFB.pipeline(phys.pl.physBody)  .parent(mainApp.loopblks.mainLoop);
-    rFB.pipeline(phys.pl.physUpdate).parent(mainApp.loopblks.mainLoop);
+    rFB.pipeline(phys.pl.physUpdate).parent(mainApp.loopblks.mainLoop).initial_stage(Done);
 
     rFB.data_emplace< ACtxPhysics > (phys.di.phys);
 
@@ -90,8 +90,6 @@ FeatureDef const ftrPrefabs = feature_def("Prefabs", [] (
 
     rFB.data_emplace< ACtxPrefabs > (prefabs.di.prefabs);
 
-        // TODO SYNCEXEC
-
     rFB.task()
         .name       ("Schedule Prefab spawn")
         .schedules  ({prefabs.pl.spawnRequest})
@@ -99,6 +97,15 @@ FeatureDef const ftrPrefabs = feature_def("Prefabs", [] (
         .func       ([] (ACtxPrefabs const &rPrefabs) noexcept -> TaskActions
     {
         return {.cancel = rPrefabs.spawnRequest.empty()};
+    });
+
+    rFB.task()
+        .name       ("Schedule spawnedEnts")
+        .schedules  (prefabs.pl.spawnedEnts)
+        .args       ({            prefabs.di.prefabs })
+        .func       ([] (ACtxPrefabs const &rPrefabs) noexcept -> TaskActions
+    {
+        return {.cancel = rPrefabs.newEnts.empty()};
     });
 
     rFB.task()
@@ -150,6 +157,15 @@ FeatureDef const ftrPrefabs = feature_def("Prefabs", [] (
     {
         rPrefabs.spawnRequest.clear();
     });
+
+    rFB.task()
+        .name       ("Clear spawned entities after use")
+        .sync_with  ({prefabs.pl.spawnedEnts(Clear)})
+        .args       ({         prefabs.di.prefabs })
+        .func       ([] (ACtxPrefabs &rPrefabs) noexcept
+    {
+        rPrefabs.newEnts.clear();
+    });
 }); // ftrPrefabs
 
 
@@ -170,7 +186,7 @@ FeatureDef const ftrPrefabDraw = feature_def("PrefabDraw", [] (
 
     rFB.task()
         .name       ("Create DrawEnts for prefabs")
-        .sync_with  ({prefabs.pl.spawnRequest(UseOrRun), prefabs.pl.spawnedEnts(UseOrRun), scnRender.pl.drawEnt(New)})
+        .sync_with  ({prefabs.pl.spawnRequest(UseOrRun), prefabs.pl.spawnedEnts(UseOrRun), scnRender.pl.drawEnt(New), scnRender.pl.activeDrawTfs(New)})
         .args       ({      prefabs.di.prefabs,  mainApp.di.resources,      scnRender.di.scnRender})
         .func       ([] (ACtxPrefabs &rPrefabs, Resources &rResources, ACtxSceneRender &rScnRender) noexcept
     {
@@ -178,7 +194,7 @@ FeatureDef const ftrPrefabDraw = feature_def("PrefabDraw", [] (
     });
     rFB.task()
         .name       ("Resync prefab DrawEnts")
-        .sync_with  ({windowApp.pl.resync(Run), comScn.pl.hierarchy(Ready), scnRender.pl.drawEnt(New)})
+        .sync_with  ({windowApp.pl.resync(Run), comScn.pl.hierarchy(Ready), scnRender.pl.drawEnt(New), scnRender.pl.activeDrawTfs(New)})
         .args       ({      prefabs.di.prefabs,  mainApp.di.resources,         comScn.di.basic,     comScn.di.drawing,      scnRender.di.scnRender})
         .func       ([] (ACtxPrefabs &rPrefabs, Resources &rResources, ACtxBasic const &rBasic, ACtxDrawing &rDrawing, ACtxSceneRender &rScnRender) noexcept
     {
@@ -188,7 +204,8 @@ FeatureDef const ftrPrefabDraw = feature_def("PrefabDraw", [] (
     rFB.task()
         .name       ("Add mesh and material to prefabs")
         .sync_with  ({prefabs.pl.spawnRequest(UseOrRun), prefabs.pl.spawnedEnts(UseOrRun),
-                      scnRender.pl.drawEnt(Ready),  scnRender.pl.activeDrawTfs(New), scnRender.pl.misc(Modify),
+                      comScn.pl.texToRes(New), comScn.pl.meshToRes(New),
+                      scnRender.pl.drawEnt(Ready),  scnRender.pl.activeDrawTfs(Ready), scnRender.pl.misc(Modify),
                       scnRender.pl.mesh      (New), scnRender.pl.meshDirty      (Modify_),
                       scnRender.pl.diffuseTex(New), scnRender.pl.diffuseTexDirty(Modify_),
                       scnRender.pl.material  (New), scnRender.pl.materialDirty  (Modify_)})
@@ -200,7 +217,8 @@ FeatureDef const ftrPrefabDraw = feature_def("PrefabDraw", [] (
     rFB.task()
         .name       ("Resync prefab mesh and material")
         .sync_with  ({windowApp.pl.resync(Run),
-                      scnRender.pl.drawEnt(Ready),  scnRender.pl.activeDrawTfs(New), scnRender.pl.misc(Modify),
+                      comScn.pl.texToRes(New), comScn.pl.meshToRes(New),
+                      scnRender.pl.drawEnt(Ready),  scnRender.pl.activeDrawTfs(Modify), scnRender.pl.misc(Modify),
                       scnRender.pl.mesh      (New), scnRender.pl.meshDirty      (Modify_),
                       scnRender.pl.diffuseTex(New), scnRender.pl.diffuseTexDirty(Modify_),
                       scnRender.pl.material  (New), scnRender.pl.materialDirty  (Modify_)})

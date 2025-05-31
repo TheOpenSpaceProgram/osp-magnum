@@ -161,12 +161,6 @@ public:
     template<typename ITA_T, typename ITB_T>
     static void cut(ACtxSceneGraph& rScnGraph, ITA_T first, ITB_T const& last);
 
-    /**
-     * @brief Add multiple entities and their descendents to a delete queue
-     */
-    template<typename ITA_T, typename ITB_T>
-    static void queue_delete_entities(ACtxSceneGraph& rScnGraph, ActiveEntVec_t &rDelete, ITA_T const& first, ITB_T const& last);
-
 private:
 
     static void do_delete(ACtxSceneGraph& rScnGraph);
@@ -193,20 +187,6 @@ void SysSceneGraph::cut(ACtxSceneGraph& rScnGraph, ITA_T first, ITB_T const& las
     do_delete(rScnGraph);
 }
 
-template<typename ITA_T, typename ITB_T>
-void SysSceneGraph::queue_delete_entities(ACtxSceneGraph& rScnGraph, ActiveEntVec_t &rDelete, ITA_T const& first, ITB_T const& last)
-{
-    std::for_each(first, last, [&] (ActiveEnt const ent)
-    {
-        rDelete.push_back(ent);
-        for (ActiveEnt const descendent : SysSceneGraph::descendants(rScnGraph, ent))
-        {
-            rDelete.push_back(descendent);
-        }
-    });
-
-    SysSceneGraph::cut(rScnGraph, first, last);
-}
 
 } // namespace osp::active
 

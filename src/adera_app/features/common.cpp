@@ -131,13 +131,15 @@ FeatureDef const ftrCommonScene = feature_def("CommonScene", [] (
         entt::any                   userData)
 {
     /* not used here */   rFB.data_emplace< ActiveEntVec_t >(comScn.di.activeEntDel);
+    /* not used here */   rFB.data_emplace< ActiveEntVec_t >(comScn.di.subtreeRootDel);
     auto &rBasic        = rFB.data_emplace< ACtxBasic >     (comScn.di.basic);
     auto &rDrawing      = rFB.data_emplace< ACtxDrawing >   (comScn.di.drawing);
     auto &rDrawingRes   = rFB.data_emplace< ACtxDrawingRes >(comScn.di.drawingRes);
     auto &rNamedMeshes  = rFB.data_emplace< NamedMeshes >   (comScn.di.namedMeshes);
 
     rFB.pipeline(comScn.pl.activeEnt)           .parent(mainApp.loopblks.mainLoop);
-    rFB.pipeline(comScn.pl.activeEntDelete)     .parent(mainApp.loopblks.mainLoop);
+    rFB.pipeline(comScn.pl.activeEntDelete)     .parent(mainApp.loopblks.mainLoop).initial_stage(UseOrRun);
+    rFB.pipeline(comScn.pl.subtreeRootDel)      .parent(mainApp.loopblks.mainLoop).initial_stage(UseOrRun);
     rFB.pipeline(comScn.pl.transform)           .parent(mainApp.loopblks.mainLoop);
     rFB.pipeline(comScn.pl.hierarchy)           .parent(mainApp.loopblks.mainLoop);
     rFB.pipeline(comScn.pl.meshIds)             .parent(mainApp.loopblks.mainLoop);
@@ -148,6 +150,24 @@ FeatureDef const ftrCommonScene = feature_def("CommonScene", [] (
     rFB.task().schedules(comScn.pl.activeEntDelete).args({comScn.di.activeEntDel}).name("Schedule activeEntDelete")
               .func(  [] (ActiveEntVec_t const &rActiveEntDel) noexcept -> TaskActions
                       { return {.cancel = rActiveEntDel.empty()}; });
+
+    rFB.task()
+        .name       ("Cut deleted ActiveEnt subtree roots from scene graph")
+        .sync_with  ({comScn.pl.subtreeRootDel(UseOrRun), comScn.pl.hierarchy(Delete)})
+        .args       ({     comScn.di.basic,              comScn.di.subtreeRootDel })
+        .func       ([] (ACtxBasic &rBasic, ActiveEntVec_t const &rSubtreeRootDel) noexcept
+    {
+        SysSceneGraph::cut(rBasic.m_scnGraph, rSubtreeRootDel.begin(), rSubtreeRootDel.end());
+    });
+
+    rFB.task()
+        .name       ("Clear subtreeRootDel vector once we're done with it")
+        .sync_with  ({comScn.pl.subtreeRootDel(Clear)})
+        .args       ({      comScn.di.subtreeRootDel })
+        .func([]    (ActiveEntVec_t &rSubtreeRootDel) noexcept
+    {
+        rSubtreeRootDel.clear();
+    });
 
     rFB.task()
         .name       ("Delete ActiveEnt IDs of deleted ActiveEnts")
@@ -291,7 +311,7 @@ FeatureDef const ftrSceneRenderer = feature_def("SceneRenderer", [] (
     rFB.pipeline(scnRender.pl.meshDirty)        .parent(mainApp.loopblks.mainLoop);
     rFB.pipeline(scnRender.pl.material)         .parent(mainApp.loopblks.mainLoop);
     rFB.pipeline(scnRender.pl.materialDirty)    .parent(mainApp.loopblks.mainLoop);
-    rFB.pipeline(scnRender.pl.drawEntDelete)    .parent(mainApp.loopblks.mainLoop);
+    rFB.pipeline(scnRender.pl.drawEntDelete)    .parent(mainApp.loopblks.mainLoop);//.initial_stage(UseOrRun);
 
     auto &rScnRender = rFB.data_emplace<ACtxSceneRender>(scnRender.di.scnRender);
     /* unused */       rFB.data_emplace<DrawTfObservers>(scnRender.di.drawTfObservers);
@@ -396,7 +416,7 @@ FeatureDef const ftrSceneRenderer = feature_def("SceneRenderer", [] (
 
     rFB.task()
         .name       ("Delete DrawEntity of deleted ActiveEnts")
-        .sync_with  ({comScn.pl.activeEntDelete(UseOrRun), scnRender.pl.drawEntDelete(Modify_)})
+        .sync_with  ({comScn.pl.activeEntDelete(UseOrRun), scnRender.pl.activeDrawTfs(ReadyWorkaround), scnRender.pl.drawEntDelete(Modify_)})
         .args       ({        scnRender.di.scnRender,              comScn.di.activeEntDel,   scnRender.di.drawEntDel })
         .func       ([] (ACtxSceneRender &rScnRender, ActiveEntVec_t const &rActiveEntDel, DrawEntVec_t &rDrawEntDel) noexcept
     {
@@ -406,7 +426,7 @@ FeatureDef const ftrSceneRenderer = feature_def("SceneRenderer", [] (
             {
                 continue;
             }
-            DrawEnt const drawEnt = std::exchange(rScnRender.m_activeToDraw[ent], lgrn::id_null<DrawEnt>());
+            DrawEnt const drawEnt = rScnRender.m_activeToDraw[ent];
             if (drawEnt != lgrn::id_null<DrawEnt>())
             {
                 rDrawEntDel.push_back(drawEnt);

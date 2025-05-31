@@ -101,7 +101,6 @@ osp::Logger_t   g_logMagnumApp;
 bool            g_autoLaunchMagnum = true;
 
 
-
 //-----------------------------------------------------------------------------
 
 int main(int argc, char** argv)
