@@ -34,8 +34,9 @@ namespace osp::exec
 {
 
 
-struct SyncGraphExecutor
+class SyncGraphExecutor
 {
+public:
     enum class ESyncState : std::int8_t { Inactive, WaitForAlign, WaitForUnlock, WaitForAdvance };
 
     enum class ESyncAction : std::int8_t { SetEnable, SetDisable, Unlock };
@@ -43,49 +44,34 @@ struct SyncGraphExecutor
 
     struct PerSubgraph
     {
+        int          activeSyncs    {0};
         LocalCycleId activeCycle;
         LocalCycleId jumpNextCycle;
-        std::uint8_t position;
-        std::uint8_t jumpNextPos;
+        LocalPointId point;
+        std::uint8_t position       {};
+        std::uint8_t jumpNextPos    {};
     };
     struct PerSync
     {
-        lgrn::IdSetStl<SubgraphId>          needToAdvance;
-        ESyncState                          state               {ESyncState::Inactive};
+        lgrn::IdSetStl<SubgraphId>  needToAdvance;
+        ESyncState                  state           {ESyncState::Inactive};
+        int                         pointsNotAligned;
     };
 
     void load(SyncGraph const& graph) noexcept;
 
     bool update(std::vector<SynchronizerId> &rJustAlignedOut, SyncGraph const& graph) noexcept;
 
-    bool is_locked(SynchronizerId syncId, SyncGraph const& graph) const noexcept
+    void batch(ESyncAction const action, osp::ArrayView<SynchronizerId const> const syncs, SyncGraph const& graph);
+
+    void batch(ESyncAction const action, std::initializer_list<SynchronizerId const> const syncs, SyncGraph const& graph)
     {
-        return perSync[syncId].state == ESyncState::WaitForUnlock;
+        batch(action, osp::arrayView(syncs), graph);
     }
 
-    bool select_cycle(SubgraphId const subgraphId, LocalCycleId const cycleId, SyncGraph const& graph) noexcept
-    {
-        Subgraph          const &rSubgraph    = graph.subgraphs[subgraphId];
-        PerSubgraph             &rPerSubgraph = perSubgraph[subgraphId];
-        SubgraphType      const &sgtype       = graph.sgtypes[rSubgraph.instanceOf];
-        LocalPointId      const currentPoint  = sgtype.cycles[rPerSubgraph.activeCycle].path[rPerSubgraph.position];
+    void batch(ESubgraphAction const action, osp::ArrayView<SubgraphId const> const subgraphs, SyncGraph const& graph);
 
-        SubgraphType::Cycle const& cycle = sgtype.cycles[cycleId];
-
-        auto const &cycleFirstIt = cycle.path.begin();
-        auto const &cycleLastIt  = cycle.path.end();
-        auto const foundIt = std::find(cycleFirstIt, cycleLastIt, currentPoint);
-
-        if (foundIt == cycleLastIt)
-        {
-            return false;
-        }
-
-        rPerSubgraph.activeCycle = cycleId;
-        rPerSubgraph.position    = std::uint8_t(std::distance(cycleFirstIt, foundIt));
-
-        return true;
-    }
+    bool select_cycle(SubgraphId const subgraphId, LocalCycleId const cycleId, SyncGraph const& graph) noexcept;
 
     void jump(SubgraphId const subgraphId, LocalCycleId const cycleId, std::uint8_t position, SyncGraph const& graph)
     {
@@ -94,61 +80,18 @@ struct SyncGraphExecutor
         rPerSubgraph.jumpNextPos   = position;
     }
 
-    void batch(ESyncAction const action, osp::ArrayView<SynchronizerId const> const syncs, SyncGraph const& graph)
+    bool is_locked(SynchronizerId syncId, SyncGraph const& graph) const noexcept
     {
-        for (SynchronizerId const syncId : syncs)
-        {
-            PerSync &rExecSync = perSync[syncId];
-            switch(action)
-            {
-            case ESyncAction::SetEnable:
-                if (rExecSync.state == ESyncState::Inactive)
-                {
-                    rExecSync.state = ESyncState::WaitForAlign;
-                }
-                break;
-            case ESyncAction::SetDisable:
-                if (rExecSync.state == ESyncState::WaitForAdvance)
-                {
-                    rExecSync.needToAdvance.clear();
-                }
-                rExecSync.state = ESyncState::Inactive;
-                break;
-            case ESyncAction::Unlock:
-                LGRN_ASSERT(rExecSync.state == ESyncState::WaitForUnlock);
-                rExecSync.state = ESyncState::WaitForAdvance;
-                for (SubgraphPointAddr const addr : graph.syncs[syncId].connectedPoints)
-                {
-                    rExecSync.needToAdvance.insert(addr.subgraph);
-                }
-                break;
-            }
-        }
+        return perSync[syncId].state == ESyncState::WaitForUnlock;
     }
 
-    void batch(ESyncAction const action, std::initializer_list<SynchronizerId const> const syncs, SyncGraph const& graph)
-    {
-        batch(action, osp::arrayView(syncs), graph);
-    }
-
-    void batch(ESubgraphAction const action, osp::ArrayView<SubgraphId const> const subgraphs, SyncGraph const& graph)
-    {
-        for (SubgraphId const subgraphId : subgraphs)
-        {
-            switch(action)
-            {
-            case ESubgraphAction::Reset:
-                perSubgraph[subgraphId].position = 0;
-                break;
-            }
-        }
-    }
-
-    lgrn::IdSetStl<SubgraphId>              toCycle;
-    std::vector<SubgraphId>                 toCyclcErase;
+    lgrn::IdSetStl<SubgraphId>              subgraphsMoving;
+    lgrn::IdSetStl<SubgraphId>              justMoved;
 
     osp::KeyedVec<SubgraphId, PerSubgraph>  perSubgraph;
     osp::KeyedVec<SynchronizerId, PerSync>  perSync;
+
+    std::vector<SynchronizerId>             alignedDuringEnable;
 
     std::chrono::time_point<std::chrono::high_resolution_clock> startTime;
 };
@@ -164,14 +107,15 @@ public:
     {
         return m_exec.perSync[syncId].state != SyncGraphExecutor::ESyncState::Inactive;
     }
+
     bool            is_sync_locked(SyncGraph const& graph, SynchronizerId syncId) override
     {
-        return m_exec.is_locked(syncId, graph);
+        return m_exec.perSync[syncId].state == SyncGraphExecutor::ESyncState::WaitForUnlock;
     }
+
     LocalPointId    current_point(SyncGraph const& graph, SubgraphId subgraphId) override
     {
-        SyncGraphExecutor::PerSubgraph const &rPerSubgraph = m_exec.perSubgraph[subgraphId];
-        return graph.sgtypes[graph.subgraphs[subgraphId].instanceOf].cycles[rPerSubgraph.activeCycle].path[rPerSubgraph.position];
+        return m_exec.perSubgraph[subgraphId].point;
     }
 
     SyncGraphExecutor const &m_exec;

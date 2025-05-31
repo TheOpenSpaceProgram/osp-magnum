@@ -133,7 +133,7 @@ class SinglethreadFWExecutor final : public osp::fw::IExecutor
     {
         struct
         {
-            int  inactiveBlocks;
+            //int  inactiveBlocks;
             int  canceledByPipelines;
         };
 

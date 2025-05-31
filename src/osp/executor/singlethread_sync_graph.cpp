@@ -26,6 +26,7 @@
 
 #include <filesystem>
 #include <fstream>
+#include <iostream>
 #include <optional>
 
 namespace osp::exec
@@ -108,22 +109,29 @@ private:
 void SyncGraphExecutor::load(SyncGraph const& graph) noexcept
 {
     auto const subgraphCapacity = graph.subgraphIds.capacity();
-    perSubgraph.resize(subgraphCapacity);
-    toCycle.resize(subgraphCapacity);
+    perSubgraph     .resize(subgraphCapacity);
+    subgraphsMoving .resize(subgraphCapacity);
+    justMoved       .resize(subgraphCapacity);
 
-    perSync.resize(graph.syncIds.capacity());
+    auto const syncCapacity = graph.syncIds.capacity();
+    perSync         .resize(syncCapacity);
 
     for (SynchronizerId const syncId : graph.syncIds)
     {
-        perSync[syncId].needToAdvance.resize(subgraphCapacity);
+        perSync[syncId].needToAdvance.resize(syncCapacity);
     }
 
     for(SubgraphId const subgraphId : graph.subgraphIds)
     {
-        SubgraphType const &sgtype = graph.sgtypes[graph.subgraphs[subgraphId].instanceOf];
-        PerSubgraph &rPerSubgraph = perSubgraph[subgraphId];
-        rPerSubgraph.activeCycle = sgtype.initialCycle;
-        rPerSubgraph.position = sgtype.initialPos;
+        Subgraph      const &rSubgraph     = graph.subgraphs[subgraphId];
+        PerSubgraph         &rExecSubgraph = perSubgraph[subgraphId];
+        SubgraphType  const &sgtype        = graph.sgtypes[rSubgraph.instanceOf];
+
+        rExecSubgraph.activeCycle = sgtype.initialCycle;
+        rExecSubgraph.position    = sgtype.initialPos;
+        rExecSubgraph.point       = sgtype.cycles[sgtype.initialCycle].path[sgtype.initialPos];
+
+        justMoved.insert(subgraphId);
     }
 
     startTime = std::chrono::high_resolution_clock::now();
@@ -133,67 +141,47 @@ void SyncGraphExecutor::load(SyncGraph const& graph) noexcept
 
 bool SyncGraphExecutor::update(std::vector<SynchronizerId> &rJustAlignedOut, SyncGraph const& graph) noexcept
 {
-    // 'pull/push' algorithm
-
-    // 1. Search for syncs that are state=WaitForAlign
-    //   * try to 'pull' connected points towards self. add subgraph to toCycle
-    //   * check for canceled too
-    // 2. Search for syncs that are state=WaitForAdvance
-    //   * try to 'push' not-yet-advanced stages. add subgraph to toCycle
-    // 3. Disqualify candidate subgraphs
-    //   * subgraphs with (current position = a point with a sync on WaitForUnlock)
-    //   * subgraphs with (current position = a point with a sync on WaitForAlign)
-    //   * subgraphs with (current position = a point with a sync on WaitForAdvance and subgraph is not in needToAdvance)
-
-    // TODO: This loops through every single sync each update. This is robust, but slow.
-    //       Optimize by keeping a IdSet of SubgraphId candidates that is added to only when
-    //       something changes that might allow a blocked subgraph to run.
-
     bool somethingHappened = false;
-    toCycle.clear();
 
-    for (SynchronizerId const syncId : graph.syncIds)
-    {
-        Synchronizer const &rSync     = graph.syncs[syncId];
-        PerSync            &rExecSync = perSync[syncId];
+    somethingHappened |= ! alignedDuringEnable.empty();
 
-        if (rExecSync.state == ESyncState::WaitForAlign)
-        {
-            bool aligned = true;
-            for (SubgraphPointAddr addr : rSync.connectedPoints)
-            {
-                Subgraph      const &rSubgraph     = graph.subgraphs[addr.subgraph];
-                PerSubgraph   const &rExecSubgraph = perSubgraph[addr.subgraph];
-                SubgraphType  const &sgtype        = graph.sgtypes[rSubgraph.instanceOf];
-                LocalPointId  const point          = sgtype.cycles[rExecSubgraph.activeCycle].path[rExecSubgraph.position];
+    rJustAlignedOut.insert(rJustAlignedOut.end(), alignedDuringEnable.begin(), alignedDuringEnable.end());
+    alignedDuringEnable.clear();
 
-                // if not yet aligned
-                if (addr.point != point)
-                {
-                    toCycle.insert(addr.subgraph); // pull subgraph's position towards self
-                    aligned = false;
-                }
-            }
-            if (aligned)
-            {
-                rExecSync.state = ESyncState::WaitForUnlock;
-                rJustAlignedOut.push_back(syncId);
-                somethingHappened = true;
-            }
-        }
-        else if (rExecSync.state == ESyncState::WaitForAdvance)
-        {
-            for (SubgraphId const subgraphId : perSync[syncId].needToAdvance)
-            {
-                toCycle.insert(subgraphId); // push subgraph's position out of self
-            }
-        }
-    }
-
-    for (SubgraphId const subgraphId : toCycle)
+    for (SubgraphId const subgraphId : justMoved)
     {
         Subgraph      const &rSubgraph     = graph.subgraphs[subgraphId];
         PerSubgraph   const &rExecSubgraph = perSubgraph[subgraphId];
+        SubgraphType  const &sgtype        = graph.sgtypes[rSubgraph.instanceOf];
+        LocalPointId  const point          = sgtype.cycles[rExecSubgraph.activeCycle].path[rExecSubgraph.position];
+
+        for (SynchronizerId const syncId : rSubgraph.points[point].connectedSyncs)
+        {
+            PerSync &rExecSync = perSync[syncId];
+            if (rExecSync.state != ESyncState::Inactive)
+            {
+                subgraphsMoving.erase(subgraphId);
+                --rExecSync.pointsNotAligned;
+                if (rExecSync.pointsNotAligned == 0)
+                {
+                    // lock
+                    rJustAlignedOut.push_back(syncId);
+                    rExecSync.state = ESyncState::WaitForUnlock;
+                    somethingHappened = true;
+                }
+            }
+        }
+    }
+    justMoved.clear();
+
+    // Eliminate invalid subgraphs from tryToAdvance
+    for (SubgraphId const subgraphId : subgraphsMoving)
+    {
+        Subgraph      const &rSubgraph     = graph.subgraphs[subgraphId];
+        PerSubgraph   const &rExecSubgraph = perSubgraph[subgraphId];
+
+        LGRN_ASSERTMV(rExecSubgraph.activeSyncs != 0, "all syncs disabled, sync should have already been removed from subgraphsMoving in batch(SetDisable, ...)", subgraphId.value);
+
         SubgraphType  const &sgtype        = graph.sgtypes[rSubgraph.instanceOf];
         LocalPointId  const point          = sgtype.cycles[rExecSubgraph.activeCycle].path[rExecSubgraph.position];
 
@@ -206,29 +194,24 @@ bool SyncGraphExecutor::update(std::vector<SynchronizerId> &rJustAlignedOut, Syn
             {
                 // Sync is aligned with the current point, and wants this subgraph to stay at
                 // its current position and wait for other subgraphs to align
-                toCyclcErase.push_back(subgraphId);
+                subgraphsMoving.erase(subgraphId);
             }
             else if (rExecSync.state == ESyncState::WaitForUnlock)
             {
                 // Sync is locked (task in progress). don't move!
-                toCyclcErase.push_back(subgraphId);
+                subgraphsMoving.erase(subgraphId);
             }
             else if (     rExecSync.state == ESyncState::WaitForAdvance
                      && ! rExecSync.needToAdvance.contains(subgraphId))
             {
                 // only happens when a cycle has only 1 state to loop through
-                toCyclcErase.push_back(subgraphId);
+                subgraphsMoving.erase(subgraphId);
             }
         }
     }
 
-    for (SubgraphId const subgraphId : toCyclcErase)
-    {
-        toCycle.erase(subgraphId);
-    }
-    toCyclcErase.clear();
-
-    for (SubgraphId const subgraphId : toCycle)
+    // Advance subgraphs to next point
+    for (SubgraphId const subgraphId : subgraphsMoving)
     {
         Subgraph      const &rSubgraph     = graph.subgraphs[subgraphId];
         SubgraphType  const &sgtype        = graph.sgtypes[rSubgraph.instanceOf];
@@ -240,38 +223,45 @@ bool SyncGraphExecutor::update(std::vector<SynchronizerId> &rJustAlignedOut, Syn
         {
             PerSync &rExecSync = perSync[syncId];
 
-            if (rExecSync.state == ESyncState::Inactive)
+            if (rExecSync.state == ESyncState::WaitForAdvance)
             {
-                continue;
-            }
+                rExecSync.needToAdvance.erase(subgraphId);
 
-            rExecSync.needToAdvance.erase(subgraphId);
-
-            if (rExecSync.needToAdvance.empty())
-            {
-                // done advancing all
-                rExecSync.state = ESyncState::WaitForAlign;
+                if (rExecSync.needToAdvance.empty())
+                {
+                    // done advancing all connected subgraphs
+                    rExecSync.state = ESyncState::WaitForAlign;
+                }
             }
         }
 
+        justMoved.insert(subgraphId);
+
         if (rExecSubgraph.jumpNextCycle.has_value())
         {
+            // Advance to next point based on rExecSubgraph.jumpNext*
             rExecSubgraph.activeCycle   = rExecSubgraph.jumpNextCycle;
             rExecSubgraph.position      = rExecSubgraph.jumpNextPos;
 
+            SubgraphType::Cycle const& cycle = sgtype.cycles[rExecSubgraph.activeCycle];
+            rExecSubgraph.point         = cycle.path[rExecSubgraph.position];
             rExecSubgraph.jumpNextCycle = {};
         }
         else
         {
+            // Advance to next point following the active selected cycle
+            SubgraphType::Cycle const& cycle = sgtype.cycles[rExecSubgraph.activeCycle];
+
             rExecSubgraph.position ++;
-            if (rExecSubgraph.position == sgtype.cycles[rExecSubgraph.activeCycle].path.size())
+            if (rExecSubgraph.position == cycle.path.size())
             {
                 rExecSubgraph.position = 0;
             }
+            rExecSubgraph.point = cycle.path[rExecSubgraph.position];
         }
     }
 
-    somethingHappened |= !toCycle.empty();
+    somethingHappened |= !subgraphsMoving.empty();
 
     if (somethingHappened)
     {
@@ -281,6 +271,120 @@ bool SyncGraphExecutor::update(std::vector<SynchronizerId> &rJustAlignedOut, Syn
     return somethingHappened;
 }
 
+void SyncGraphExecutor::batch(ESyncAction const action, osp::ArrayView<SynchronizerId const> const syncs, SyncGraph const& graph)
+{
+    for (SynchronizerId const syncId : syncs)
+    {
+        Synchronizer const &rSync = graph.syncs[syncId];
+        PerSync &rExecSync = perSync[syncId];
+        switch(action)
+        {
+        case ESyncAction::SetEnable:
+            if (rExecSync.state == ESyncState::Inactive)
+            {
+                rExecSync.state            = ESyncState::WaitForAlign;
+                rExecSync.pointsNotAligned = rSync.connectedPoints.size();
+
+                for (SubgraphPointAddr const addr : rSync.connectedPoints)
+                {
+                    PerSubgraph &rExecSubgraph = perSubgraph[addr.subgraph];
+                    if (rExecSubgraph.activeSyncs == 0)
+                    {
+                        subgraphsMoving.insert(addr.subgraph);
+                    }
+                    ++rExecSubgraph.activeSyncs;
+
+                    if ( ! justMoved.contains(addr.subgraph) && rExecSubgraph.point == addr.point )
+                    {
+                        --rExecSync.pointsNotAligned;
+                    }
+                }
+                if (rExecSync.pointsNotAligned == 0)
+                {
+                    rExecSync.state = ESyncState::WaitForUnlock;
+                    alignedDuringEnable.push_back(syncId);
+                }
+            }
+            break;
+        case ESyncAction::SetDisable:
+            rExecSync.pointsNotAligned = 0;
+            if (rExecSync.state == ESyncState::WaitForAdvance)
+            {
+                rExecSync.needToAdvance.clear();
+            }
+            if (rExecSync.state != ESyncState::Inactive)
+            {
+                 rExecSync.state = ESyncState::Inactive;
+
+                 for (SubgraphPointAddr const& addr : graph.syncs[syncId].connectedPoints)
+                 {
+                     PerSubgraph &rExecSubgraph = perSubgraph[addr.subgraph];
+                     --rExecSubgraph.activeSyncs;
+                     if (rExecSubgraph.activeSyncs == 0)
+                     {
+                         subgraphsMoving.erase(addr.subgraph);
+                     }
+                     else
+                     {
+                         subgraphsMoving.insert(addr.subgraph);
+                     }
+                 }
+            }
+            break;
+        case ESyncAction::Unlock:
+            LGRN_ASSERT(rExecSync.state == ESyncState::WaitForUnlock);
+            rExecSync.state            = ESyncState::WaitForAdvance;
+            rExecSync.pointsNotAligned = rSync.connectedPoints.size();
+
+            for (SubgraphPointAddr const addr : graph.syncs[syncId].connectedPoints)
+            {
+                rExecSync.needToAdvance.insert(addr.subgraph);
+                subgraphsMoving.insert(addr.subgraph);
+            }
+            break;
+        }
+    }
+}
+
+void SyncGraphExecutor::batch(ESubgraphAction const action, osp::ArrayView<SubgraphId const> const subgraphs, SyncGraph const& graph)
+{
+    for (SubgraphId const subgraphId : subgraphs)
+    {
+        Subgraph    const &rSubgraph     = graph.subgraphs[subgraphId];
+        PerSubgraph       &rExecSubgraph = perSubgraph[subgraphId];
+        switch(action)
+        {
+        case ESubgraphAction::Reset:
+            rExecSubgraph.position = 0;
+            rExecSubgraph.point = graph.sgtypes[rSubgraph.instanceOf].cycles[rExecSubgraph.activeCycle].path[0];
+            break;
+        }
+    }
+}
+
+bool SyncGraphExecutor::select_cycle(SubgraphId const subgraphId, LocalCycleId const cycleId, SyncGraph const& graph) noexcept
+{
+    Subgraph          const &rSubgraph    = graph.subgraphs[subgraphId];
+    PerSubgraph             &rPerSubgraph = perSubgraph[subgraphId];
+    SubgraphType      const &sgtype       = graph.sgtypes[rSubgraph.instanceOf];
+    LocalPointId      const currentPoint  = sgtype.cycles[rPerSubgraph.activeCycle].path[rPerSubgraph.position];
+
+    SubgraphType::Cycle const& cycle = sgtype.cycles[cycleId];
+
+    auto const &cycleFirstIt = cycle.path.begin();
+    auto const &cycleLastIt  = cycle.path.end();
+    auto const foundIt = std::find(cycleFirstIt, cycleLastIt, currentPoint);
+
+    if (foundIt == cycleLastIt)
+    {
+        return false;
+    }
+
+    rPerSubgraph.activeCycle = cycleId;
+    rPerSubgraph.position    = std::uint8_t(std::distance(cycleFirstIt, foundIt));
+
+    return true;
+}
 
 
 }; // namespace osp::exec

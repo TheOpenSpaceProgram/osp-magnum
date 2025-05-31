@@ -64,7 +64,6 @@ void Framework::close_context(ContextId ctx)
         }
         rFIInst.loopblks.clear();
 
-
         rFIInst.context = {};
         rFIInst.type = {};
 
@@ -85,11 +84,8 @@ void Framework::close_context(ContextId ctx)
             m_tasks.taskIds.remove(taskId);
             deletedTasks.insert(taskId);
 
-            TaskImpl &rTaskImpl = m_taskImpl[taskId];
-            rTaskImpl.args.clear();
-            rTaskImpl.func = nullptr;
-
-            m_tasks.taskInst[taskId].debugName.clear();
+            m_taskImpl[taskId]       = {};
+            m_tasks.taskInst[taskId] = {};
         }
     }
 

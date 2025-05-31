@@ -143,6 +143,8 @@ void check_task_order(Tasks const& tasks, TaskOrderReport& rOut, lgrn::IdSetStl<
 
         stageJustChanged.clear();
 
+        nothingMoved = true;
+
         // move points
         for (PipelineId const pipelineId : tasks.pipelineIds)
         {

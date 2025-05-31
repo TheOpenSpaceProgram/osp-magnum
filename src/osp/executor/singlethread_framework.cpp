@@ -88,8 +88,8 @@ void SinglethreadFWExecutor::load(osp::fw::Framework& rFW)
     m_graph.syncs       .clear();
     m_exec.perSubgraph  .clear();
     m_exec.perSync      .clear();
-    m_exec.toCyclcErase .clear();
-    m_exec.toCycle      .clear();
+    m_exec.subgraphsMoving.clear();
+    m_exec.justMoved    .clear();
     m_roxLoopblkOf      .clear();
     m_roxPipelineOf     .clear();
     m_roxSyncOf         .clear();
@@ -113,8 +113,9 @@ void SinglethreadFWExecutor::load(osp::fw::Framework& rFW)
 
     LocalPointId const blkctrlStart     = point(0);
     LocalPointId const blkctrlSchedule  = point(1);
-    LocalPointId const blkctrlRunning   = point(2);
-    LocalPointId const blkctrlFinish    = point(3);
+    LocalPointId const blkctrlBlkRun    = point(2);
+    LocalPointId const blkctrlBlkExit   = point(3);
+    LocalPointId const blkctrlFinish    = point(4);
 
     {
         SubgraphType &rSgtype = m_graph.sgtypes[sgtBlkCtrlId];
@@ -122,12 +123,13 @@ void SinglethreadFWExecutor::load(osp::fw::Framework& rFW)
         rSgtype.points = {{
             {.debugName = "Start"},     // point(0)
             {.debugName = "Schedule"},  // point(1)
-            {.debugName = "Running"},   // point(2)
-            {.debugName = "Finish"}     // point(3)
+            {.debugName = "BlockRun"},  // point(2)
+            {.debugName = "BlockExit"}, // point(3)
+            {.debugName = "Finish"}     // point(4)
         }};
         rSgtype.cycles = {{
             {.debugName = "Control",    .path = {blkctrlStart,    blkctrlFinish}},
-            {.debugName = "Run",        .path = {blkctrlSchedule, blkctrlRunning}}
+            {.debugName = "Run",        .path = {blkctrlSchedule, blkctrlBlkRun, blkctrlBlkExit}}
         }};
         rSgtype.initialCycle = cycle(0);
         rSgtype.initialPos   = 0;
@@ -281,8 +283,8 @@ void SinglethreadFWExecutor::load(osp::fw::Framework& rFW)
         m_roxSyncOf[roxLoopblk.left]        = {.tag = ESyncType::BlkLeft,      .loopBlk = loopblkId};
         m_roxSyncOf[roxLoopblk.right]       = {.tag = ESyncType::BlkRight,     .loopBlk = loopblkId};
 
-        m_graph.connect({.sync = roxLoopblk.left,   .subgraphPoint = {roxLoopblk.subgraph, blkctrlRunning}});
-        m_graph.connect({.sync = roxLoopblk.right,  .subgraphPoint = {roxLoopblk.subgraph, blkctrlRunning}});
+        m_graph.connect({.sync = roxLoopblk.left,   .subgraphPoint = {roxLoopblk.subgraph, blkctrlBlkRun}});
+        m_graph.connect({.sync = roxLoopblk.right,  .subgraphPoint = {roxLoopblk.subgraph, blkctrlBlkRun}});
     }
 
     // Add loopblock parent - loopblock child connections
@@ -295,8 +297,9 @@ void SinglethreadFWExecutor::load(osp::fw::Framework& rFW)
             RoxLoopblk const &child  = m_roxLoopblkOf[loopblkId];
             RoxLoopblk const &parent = m_roxLoopblkOf[loopblk.parent];
 
-            m_graph.connect({.sync = parent.left,      .subgraphPoint = {child.subgraph, point(0) /*start*/}});
-            m_graph.connect({.sync = parent.right,     .subgraphPoint = {child.subgraph, point(3) /*finish*/}});
+            m_graph.connect({.sync = parent.left,      .subgraphPoint = {child.subgraph, blkctrlStart}});
+            m_graph.connect({.sync = parent.right,     .subgraphPoint = {child.subgraph, blkctrlFinish}});
+            m_graph.connect({.sync = parent.checkstop, .subgraphPoint = {child.subgraph, blkctrlBlkExit}});
             m_graph.connect({.sync = parent.checkstop, .subgraphPoint = {child.scheduleStatus, point(1)}});
         }
     }
@@ -370,9 +373,7 @@ void SinglethreadFWExecutor::load(osp::fw::Framework& rFW)
                 .taskId         = TaskId{},
                 .pipelineId     = pipelineId,
             };
-            m_wtxSyncOf[roxPl.schedule] = {
-                .inactiveBlocks = 0
-            };
+            m_wtxSyncOf[roxPl.schedule] = {  };
 
             m_graph.syncs[roxPl.schedule].debugName = fmt::format("PL{} DefaultSchedule", pipelineId.value);
         }
@@ -400,8 +401,7 @@ void SinglethreadFWExecutor::load(osp::fw::Framework& rFW)
         };
 
         m_wtxSyncOf[rRoxTask.main] = {
-            .canceledByPipelines    = 0,
-            .inactiveBlocks         = 0
+            .canceledByPipelines    = 0
         };
     }
 
@@ -440,11 +440,8 @@ void SinglethreadFWExecutor::load(osp::fw::Framework& rFW)
         {
             RoxLoopblk &rParentRoxLoopblk = m_roxLoopblkOf[loopBlk.parent];
 
-            rParentRoxLoopblk.loopblkChildren.push_back(loopblkId);
-
-            rParentRoxLoopblk.associatedTasks.push_back(rRoxLoopblk.schedule);
-            ++m_wtxSyncOf[rRoxLoopblk.schedule].inactiveBlocks;
-
+            rParentRoxLoopblk.loopblkChildren .push_back(loopblkId);
+            rParentRoxLoopblk.associatedTasks .push_back(rRoxLoopblk.schedule);
             rParentRoxLoopblk.associatedOthers.push_back(rRoxLoopblk.left);
             rParentRoxLoopblk.associatedOthers.push_back(rRoxLoopblk.right);
         }
@@ -485,7 +482,6 @@ void SinglethreadFWExecutor::load(osp::fw::Framework& rFW)
         m_graph.connect({.sync = rRoxPipeline.schedule, .subgraphPoint = {rRoxPipeline.main, roxPltype.schedulePoint}});
         m_graph.connect({.sync = rRoxPipeline.schedule, .subgraphPoint = {rRoxPipeline.scheduleStatus, point(0)}});
 
-        ++m_wtxSyncOf[rRoxPipeline.schedule].inactiveBlocks;
         rRoxLoopblk.associatedTasks.push_back(rRoxPipeline.schedule);
     }
 
@@ -500,7 +496,6 @@ void SinglethreadFWExecutor::load(osp::fw::Framework& rFW)
         if ( ! vec_contains(rRoxLoopblk.associatedTasks, rRoxTask.main) )
         {
             rRoxLoopblk.associatedTasks.push_back(rRoxTask.main);
-            ++rTaskWtxSync.inactiveBlocks;
         }
 
         if (rRoxTask.parent.has_value())
@@ -619,60 +614,6 @@ void SinglethreadFWExecutor::load(osp::fw::Framework& rFW)
             else
             {
                 m_graph.connect({.sync = rRoxTask.sustainer, .subgraphPoint = {rRoxPipeline.main, stagePoint}});
-            }
-        }
-    }
-
-    // Add 'maybe cancel' syncs
-    for (TaskSyncToPipeline const& taskSync : tasks.syncs)
-    {
-        RoxTask           const &rRoxTask = m_roxTaskOf[taskSync.task];
-        Pipeline          const &pipeline       = tasks.pipelineInst[taskSync.pipeline];
-
-        if (pipeline.block == rRoxTask.parent)
-        {
-            PipelineTypeInfo  const &pltypeinfo     = pltypeinfoReg.get(pipeline.type);
-            auto              const &stageInfo      = pltypeinfo.stages[taskSync.stage];
-
-            LocalPointId const plpoint = point(1u + taskSync.stage.value);
-
-            // Add MaybeCancel sync for each task that might be canceled
-            if (stageInfo.useCancel)
-            {
-                RoxPipeline       const &roxPipeline    = m_roxPipelineOf[taskSync.pipeline];
-                RoxPltype         const &roxPltype      = roxPltypeOf[pipeline.type];
-                RoxLoopblk              &rRoxLoopblk    = m_roxLoopblkOf[pipeline.block];
-
-                SynchronizerId const maybeCancelId = m_graph.syncIds.create();
-                m_roxLoopblkOf[rRoxTask.parent].associatedOthers.push_back(maybeCancelId);
-
-                resize_fit_syncs();
-
-                WtxSync   const &rTaskWtxSync       = m_wtxSyncOf[rRoxTask.main];
-                Synchronizer    &rMaybeCancel       = m_graph.syncs[maybeCancelId];
-                RoxSync         &rRoxSync           = m_roxSyncOf[maybeCancelId];
-
-                rMaybeCancel.debugName = fmt::format("MaybeCancel: {}", tasks.taskInst[taskSync.task].debugName);
-
-                rRoxSync = {
-                    .tag = ESyncType::MaybeCancel
-                };
-
-                // copy connections from target task main sync to maybeCancel
-                Synchronizer const& mainCopySrc = m_graph.syncs[rRoxTask.main];
-                rMaybeCancel.connectedPoints.reserve(mainCopySrc.connectedPoints.size());
-                for (SubgraphPointAddr const& addr : mainCopySrc.connectedPoints)
-                {
-                    if (addr.subgraph == roxPipeline.main && addr.point == plpoint) { continue; }
-
-                    WtxSubgraph const& connectedWtxSubgraph = m_wtxSubgraphOf[addr.subgraph];
-
-                    if (connectedWtxSubgraph.tag != WtxSubgraph::ETag::Pipeline) { continue; }
-
-                    m_graph.connect({.sync = maybeCancelId, .subgraphPoint = {addr.subgraph, addr.point}});
-                }
-
-                m_graph.connect({.sync = maybeCancelId, .subgraphPoint = {roxPipeline.scheduleStatus, point(1)}});
             }
         }
     }
@@ -826,14 +767,6 @@ void SinglethreadFWExecutor::finish_schedule_block(LoopBlockId const loopblkId, 
     {
         RoxLoopblk const& roxLoopblk = m_roxLoopblkOf[loopblkId];
         rWtxLoopblk.state = WtxLoopblk::EState::ScheduledToRun;
-
-        // if nested loopblock
-        LoopBlockId const parent = rFW.m_tasks.loopblkInst[loopblkId].parent;
-        if (parent.has_value())
-        {
-            WtxLoopblk &rParentWtxLoopblk = m_wtxLoopblkOf[parent];
-            ++rParentWtxLoopblk.pipelinesRunning;
-        }
     }
 }
 
@@ -859,13 +792,9 @@ void SinglethreadFWExecutor::finish_schedule_pipeline(PipelineId const pipelineI
             SynchronizerId const cancelSyncId    = m_roxTaskOf[cancelTaskId].main;
             WtxSync              &rCancelWtxSync = m_wtxSyncOf[cancelSyncId];
             --rCancelWtxSync.canceledByPipelines;
-            if (rCancelWtxSync.canceledByPipelines == 0 && rCancelWtxSync.inactiveBlocks == 0)
+            if (m_log && rCancelWtxSync.canceledByPipelines == 0)
             {
-                if (m_log)
-                {
-                    SPDLOG_LOGGER_TRACE(m_log, "Enable Task{}: {}", cancelTaskId.value, rFW.m_tasks.taskInst[cancelTaskId].debugName);
-                }
-                m_exec.batch(SetEnable, {cancelSyncId}, m_graph);
+                SPDLOG_LOGGER_TRACE(m_log, "Enable Task{}: {}", cancelTaskId.value, rFW.m_tasks.taskInst[cancelTaskId].debugName);
             }
         }
     }
@@ -881,13 +810,9 @@ void SinglethreadFWExecutor::finish_schedule_pipeline(PipelineId const pipelineI
         {
             SynchronizerId const cancelSyncId    = m_roxTaskOf[cancelTaskId].main;
             WtxSync              &rCancelWtxSync = m_wtxSyncOf[cancelSyncId];
-            if (rCancelWtxSync.canceledByPipelines == 0 && rCancelWtxSync.inactiveBlocks == 0)
+            if (rCancelWtxSync.canceledByPipelines == 0)
             {
-                if (m_log)
-                {
-                    SPDLOG_LOGGER_TRACE(m_log, "Disable Task{}: {}", cancelTaskId.value, rFW.m_tasks.taskInst[cancelTaskId].debugName);
-                }
-                m_exec.batch(SetDisable, {cancelSyncId}, m_graph);
+                SPDLOG_LOGGER_TRACE(m_log, "Disable Task{}: {}", cancelTaskId.value, rFW.m_tasks.taskInst[cancelTaskId].debugName);
             }
             ++rCancelWtxSync.canceledByPipelines;
         }
@@ -908,6 +833,11 @@ void SinglethreadFWExecutor::process_aligned_sync(SynchronizerId const alignedSy
 
     if (isTask)
     {
+        if (alignedWtxSync.canceledByPipelines != 0)
+        {
+            m_exec.batch(Unlock, {alignedSyncId}, m_graph);
+            return;
+        }
         auto const taskId = TaskId{alignedRoxSync.taskId};
         if (taskId.has_value())
         {
@@ -965,16 +895,6 @@ void SinglethreadFWExecutor::process_aligned_sync(SynchronizerId const alignedSy
 
         if (taskId.has_value())
         {
-            RoxTask const& roxTask = m_roxTaskOf[taskId];
-            if (roxTask.external.has_value())
-            {
-                //make sure external is locked?
-                if (!m_exec.is_locked(roxTask.external, m_graph))
-                {
-
-                }
-            }
-
             fw::TaskImpl const &taskImpl = rFW.m_taskImpl[taskId];
 
             externalFinish = taskImpl.externalFinish;
@@ -1045,25 +965,16 @@ void SinglethreadFWExecutor::process_aligned_sync(SynchronizerId const alignedSy
                 m_exec.jump(roxLoopblkChild.subgraph, cycle(1), 0, m_graph);
             }
 
-            for (SynchronizerId const syncId : roxLoopblk.associatedTasks)
-            {
-                WtxSync &rTaskWtxSync = m_wtxSyncOf[syncId];
-                --rTaskWtxSync.inactiveBlocks;
-
-                if (rTaskWtxSync.inactiveBlocks == 0 && rTaskWtxSync.canceledByPipelines == 0)
-                {
-                    m_exec.batch(SetEnable, {syncId}, m_graph);
-                }
-            }
             for (SynchronizerId const syncId : roxLoopblk.externals)
             {
                 WtxTask &rWtxTask = m_wtxTaskOf[m_roxSyncOf[syncId].taskId];
                 rWtxTask.blockedByExternal  = true;
                 rWtxTask.waitingForExternal = false;
             }
-            m_exec.batch(SetEnable, roxLoopblk.externals, m_graph);
+            m_exec.batch(SetEnable, roxLoopblk.externals,        m_graph);
+            m_exec.batch(SetEnable, roxLoopblk.associatedTasks,  m_graph);
             m_exec.batch(SetEnable, roxLoopblk.associatedOthers, m_graph);
-            m_exec.batch(SetEnable, {roxLoopblk.checkstop}, m_graph);
+            m_exec.batch(SetEnable, {roxLoopblk.checkstop},      m_graph);
 
         }
 
@@ -1077,17 +988,7 @@ void SinglethreadFWExecutor::process_aligned_sync(SynchronizerId const alignedSy
         if (rWtxLoopblk.pipelinesRunning == 0)
         {
             // disable every sync
-            for (SynchronizerId const syncId : roxLoopblk.associatedTasks)
-            {
-                WtxSync &rTaskWtxSync = m_wtxSyncOf[syncId];
 
-                if (rTaskWtxSync.inactiveBlocks == 0 && rTaskWtxSync.canceledByPipelines == 0)
-                {
-                    m_disableSyncs.push_back(syncId);
-                }
-
-                ++rTaskWtxSync.inactiveBlocks;
-            }
             for (SynchronizerId const syncId : roxLoopblk.externals)
             {
                 WtxTask &rWtxTask = m_wtxTaskOf[m_roxSyncOf[syncId].taskId];
@@ -1096,6 +997,8 @@ void SinglethreadFWExecutor::process_aligned_sync(SynchronizerId const alignedSy
             }
             m_disableSyncs.insert(m_disableSyncs.end(), roxLoopblk.externals.begin(),
                                                         roxLoopblk.externals.end());
+            m_disableSyncs.insert(m_disableSyncs.end(), roxLoopblk.associatedTasks.begin(),
+                                                        roxLoopblk.associatedTasks.end());
             m_disableSyncs.insert(m_disableSyncs.end(), roxLoopblk.associatedOthers.begin(),
                                                         roxLoopblk.associatedOthers.end());
 
@@ -1103,6 +1006,9 @@ void SinglethreadFWExecutor::process_aligned_sync(SynchronizerId const alignedSy
             {
                 RoxLoopblk const &roxLoopblkChild = m_roxLoopblkOf[childLoopblkId];
                 m_exec.jump(roxLoopblkChild.subgraph, cycle(0), 1, m_graph);
+
+                LGRN_ASSERTM(m_wtxLoopblkOf[childLoopblkId].state == WtxLoopblk::EState::NotRunning,
+                             "child pipelines must have all exited before checkstop sync");
             }
 
             for (PipelineId const pipelineId : roxLoopblk.pipelineChildren)
@@ -1118,10 +1024,9 @@ void SinglethreadFWExecutor::process_aligned_sync(SynchronizerId const alignedSy
                     {
                         SynchronizerId const cancelSyncId = m_roxTaskOf[cancelTaskId].main;
                         WtxSync &rCancelWtxSync = m_wtxSyncOf[cancelSyncId];
-                        if (rCancelWtxSync.canceledByPipelines == 0 && rCancelWtxSync.inactiveBlocks == 0)
+                        if (m_log && rCancelWtxSync.canceledByPipelines == 0)
                         {
-                            std::cout << "disable task " << cancelTaskId.value << "\n";
-                            m_disableSyncs.push_back(cancelSyncId);
+                            SPDLOG_LOGGER_TRACE(m_log, "Disable Task{}: {}", cancelTaskId.value, rFW.m_tasks.taskInst[cancelTaskId].debugName);
                         }
                         ++rCancelWtxSync.canceledByPipelines;
                     }
@@ -1145,12 +1050,6 @@ void SinglethreadFWExecutor::process_aligned_sync(SynchronizerId const alignedSy
         if (rWtxLoopblk.state == WtxLoopblk::EState::Running)
         {
             rWtxLoopblk.state = WtxLoopblk::EState::NotRunning;
-            LoopBlockId const parent = rFW.m_tasks.loopblkInst[LoopBlockId{alignedRoxSync.loopBlk}].parent;
-            if (parent.has_value())
-            {
-                WtxLoopblk &rParentWtxLoopblk = m_wtxLoopblkOf[parent];
-                --rParentWtxLoopblk.pipelinesRunning;
-            }
 
             // set subgraphs back to their initial point for next iteration
             for (PipelineId const pipeline : roxLoopblk.pipelineChildren)
