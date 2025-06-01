@@ -62,9 +62,9 @@ extern osp::fw::FeatureDef const ftrUniverseTestPlanetsDraw;
 
 struct CoSpaceNBody
 {
-    osp::universe::TypedStrideDesc<float> mass;
-    osp::universe::TypedStrideDesc<float> radius;
-    osp::universe::TypedStrideDesc<Magnum::Color3> color;
+    osp::BufAttribFormat<float> mass;
+    osp::BufAttribFormat<float> radius;
+    osp::BufAttribFormat<Magnum::Color3> color;
 };
 
 /**

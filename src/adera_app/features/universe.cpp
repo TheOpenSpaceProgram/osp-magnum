@@ -23,9 +23,11 @@
  * SOFTWARE.
  */
 #include "universe.h"
+#include "misc.h"
 
 #include "../feature_interfaces.h"
 
+#include <adera/universe_demo/simulations.h>
 #include <adera/drawing/CameraController.h>
 
 #include <osp/core/math_2pow.h>
@@ -35,6 +37,8 @@
 #include <osp/util/logging.h>
 
 #include <random>
+#include <unordered_set>
+
 
 using namespace adera;
 using namespace ftr_inter::stages;
@@ -44,19 +48,61 @@ using namespace osp::fw;
 using namespace osp::universe;
 using namespace osp;
 
+using Corrade::Containers::Array;
+
 namespace adera
 {
 #if 0  // SYNCEXEC
 
 // Universe Scenario
 
+struct FIUniCore {
+    struct DataIds {
+        DataId coordSpaces;
+        DataId compTypes;
+        DataId compDefaults;
+        DataId dataAccessors;
+        DataId deletedSats;
+        DataId dataSrcs;
+        DataId satInst;
+        DataId simulations;
+        DataId time;
+        DataId intakes;
+        DataId deltaTimeIn;
+    };
+
+    struct Pipelines {
+        PipelineDef<EStgOptn> update            {"update            - Universe update"};
+        PipelineDef<EStgIntr> transfer          {"transfer"};
+    };
+};
+
 FeatureDef const ftrUniverseCore = feature_def("UniverseCore", [] (
         FeatureBuilder              &rFB,
         Implement<FIUniCore>        uniCore,
         entt::any                   userData)
 {
-    rFB.data_emplace< Universe >    (uniCore.di.universe);
     rFB.data_emplace< float >       (uniCore.di.deltaTimeIn, 1.0f / 60.0f);
+
+    auto &rCoordSpaces      = rFB.data_emplace< UCtxCoordSpaces >       (uniCore.di.coordSpaces);
+    auto &rCompTypes        = rFB.data_emplace< UCtxComponentTypes >    (uniCore.di.compTypes);
+    auto &rCompDefaults     = rFB.data_emplace< UCtxDefaultComponents > (uniCore.di.compDefaults);
+    auto &rDataAccessors    = rFB.data_emplace< UCtxDataAccessors >     (uniCore.di.dataAccessors);
+    auto &rDeletedSats      = rFB.data_emplace< UCtxDeletedSatellites > (uniCore.di.deletedSats);
+    auto &rDataSrcs         = rFB.data_emplace< UCtxDataSources >       (uniCore.di.dataSrcs);
+    auto &rSatInst          = rFB.data_emplace< UCtxSatelliteInstances >(uniCore.di.satInst);
+    auto &rSimulations      = rFB.data_emplace< UCtxSimulations >       (uniCore.di.simulations);
+    auto &rTime             = rFB.data_emplace< UCtxTime >              (uniCore.di.time);
+
+    auto &rIntakes          = rFB.data_emplace< UCtxIntakes >           (uniCore.di.intakes);
+
+    {
+        auto gen = rCompTypes.ids.generator();
+        rCompDefaults = {
+            gen.create(), gen.create(), gen.create(), gen.create(), gen.create(),
+            gen.create(), gen.create(), gen.create(), gen.create(), gen.create(),
+            gen.create(), gen.create(), gen.create()};
+    }
 
     auto const updateOn = entt::any_cast<PipelineId>(userData);
 
@@ -76,16 +122,158 @@ FeatureDef const ftrUniverseSceneFrame = feature_def("UniverseSceneFrame", [] (
 }); // ftrUniverseSceneFrame
 
 
+using adera::sims::CirclePathSim;
+using adera::sims::ConstantSpinSim;
+
+struct FITestSims {
+    struct DataIds {
+        DataId circleSim;
+        DataId spinSim;
+    };
+
+    struct Pipelines { };
+};
+
+template <typename T>
+DataAccessor::Component make_comp(T const* ptr, std::ptrdiff_t stride)
+{
+    return {reinterpret_cast<std::byte const*>(ptr), stride};
+}
+
+DataSourceId find_datasource(UCtxDataSources const& dataSrcs, DataSource const& query)
+{
+    std::size_t const size = query.entries.size();
+    for (DataSourceId const dataSrcId : dataSrcs.ids)
+    {
+        DataSource const& candidate = dataSrcs.instances[dataSrcId];
+        if (candidate.entries.size() != size)
+        {
+            continue;
+        }
+
+        if (std::memcmp(candidate.entries.data(), query.entries.data(), size * sizeof(DataSource::Entry)) != 0)
+        {
+            continue;
+        }
+
+        return dataSrcId;
+    }
+    return {};
+}
+
 FeatureDef const ftrUniverseTestPlanets = feature_def("UniverseTestPlanets", [] (
         FeatureBuilder              &rFB,
         Implement<FIUniPlanets>     uniPlanets,
+        Implement<FITestSims>       sim,
         DependOn<FIUniSceneFrame>   uniScnFrame,
         DependOn<FIUniCore>         uniCore)
 {
     using CoSpaceIdVec_t = std::vector<CoSpaceId>;
-    using Corrade::Containers::Array;
 
-    auto &rUniverse = rFB.data_get< Universe >(uniCore.di.universe);
+    auto &rCoordSpaces      = rFB.data_get< UCtxCoordSpaces >       (uniCore.di.coordSpaces);
+    auto &rCompTypes        = rFB.data_get< UCtxComponentTypes >    (uniCore.di.compTypes);
+    auto &rCompDefaults     = rFB.data_get< UCtxDefaultComponents > (uniCore.di.compDefaults);
+    auto &rDataAccessors    = rFB.data_get< UCtxDataAccessors >     (uniCore.di.dataAccessors);
+    auto &rDeletedSats      = rFB.data_get< UCtxDeletedSatellites > (uniCore.di.deletedSats);
+    auto &rDataSrcs         = rFB.data_get< UCtxDataSources >       (uniCore.di.dataSrcs);
+    auto &rSatInst          = rFB.data_get< UCtxSatelliteInstances >(uniCore.di.satInst);
+    auto &rSimulations      = rFB.data_get< UCtxSimulations >       (uniCore.di.simulations);
+    auto &rTime             = rFB.data_get< UCtxTime >              (uniCore.di.time);
+    auto &rIntakes          = rFB.data_get< UCtxIntakes >           (uniCore.di.intakes);
+
+    // Create coordinate spaces
+    CoSpaceId const mainSpace = rCoordSpaces.ids.create();
+
+    {
+        // add 1 satellite
+        SatelliteId const satId = rSatInst.ids.create();
+
+        DataSourceId const srcId = rDataSrcs.ids.create();
+        rDataSrcs.instances.resize(rDataSrcs.ids.capacity());
+
+        DataSource &rDataSrc = rDataSrcs.instances[srcId];
+
+        // Make circular path simulator for the satellite's position
+        auto &rCircleSim = rFB.data_emplace< CirclePathSim >(sim.di.circleSim);
+        rCircleSim.m_id = rSimulations.ids.create();
+        rCircleSim.m_data.resize(1);
+        rCircleSim.m_data[0].radius     = 4.0 * 1024.0;
+        rCircleSim.m_data[0].initTime   = 0;
+        rCircleSim.m_data[0].period     = 10000;
+        rCircleSim.m_data[0].id         = satId;
+
+        // setup data accessor to expose position and stuff
+        {
+            DataAccessor accessor;
+
+            accessor.cospace = mainSpace;
+            accessor.owner = rCircleSim.m_id;
+            accessor.count = 1;
+
+            constexpr std::size_t stride = sizeof(CirclePathSim::SatData);
+            CirclePathSim::SatData const *pFirst = rCircleSim.m_data.data();
+            accessor.components[rCompDefaults.posX]  = make_comp(&pFirst->position.data()[0], stride);
+            accessor.components[rCompDefaults.posY]  = make_comp(&pFirst->position.data()[1], stride);
+            accessor.components[rCompDefaults.posZ]  = make_comp(&pFirst->position.data()[2], stride);
+            accessor.components[rCompDefaults.satId] = make_comp(&pFirst->id, stride);
+
+            rCircleSim.m_accessor = std::make_shared<DataAccessor>(std::move(accessor));
+            DataAccessorId const accessorId = rDataAccessors.ids.create();
+            rDataAccessors.instances.resize(rDataAccessors.ids.size());
+            rDataAccessors.instances[accessorId] = rCircleSim.m_accessor;
+
+            DataSource::ComponentTypeSet_t comps;
+            comps.emplace(rCompDefaults.posX);
+            comps.emplace(rCompDefaults.posY);
+            comps.emplace(rCompDefaults.posZ);
+            comps.emplace(rCompDefaults.satId);
+            rDataSrc.entries.push_back(DataSource::Entry{comps, accessorId});
+        }
+
+        // Make constant spin simulator to control the satellite's rotation
+        auto &rSpinSim = rFB.data_emplace< ConstantSpinSim >(sim.di.spinSim);
+        rSpinSim.m_id = rSimulations.ids.create();
+        rSpinSim.m_data.resize(1);
+        rSpinSim.m_data[0].initTime   = 0;
+        rSpinSim.m_data[0].period     = 1000;
+        rSpinSim.m_data[0].axis       = {0.0f, 0.0f, 1.0f};
+        rSpinSim.m_data[0].id         = satId;
+
+        {
+            DataAccessor accessor;
+
+            accessor.cospace = mainSpace;
+            accessor.owner = rSpinSim.m_id;
+            accessor.count = 1;
+
+            constexpr std::size_t stride = sizeof(ConstantSpinSim::SatData);
+            ConstantSpinSim::SatData const *pFirst = rSpinSim.m_data.data();
+
+            accessor.components[rCompDefaults.rotX]  = make_comp(&pFirst->rot.data()[0], stride);
+            accessor.components[rCompDefaults.rotY]  = make_comp(&pFirst->rot.data()[1], stride);
+            accessor.components[rCompDefaults.rotZ]  = make_comp(&pFirst->rot.data()[2], stride);
+            accessor.components[rCompDefaults.rotW]  = make_comp(&pFirst->rot.data()[3], stride);
+            accessor.components[rCompDefaults.satId] = make_comp(&pFirst->id, stride);
+
+            rSpinSim.m_accessor = std::make_shared<DataAccessor>(std::move(accessor));
+            DataAccessorId const accessorId = rDataAccessors.ids.create();
+            rDataAccessors.instances.resize(rDataAccessors.ids.size());
+            rDataAccessors.instances[accessorId] = rSpinSim.m_accessor;
+
+            DataSource::ComponentTypeSet_t comps;
+            comps.emplace(rCompDefaults.rotX);
+            comps.emplace(rCompDefaults.rotY);
+            comps.emplace(rCompDefaults.rotZ);
+            comps.emplace(rCompDefaults.rotW);
+            comps.emplace(rCompDefaults.satId);
+            rDataSrc.entries.push_back(DataSource::Entry{comps, accessorId});
+        }
+
+        rSatInst.dataSrc.resize(rSatInst.ids.capacity());
+        rSatInst.dataSrc[satId] = srcId;
+    }
+
+    rDeletedSats.sets.resize(rDataAccessors.ids.capacity());
 
     constexpr int           precision       = 10;
     constexpr int           planetCount     = 64;
@@ -93,205 +281,77 @@ FeatureDef const ftrUniverseTestPlanets = feature_def("UniverseTestPlanets", [] 
     constexpr spaceint_t    maxDist         = math::mul_2pow<spaceint_t, int>(20000ul, precision);
     constexpr float         maxVel          = 800.0f;
 
-    // Create coordinate spaces
-    CoSpaceId const mainSpace = rUniverse.m_coordIds.create();
+
     std::vector<CoSpaceId> satSurfaceSpaces(planetCount);
-    rUniverse.m_coordIds.create(satSurfaceSpaces.begin(), satSurfaceSpaces.end());
+    rCoordSpaces.ids.create(satSurfaceSpaces.begin(), satSurfaceSpaces.end());
 
-    rUniverse.m_coordCommon.resize(rUniverse.m_coordIds.capacity());
+    // finalize coordinate space tree
+    auto const cospaceCapacity = rCoordSpaces.ids.capacity();
+    rCoordSpaces.transforms     .resize(cospaceCapacity);
+    rCoordSpaces.idParent       .resize(cospaceCapacity);
+    rCoordSpaces.idToTreePos    .resize(cospaceCapacity);
 
-    CoSpaceCommon &rMainSpaceCommon = rUniverse.m_coordCommon[mainSpace];
-    rMainSpaceCommon.m_satCount     = planetCount;
-    rMainSpaceCommon.m_satCapacity  = planetCount;
-
-    // Associate each planet satellite with their surface coordinate space
-    for (SatId satId = 0; satId < planetCount; ++satId)
-    {
-        CoSpaceId const surfaceSpaceId = satSurfaceSpaces[satId];
-        CoSpaceCommon &rCommon = rUniverse.m_coordCommon[surfaceSpaceId];
-        rCommon.m_parent    = mainSpace;
-        rCommon.m_parentSat = satId;
-    }
-
-    // Coordinate space data is a single allocation partitioned to hold positions, velocities, and
-    // rotations.
-    // TODO: Alignment is needed for SIMD (not yet implemented). see Corrade alignedAlloc
-
-    std::size_t bytesUsed = 0;
-
-    // Positions and velocities are arranged as XXXX... YYYY... ZZZZ...
-    partition(bytesUsed, planetCount, rMainSpaceCommon.m_satPositions[0]);
-    partition(bytesUsed, planetCount, rMainSpaceCommon.m_satPositions[1]);
-    partition(bytesUsed, planetCount, rMainSpaceCommon.m_satPositions[2]);
-    partition(bytesUsed, planetCount, rMainSpaceCommon.m_satVelocities[0]);
-    partition(bytesUsed, planetCount, rMainSpaceCommon.m_satVelocities[1]);
-    partition(bytesUsed, planetCount, rMainSpaceCommon.m_satVelocities[2]);
-
-    // Rotations use XYZWXYZWXYZWXYZW...
-    partition(bytesUsed, planetCount, rMainSpaceCommon.m_satRotations[0],
-                                      rMainSpaceCommon.m_satRotations[1],
-                                      rMainSpaceCommon.m_satRotations[2],
-                                      rMainSpaceCommon.m_satRotations[3]);
-
-    // Allocate data for all planets
-    rMainSpaceCommon.m_data = Array<unsigned char>{Corrade::NoInit, bytesUsed};
-
-    // Create easily accessible array views for each component
-    auto const [x, y, z]        = sat_views(rMainSpaceCommon.m_satPositions,  rMainSpaceCommon.m_data, planetCount);
-    auto const [vx, vy, vz]     = sat_views(rMainSpaceCommon.m_satVelocities, rMainSpaceCommon.m_data, planetCount);
-    auto const [qx, qy, qz, qw] = sat_views(rMainSpaceCommon.m_satRotations,  rMainSpaceCommon.m_data, planetCount);
-
-    std::mt19937 gen(seed);
-    std::uniform_int_distribution<spaceint_t> posDist(-maxDist, maxDist);
-    std::uniform_real_distribution<double> velDist(-maxVel, maxVel);
-
-    for (std::size_t i = 0; i < planetCount; ++i)
-    {
-        // Assign each planet random positions and velocities
-        x[i] = posDist(gen);
-        y[i] = posDist(gen);
-        z[i] = posDist(gen);
-        vx[i] = velDist(gen);
-        vy[i] = velDist(gen);
-        vz[i] = velDist(gen);
-
-        // No rotation
-        qx[i] = 0.0;
-        qy[i] = 0.0;
-        qz[i] = 0.0;
-        qw[i] = 1.0;
-    }
-
-    // Set initial scene frame
-
-    auto &rScnFrame      = rFB.data_get<SceneFrame>(uniScnFrame.di.scnFrame);
-    rScnFrame.m_parent   = mainSpace;
-    rScnFrame.m_position = math::mul_2pow<Vector3g, int>({400, 400, 400}, precision);
-
-    rFB.data_emplace< CoSpaceId >        (uniPlanets.di.planetMainSpace, mainSpace);
-    rFB.data_emplace< CoSpaceIdVec_t >   (uniPlanets.di.satSurfaceSpaces, std::move(satSurfaceSpaces));
+    //rCoordSpaces.transforms[mainSpace].;
+    rCoordSpaces.treeDescendants.assign({0u});
+    rCoordSpaces.treeToId.assign({mainSpace});
+    rCoordSpaces.idToTreePos[mainSpace] = 0;
 
     rFB.task()
         .name       ("Update planets")
         .run_on     (uniCore.pl.update(Run))
         .sync_with  ({uniScnFrame.pl.sceneFrame(Modify)})
-        .args       ({   uniCore.di.universe,   uniPlanets.di.planetMainSpace, uniScnFrame.di.scnFrame,          uniPlanets.di.satSurfaceSpaces,     uniCore.di.deltaTimeIn })
-        .func       ([] (Universe& rUniverse, CoSpaceId const planetMainSpace,   SceneFrame &rScnFrame, CoSpaceIdVec_t const& rSatSurfaceSpaces, float const uniDeltaTimeIn) noexcept
+        .args       ({            sim.di.circleSim,            sim.di.spinSim })
+        .func       ([] (CirclePathSim &rCircleSim, ConstantSpinSim &rSpinSim) noexcept
     {
-        CoSpaceCommon &rMainSpaceCommon = rUniverse.m_coordCommon[planetMainSpace];
+        static std::uint64_t time = 0;
 
-        auto const scale = osp::math::mul_2pow<double, int>(1.0, -rMainSpaceCommon.m_precision);
-        double const scaleDelta = uniDeltaTimeIn / scale;
-
-        auto const [x, y, z]        = sat_views(rMainSpaceCommon.m_satPositions,  rMainSpaceCommon.m_data, rMainSpaceCommon.m_satCount);
-        auto const [vx, vy, vz]     = sat_views(rMainSpaceCommon.m_satVelocities, rMainSpaceCommon.m_data, rMainSpaceCommon.m_satCount);
-        auto const [qx, qy, qz, qw] = sat_views(rMainSpaceCommon.m_satRotations,  rMainSpaceCommon.m_data, rMainSpaceCommon.m_satCount);
-
-        // Phase 1: Move satellites
-
-        for (std::size_t i = 0; i < rMainSpaceCommon.m_satCount; ++i)
-        {
-            x[i] += vx[i] * scaleDelta;
-            y[i] += vy[i] * scaleDelta;
-            z[i] += vz[i] * scaleDelta;
-
-            // Apply arbitrary inverse-square gravity towards origin
-            Vector3d const pos       = Vector3d( Vector3g( x[i], y[i], z[i] ) ) * scale;
-            double const r           = pos.length();
-            double const c_gm        = 10000000000.0;
-            Vector3d const accel     = -pos * uniDeltaTimeIn * c_gm / (r * r * r);
-
-            vx[i] += accel.x();
-            vy[i] += accel.y();
-            vz[i] += accel.z();
-
-            // Rotate based on i, semi-random
-            Vector3d const axis = Vector3d{std::sin(i), std::cos(i), double(i % 8 - 4)}.normalized();
-            Radd const speed{(i % 16) / 16.0};
-
-            Quaterniond const rot =   Quaterniond{{qx[i], qy[i], qz[i]}, qw[i]}
-                                    * Quaterniond::rotation(speed * uniDeltaTimeIn, axis);
-            qx[i] = rot.vector().x();
-            qy[i] = rot.vector().y();
-            qz[i] = rot.vector().z();
-            qw[i] = rot.scalar();
-        }
-
-        // Phase 2: Transfers and stuff
-
-        constexpr float captureDist = 500.0f;
-
-        Vector3g const cameraPos{rScnFrame.m_rotation.transformVector(Vector3d(rScnFrame.m_scenePosition))};
-        Vector3g const areaPos{rScnFrame.m_position + cameraPos};
-
-        bool const notInPlanet = (rScnFrame.m_parent == planetMainSpace);
-
-        if (notInPlanet)
-        {
-            // Find a planet to enter
-            std::size_t nearbyPlanet = rMainSpaceCommon.m_satCount;
-            for (std::size_t i = 0; i < rMainSpaceCommon.m_satCount; ++i)
-            {
-                Vector3 const diff = (Vector3( x[i], y[i], z[i] ) - Vector3(areaPos)) * scale;
-                if (diff.length() < captureDist)
-                {
-                    nearbyPlanet = i;
-                    break;
-                }
-            }
-
-            if (nearbyPlanet < rMainSpaceCommon.m_satCount)
-            {
-                OSP_LOG_INFO("Captured into Satellite {} under CoordSpace {}",
-                             nearbyPlanet, int(rSatSurfaceSpaces[nearbyPlanet]));
-
-                CoSpaceId const surface         = rSatSurfaceSpaces[nearbyPlanet];
-                CoSpaceCommon  &rSurfaceCommon  = rUniverse.m_coordCommon[surface];
-
-                CoSpaceTransform const surfaceTf     = coord_get_transform(rSurfaceCommon, rSurfaceCommon, x, y, z, qx, qy, qz, qw);
-                CoordTransformer const mainToSurface = coord_parent_to_child(rMainSpaceCommon, surfaceTf);
-
-                // Transfer scene frame from Main to Surface coordinate space
-                rScnFrame.m_parent   = surface;
-                rScnFrame.m_position = mainToSurface.transform_position(rScnFrame.m_position);
-                rScnFrame.m_rotation = mainToSurface.rotation() * rScnFrame.m_rotation;
-            }
-        }
-        else
-        {
-            // Currently within planet, try to escape it
-
-            Vector3 const diff = Vector3(areaPos) * scale;
-            if (diff.length() > captureDist)
-            {
-                OSP_LOG_INFO("Leaving planet");
-
-                CoSpaceId const surface       = rScnFrame.m_parent;
-                CoSpaceCommon &rSurfaceCommon = rUniverse.m_coordCommon[surface];
-
-                CoSpaceTransform const surfaceTf     = coord_get_transform(rSurfaceCommon, rSurfaceCommon, x, y, z, qx, qy, qz, qw);
-                CoordTransformer const surfaceToMain = coord_child_to_parent(rMainSpaceCommon, surfaceTf);
-
-                // Transfer scene frame from Surface to Main coordinate space
-                rScnFrame.m_parent   = planetMainSpace;
-                rScnFrame.m_position = surfaceToMain.transform_position(rScnFrame.m_position);
-                rScnFrame.m_rotation = surfaceToMain.rotation() * rScnFrame.m_rotation;
-            }
-        }
+        time+=15;
+        rCircleSim.update(time);
+        rSpinSim.update(time);
     });
 }); // ftrUniverseTestPlanets
 
+struct FIUniPlanetsDraw {
+    struct DataIds {
+        DataId planetDraw;
+    };
 
-
+    struct Pipelines {
+        PipelineDef<EStgOptn> resync  {"resync - Resync planet drawer with universe"};
+    };
+};
 
 struct PlanetDraw
 {
+
+    struct SatelliteToDraw
+    {
+        DrawEnt drawEnt;
+    };
+
+    struct TrackedCoordspace
+    {
+        std::unordered_set<DataAccessorId> accessors;
+        osp::KeyedVec<SatelliteId, std::optional<SatelliteToDraw>> sats;
+    };
+
+    bool connected = false;
+    bool doResync = false;
+
+
+    // [coordspace][satset]-> (list of dataacessors)
+
+    //std::unordered_map<SatelliteSetId, TrackedSatSet> trackedsatInst;
+    std::unordered_map<CoSpaceId, TrackedCoordspace> cospaces;
+
     DrawEntVec_t            drawEnts;
     std::array<DrawEnt, 3>  axis;
     DrawEnt                 attractor;
     MaterialId              planetMat;
     MaterialId              axisMat;
+
 };
+
 
 FeatureDef const ftrUniverseTestPlanetsDraw = feature_def("UniverseTestPlanetsDraw", [] (
         FeatureBuilder              &rFB,
@@ -305,6 +365,234 @@ FeatureDef const ftrUniverseTestPlanetsDraw = feature_def("UniverseTestPlanetsDr
         DependOn<FIUniPlanets>      uniPlanets,
         entt::any                   userData)
 {
+    auto const &params = entt::any_cast<PlanetDrawParams>(userData);
+
+    rFB.pipeline(uniPlanetsDraw.pl.resync) .parent(windowApp.pl.sync);
+
+    auto &rPlanetDraw  = rFB.data_emplace<PlanetDraw>(uniPlanetsDraw.di.planetDraw);
+
+
+    rPlanetDraw.planetMat = params.planetMat;
+
+
+    rFB.task()
+        .name       ("Read universe changes")
+        .run_on     ({windowApp.pl.sync(Run)})
+        .sync_with  ({uniPlanetsDraw.pl.resync(Schedule)})
+        .args       ({uniPlanetsDraw.di.planetDraw,          uniCore.di.dataAccessors,               uniCore.di.satInst,        uniCore.di.dataSrcs,                   uniCore.di.compDefaults})
+        .func       ([] (  PlanetDraw &rPlanetDraw, UCtxDataAccessors &rDataAccessors, UCtxSatelliteInstances &rSatInst, UCtxDataSources &rDataSrcs, UCtxDefaultComponents const& compDefaults) noexcept
+    {
+        if ( ! rPlanetDraw.connected)
+        {
+            rPlanetDraw.connected = true;
+
+            DataSource::ComponentTypeSet_t compsRequired;
+            compsRequired.emplace(compDefaults.posX);
+            compsRequired.emplace(compDefaults.posY);
+            compsRequired.emplace(compDefaults.posZ);
+
+            rPlanetDraw.cospaces.clear();
+
+            for (DataSourceId const id : rDataSrcs.ids)
+            {
+                DataSource const rSrc = rDataSrcs.instances[id];
+                DataSource::ComponentTypeSet_t compsRemaining = compsRequired;
+
+                for (DataSource::Entry const& entry : rSrc.entries)
+                {
+                    std::shared_ptr<DataAccessor> pAccessor = rDataAccessors.instances[entry.accessor].lock();
+
+                    bool hasComponentsWeCareAbout = true;
+
+                    // TODO
+                    // for (ComponentTypeId const comp : entry.components)
+                    // {
+                    // }
+
+                    if (hasComponentsWeCareAbout)
+                    {
+                        PlanetDraw::TrackedCoordspace &rTrack = rPlanetDraw.cospaces[pAccessor->cospace];
+                        rTrack.accessors.emplace(entry.accessor);
+                    }
+                }
+            }
+
+            rPlanetDraw.doResync = true;
+
+            // TODO: Subscribe to events
+            // TODO: somehow modify pipelines to connect to universe?
+        }
+
+        // on subscriber added, just push them all events so they don't directly just read?
+
+        // deal with events. satellites added/removed/transfered and stuff
+
+        // loop through all dataaccessors that we can and actually read positions
+        // the problem here is the 'resync' stage.
+        // how to initially discover all the stuff in the universe?
+    });
+
+    rFB.task()
+        .name       ("create draw entities")
+        .run_on     ({windowApp.pl.sync(Run)})
+        .sync_with  ({uniPlanetsDraw.pl.resync(Run), scnRender.pl.drawEntResized(ModifyOrSignal), scnRender.pl.drawEnt(New)})
+        .args       ({    uniPlanetsDraw.di.planetDraw,  uniCore.di.dataAccessors,   uniCore.di.satInst, uniCore.di.dataSrcs,            uniCore.di.compDefaults, scnRender.di.scnRender })
+        .func       ([] (      PlanetDraw &rPlanetDraw, UCtxDataAccessors &rDataAccessors, UCtxSatelliteInstances &rSatInst, UCtxDataSources &rDataSrcs, UCtxDefaultComponents const& compDefaults, ACtxSceneRender &rScnRender) noexcept
+    {
+        if (rPlanetDraw.doResync)
+        {
+            // create draw ents?
+
+            auto drawEntGen = rScnRender.m_drawIds.generator();
+
+            for (auto & [cospaceId, rTrackedCospace] : rPlanetDraw.cospaces)
+            {
+                rTrackedCospace.sats.resize(rSatInst.ids.capacity());
+                for (SatelliteId const satId : rSatInst.ids)
+                {
+                    PlanetDraw::SatelliteToDraw &rSatToDraw = rTrackedCospace.sats[satId].emplace(PlanetDraw::SatelliteToDraw{});
+                    rSatToDraw.drawEnt = drawEntGen.create();
+                }
+            }
+        }
+
+    });
+
+    rFB.task()
+        .name       ("Add mesh and materials to universe stuff")
+        .run_on     ({windowApp.pl.sync(Run)})
+        .sync_with  ({uniPlanetsDraw.pl.resync(Run), scnRender.pl.drawEntResized(Done), scnRender.pl.drawEnt(Ready), scnRender.pl.entMesh(New), scnRender.pl.material(New)})
+        .args       ({    uniPlanetsDraw.di.planetDraw,          uniCore.di.dataAccessors,               uniCore.di.satInst,        uniCore.di.dataSrcs,            uniCore.di.compDefaults, scnRender.di.scnRender, comScn.di.drawing, comScn.di.namedMeshes })
+        .func       ([] (      PlanetDraw &rPlanetDraw, UCtxDataAccessors &rDataAccessors, UCtxSatelliteInstances &rSatInst, UCtxDataSources &rDataSrcs, UCtxDefaultComponents const& compDefaults, ACtxSceneRender &rScnRender, ACtxDrawing& rDrawing, NamedMeshes& rNamedMeshes) noexcept
+    {
+        if (rPlanetDraw.doResync)
+        {
+            // eat everything
+            //std::cout << "eat";
+
+            // maybe for each satellite type?
+            // or each coordspace?
+            //
+            // which one makes the most sense?
+            // usually want to specify a coordspace. 'what is here'
+            // write to roughly the same physical space.
+            // better to have per satset/coordspace pair. or datasource
+            // (satset,coordspace)-> (list of dataacessors)
+
+            // loop through all dataacessors, and write positions and stuff
+            //
+            for (auto & [cospaceId, rTrackedCospace] : rPlanetDraw.cospaces)
+            {
+                for (SatelliteId const satId : rSatInst.ids)
+                {
+                    PlanetDraw::SatelliteToDraw &rSatToDraw = rTrackedCospace.sats[satId].value();
+                    rScnRender.m_visible.insert(rSatToDraw.drawEnt);
+                    rScnRender.m_opaque .insert(rSatToDraw.drawEnt);
+                    MeshId const sphereMeshId = rNamedMeshes.m_shapeToMesh.at(EShape::Sphere);
+                    rScnRender.m_mesh[rSatToDraw.drawEnt] = rDrawing.m_meshRefCounts.ref_add(sphereMeshId);
+                    rScnRender.m_meshDirty.push_back(rSatToDraw.drawEnt);
+
+                    rScnRender.m_color[rSatToDraw.drawEnt] = {1.0f, 1.0f, 1.0f, 1.0f};
+
+                    rScnRender.m_materials[rPlanetDraw.planetMat].m_ents.insert(rSatToDraw.drawEnt);
+                    rScnRender.m_materials[rPlanetDraw.planetMat].m_dirty.push_back(rSatToDraw.drawEnt);
+                }
+            }
+        }
+    });
+
+    rFB.task()
+        .name       ("write draw transforms")
+        .run_on     ({windowApp.pl.sync(Run)})
+        .sync_with  ({uniPlanetsDraw.pl.resync(Run), scnRender.pl.drawEntResized(Done), scnRender.pl.drawEnt(Ready), scnRender.pl.entMesh(New), scnRender.pl.material(New)})
+        .args       ({    uniPlanetsDraw.di.planetDraw,          uniCore.di.dataAccessors,              uniCore.di.deletedSats,               uniCore.di.satInst,        uniCore.di.dataSrcs,                   uniCore.di.compDefaults,      scnRender.di.scnRender })
+        .func       ([] (      PlanetDraw &rPlanetDraw, UCtxDataAccessors &rDataAccessors, UCtxDeletedSatellites &rDeletedSats, UCtxSatelliteInstances &rSatInst, UCtxDataSources &rDataSrcs, UCtxDefaultComponents const& compDefaults, ACtxSceneRender &rScnRender) noexcept
+    {
+        for (auto & [cospaceId, rTrackedCospace] : rPlanetDraw.cospaces)
+        {
+            for (DataAccessorId const accessorId : rTrackedCospace.accessors)
+            {
+                std::shared_ptr<DataAccessor> rInstance = rDataAccessors.instances[accessorId].lock();
+
+                UCtxDeletedSatellites::Accessor const& deleted = rDeletedSats.sets[accessorId];
+
+                if (rInstance->iterMethod == DataAccessor::IterationMethod::SkipNullSatellites)
+                {
+                    static constexpr auto indices = std::array<std::size_t const, 8u>{0u, 1u, 2u, 3u, 4u, 5u, 6u, 7u};
+                    auto const [idxPosX, idxPosY, idxPosZ, idxRotX, idxRotY, idxRotZ, idxRotW, idxSatId] = indices;
+
+                    auto iter = rInstance->iterate(std::array{
+                            compDefaults.posX, compDefaults.posY, compDefaults.posZ,
+                            compDefaults.rotX, compDefaults.rotY, compDefaults.rotZ, compDefaults.rotW,
+                            compDefaults.satId});
+
+                    bool const hasPosXYZ  = iter.has(idxPosX) && iter.has(idxPosY) && iter.has(idxPosZ);
+                    bool const hasRotXYZW = iter.has(idxRotX) && iter.has(idxRotY) && iter.has(idxRotZ) && iter.has(idxRotW);
+
+                    LGRN_ASSERTM(iter.has(idxSatId), "other iteration methods not yet supported");
+
+
+
+                    for (std::size_t i = 0; i < rInstance->count; ++i)
+                    {
+                        SatelliteId const satId = iter.get<SatelliteId>(idxSatId);
+
+                        if (deleted.dirty && deleted.set.contains(satId))
+                        {
+                            continue;
+                        }
+
+                        if (hasPosXYZ)
+                        {
+                            Vector3g const pos {iter.get<spaceint_t>(idxPosX),
+                                                iter.get<spaceint_t>(idxPosY),
+                                                iter.get<spaceint_t>(idxPosZ)};
+
+                            Vector3d const d = Vector3d(pos);
+                            Vector3 const qux = Vector3(d / 1024.0);
+
+                            PlanetDraw::SatelliteToDraw const &rSatToDraw = rTrackedCospace.sats[satId].value();
+
+                            LGRN_ASSERT(rSatToDraw.drawEnt.has_value());
+
+                            rScnRender.m_drawTransform[rSatToDraw.drawEnt].translation() = qux;
+                        }
+
+                        if (hasRotXYZW)
+                        {
+                            Quaternion const rot { {iter.get<float>(idxRotX), iter.get<float>(idxRotY), iter.get<float>(idxRotZ)}, iter.get<float>(idxRotW)};
+
+                            PlanetDraw::SatelliteToDraw const &rSatToDraw = rTrackedCospace.sats[satId].value();
+
+                            LGRN_ASSERT(rSatToDraw.drawEnt.has_value());
+
+                            Matrix3 const foo = rot.toMatrix();
+                            rScnRender.m_drawTransform[rSatToDraw.drawEnt][0].xyz() = foo[0];
+                            rScnRender.m_drawTransform[rSatToDraw.drawEnt][1].xyz() = foo[1];
+                            rScnRender.m_drawTransform[rSatToDraw.drawEnt][2].xyz() = foo[2];
+                        }
+
+                        iter.next();
+                    }
+                }
+            }
+        }
+    });
+
+    rFB.task()
+        .name       ("resync done")
+        .run_on     ({windowApp.pl.sync(Run)})
+        .sync_with  ({uniPlanetsDraw.pl.resync(Done)})
+        .args       ({uniPlanetsDraw.di.planetDraw })
+        .func       ([] (PlanetDraw &rPlanetDraw) noexcept
+    {
+        // for each
+        rPlanetDraw.doResync = false;
+    });
+
+
+
+        #if 0
     auto const params = entt::any_cast<PlanetDrawParams>(userData);
 
     rFB.data_emplace<PlanetDraw>(uniPlanetsDraw.di.planetDraw, PlanetDraw{
@@ -480,6 +768,7 @@ FeatureDef const ftrUniverseTestPlanetsDraw = feature_def("UniverseTestPlanetsDr
                 * Matrix4{(mainToAreaRot * Quaternion{rot}).toMatrix()};
         }
     });
+#endif
 }); // setup_testplanets_draw
 
 
@@ -494,6 +783,7 @@ FeatureDef const ftrSolarSystem = feature_def("SolarSystem", [] (
         DependOn<FIUniCore>         uniCore,
         DependOn<FIUniSceneFrame>   uniScnFrame)
 {
+        #if 0
     using CoSpaceIdVec_t = std::vector<CoSpaceId>;
     using Corrade::Containers::Array;
 
@@ -528,28 +818,27 @@ FeatureDef const ftrSolarSystem = feature_def("SolarSystem", [] (
     // rotations.
     // TODO: Alignment is needed for SIMD (not yet implemented). see Corrade alignedAlloc
 
-    std::size_t bytesUsed = 0;
-
     // Positions and velocities are arranged as XXXX... YYYY... ZZZZ...
-    partition(bytesUsed, c_planetCount, rMainSpaceCommon.m_satPositions[0]);
-    partition(bytesUsed, c_planetCount, rMainSpaceCommon.m_satPositions[1]);
-    partition(bytesUsed, c_planetCount, rMainSpaceCommon.m_satPositions[2]);
-    partition(bytesUsed, c_planetCount, rMainSpaceCommon.m_satVelocities[0]);
-    partition(bytesUsed, c_planetCount, rMainSpaceCommon.m_satVelocities[1]);
-    partition(bytesUsed, c_planetCount, rMainSpaceCommon.m_satVelocities[2]);
+    osp::BufferFormatBuilder fb;
+    rMainSpaceCommon.m_satPositions [0] = fb.insert_block<spaceint_t>(c_planetCount);
+    rMainSpaceCommon.m_satPositions [1] = fb.insert_block<spaceint_t>(c_planetCount);
+    rMainSpaceCommon.m_satPositions [2] = fb.insert_block<spaceint_t>(c_planetCount);
+    rMainSpaceCommon.m_satVelocities[0] = fb.insert_block<double>(c_planetCount);
+    rMainSpaceCommon.m_satVelocities[1] = fb.insert_block<double>(c_planetCount);
+    rMainSpaceCommon.m_satVelocities[2] = fb.insert_block<double>(c_planetCount);
 
     // Rotations use XYZWXYZWXYZWXYZW...
-    partition(bytesUsed, c_planetCount, rMainSpaceCommon.m_satRotations[0],
-        rMainSpaceCommon.m_satRotations[1],
-        rMainSpaceCommon.m_satRotations[2],
-        rMainSpaceCommon.m_satRotations[3]);
+    fb.insert_interleave(c_planetCount, rMainSpaceCommon.m_satRotations[0],
+                                        rMainSpaceCommon.m_satRotations[1],
+                                        rMainSpaceCommon.m_satRotations[2],
+                                        rMainSpaceCommon.m_satRotations[3]);
 
-    partition(bytesUsed, c_planetCount, rCoordNBody[mainSpace].mass);
-    partition(bytesUsed, c_planetCount, rCoordNBody[mainSpace].radius);
-    partition(bytesUsed, c_planetCount, rCoordNBody[mainSpace].color);
+    rCoordNBody[mainSpace].mass = fb.insert_block<float>(c_planetCount);
+    rCoordNBody[mainSpace].radius = fb.insert_block<float>(c_planetCount);
+    rCoordNBody[mainSpace].color = fb.insert_block<Magnum::Color3>(c_planetCount);
 
     // Allocate data for all planets
-    rMainSpaceCommon.m_data = Array<unsigned char>{ Corrade::NoInit, bytesUsed };
+    rMainSpaceCommon.m_data = Array<std::byte>{ Corrade::NoInit, fb.total_size() };
 
     std::size_t nextBody = 0;
     auto const add_body = [&rMainSpaceCommon, &nextBody, &rCoordNBody, &mainSpace] (
@@ -686,7 +975,7 @@ FeatureDef const ftrSolarSystem = feature_def("SolarSystem", [] (
             }
         }
     });
-
+#endif
 }); // ftrSolarSystemPlanets
 
 
@@ -703,6 +992,7 @@ FeatureDef const ftrSolarSystemDraw = feature_def("SolarSystemDraw", [] (
         DependOn<FISolarSys>        solarSys,
         entt::any                   userData)
 {
+        #if 0
     auto const params = entt::any_cast<PlanetDrawParams>(userData);
 
     rFB.data_emplace<PlanetDraw>(uniPlanetsDraw.di.planetDraw, PlanetDraw{
@@ -840,6 +1130,7 @@ FeatureDef const ftrSolarSystemDraw = feature_def("SolarSystemDraw", [] (
             };
         }
     });
+#endif
 }); // ftrSolarSystemDraw
 
 #endif
