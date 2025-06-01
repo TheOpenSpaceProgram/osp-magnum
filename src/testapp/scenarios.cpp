@@ -1,4 +1,4 @@
-/**
+﻿/**
  * Open Space Program
  * Copyright © 2019-2021 Open Space Program Project
  *
@@ -305,7 +305,6 @@ static ScenarioMap_t make_scenarios()
     }});
 
 
-/*
 
     add_scenario({
         .name        = "universe",
@@ -315,17 +314,17 @@ static ScenarioMap_t make_scenarios()
                        "* [QE]              - Move camera up/down\n"
                        "* [Drag MouseRight] - Orbit camera\n"
                        "* [Space]           - Throw spheres\n",
-        .loadFunc = [] (TestApp& rTestApp)
+        .loadFunc = [] (ScenarioArgs args)
     {
-        auto        &rFW      = rTestApp.m_framework;
-        auto  const mainApp   = rFW.get_interface<FIMainApp>  (rTestApp.m_mainContext);
+        auto  const mainApp   = args.rFW.get_interface<FIMainApp>(args.mainContext);
 
-        ContextId const sceneCtx = rFW.m_contextIds.create();
-        rFW.data_get<adera::AppContexts&>(mainApp.di.appContexts).scene = sceneCtx;
+        ContextId const sceneCtx = args.rFW.m_contextIds.create();
+        args.rFW.data_get<adera::AppContexts&>(mainApp.di.appContexts).scene = sceneCtx;
 
-        ContextBuilder  sceneCB { sceneCtx, {rTestApp.m_mainContext}, rFW };
+        ContextBuilder  sceneCB { sceneCtx, {args.mainContext}, args.rFW };
         sceneCB.add_feature(ftrScene);
-        sceneCB.add_feature(ftrCommonScene, rTestApp.m_defaultPkg);
+        sceneCB.add_feature(ftrCleanupCtx);
+        sceneCB.add_feature(ftrCommonScene, args.defaultPkg);
         sceneCB.add_feature(ftrPhysics);
         sceneCB.add_feature(ftrPhysicsShapes, osp::draw::MaterialId{0});
         //sceneCB.add_feature(ftrDroppers);
@@ -335,19 +334,20 @@ static ScenarioMap_t make_scenarios()
         sceneCB.add_feature(ftrJoltConstAccel);
         sceneCB.add_feature(ftrPhysicsShapesJolt);
 
-        auto const scene = rFW.get_interface<FIScene>(sceneCtx);
+        auto const scene = args.rFW.get_interface<FIScene>(sceneCtx);
 
-        //sceneCB.add_feature(ftrUniverseCore, PipelineId{mainApp.pl.mainLoop});
+        sceneCB.add_feature(ftrUniverseCore);
         sceneCB.add_feature(ftrUniverseSceneFrame);
         sceneCB.add_feature(ftrUniverseTestPlanets);
         ContextBuilder::finalize(std::move(sceneCB));
 
-        ospjolt::ForceFactors_t const gravity = add_constant_acceleration(sc_gravityForce, rFW, sceneCtx);
-        set_phys_shape_factors(gravity, rFW, sceneCtx);
+        ospjolt::ForceFactors_t const gravity = add_constant_acceleration(sc_gravityForce, args.rFW, sceneCtx);
+        set_phys_shape_factors(gravity, args.rFW, sceneCtx);
         //add_floor(rFW, sceneCtx, rTestApp.m_defaultPkg, 0);
     }});
 
 
+/*
 
     add_scenario({
         .name        = "solar-system",

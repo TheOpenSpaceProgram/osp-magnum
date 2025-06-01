@@ -52,7 +52,6 @@ using Corrade::Containers::Array;
 
 namespace adera
 {
-#if 0  // SYNCEXEC
 
 // Universe Scenario
 
@@ -80,6 +79,7 @@ struct FIUniCore {
 FeatureDef const ftrUniverseCore = feature_def("UniverseCore", [] (
         FeatureBuilder              &rFB,
         Implement<FIUniCore>        uniCore,
+        DependOn<FIMainApp>         mainApp,
         entt::any                   userData)
 {
     rFB.data_emplace< float >       (uniCore.di.deltaTimeIn, 1.0f / 60.0f);
@@ -104,10 +104,10 @@ FeatureDef const ftrUniverseCore = feature_def("UniverseCore", [] (
             gen.create(), gen.create(), gen.create()};
     }
 
-    auto const updateOn = entt::any_cast<PipelineId>(userData);
+    //auto const updateOn = entt::any_cast<PipelineId>(userData);
 
-    rFB.pipeline(uniCore.pl.update).parent(updateOn);
-    rFB.pipeline(uniCore.pl.transfer).parent(uniCore.pl.update);
+    rFB.pipeline(uniCore.pl.update)  .parent(mainApp.loopblks.mainLoop);
+    rFB.pipeline(uniCore.pl.transfer).parent(mainApp.loopblks.mainLoop);
 
 }); // setup_uni_core
 
@@ -115,10 +115,11 @@ FeatureDef const ftrUniverseCore = feature_def("UniverseCore", [] (
 FeatureDef const ftrUniverseSceneFrame = feature_def("UniverseSceneFrame", [] (
         FeatureBuilder              &rFB,
         Implement<FIUniSceneFrame>  uniScnFrame,
+        DependOn<FIMainApp>         mainApp,
         DependOn<FIUniCore>         uniCore)
 {
     rFB.data_emplace< SceneFrame > (uniScnFrame.di.scnFrame);
-    rFB.pipeline(uniScnFrame.pl.sceneFrame).parent(uniCore.pl.update);
+    rFB.pipeline(uniScnFrame.pl.sceneFrame).parent(mainApp.loopblks.mainLoop);
 }); // ftrUniverseSceneFrame
 
 
@@ -298,8 +299,7 @@ FeatureDef const ftrUniverseTestPlanets = feature_def("UniverseTestPlanets", [] 
 
     rFB.task()
         .name       ("Update planets")
-        .run_on     (uniCore.pl.update(Run))
-        .sync_with  ({uniScnFrame.pl.sceneFrame(Modify)})
+        .sync_with  ({uniCore.pl.update(Run), uniScnFrame.pl.sceneFrame(Modify)})
         .args       ({            sim.di.circleSim,            sim.di.spinSim })
         .func       ([] (CirclePathSim &rCircleSim, ConstantSpinSim &rSpinSim) noexcept
     {
@@ -356,6 +356,7 @@ struct PlanetDraw
 FeatureDef const ftrUniverseTestPlanetsDraw = feature_def("UniverseTestPlanetsDraw", [] (
         FeatureBuilder              &rFB,
         Implement<FIUniPlanetsDraw> uniPlanetsDraw,
+        DependOn<FIMainApp>         mainApp,
         DependOn<FIWindowApp>       windowApp,
         DependOn<FISceneRenderer>   scnRender,
         DependOn<FICameraControl>   camCtrl,
@@ -367,7 +368,7 @@ FeatureDef const ftrUniverseTestPlanetsDraw = feature_def("UniverseTestPlanetsDr
 {
     auto const &params = entt::any_cast<PlanetDrawParams>(userData);
 
-    rFB.pipeline(uniPlanetsDraw.pl.resync) .parent(windowApp.pl.sync);
+    rFB.pipeline(uniPlanetsDraw.pl.resync).parent(mainApp.loopblks.mainLoop);
 
     auto &rPlanetDraw  = rFB.data_emplace<PlanetDraw>(uniPlanetsDraw.di.planetDraw);
 
@@ -377,8 +378,7 @@ FeatureDef const ftrUniverseTestPlanetsDraw = feature_def("UniverseTestPlanetsDr
 
     rFB.task()
         .name       ("Read universe changes")
-        .run_on     ({windowApp.pl.sync(Run)})
-        .sync_with  ({uniPlanetsDraw.pl.resync(Schedule)})
+        .sync_with  ({windowApp.pl.sync(Run), uniPlanetsDraw.pl.resync(ModifyOrSignal)})
         .args       ({uniPlanetsDraw.di.planetDraw,          uniCore.di.dataAccessors,               uniCore.di.satInst,        uniCore.di.dataSrcs,                   uniCore.di.compDefaults})
         .func       ([] (  PlanetDraw &rPlanetDraw, UCtxDataAccessors &rDataAccessors, UCtxSatelliteInstances &rSatInst, UCtxDataSources &rDataSrcs, UCtxDefaultComponents const& compDefaults) noexcept
     {
@@ -434,8 +434,7 @@ FeatureDef const ftrUniverseTestPlanetsDraw = feature_def("UniverseTestPlanetsDr
 
     rFB.task()
         .name       ("create draw entities")
-        .run_on     ({windowApp.pl.sync(Run)})
-        .sync_with  ({uniPlanetsDraw.pl.resync(Run), scnRender.pl.drawEntResized(ModifyOrSignal), scnRender.pl.drawEnt(New)})
+        .sync_with  ({windowApp.pl.sync(Run), uniPlanetsDraw.pl.resync(Run), scnRender.pl.drawEnt(New)})
         .args       ({    uniPlanetsDraw.di.planetDraw,  uniCore.di.dataAccessors,   uniCore.di.satInst, uniCore.di.dataSrcs,            uniCore.di.compDefaults, scnRender.di.scnRender })
         .func       ([] (      PlanetDraw &rPlanetDraw, UCtxDataAccessors &rDataAccessors, UCtxSatelliteInstances &rSatInst, UCtxDataSources &rDataSrcs, UCtxDefaultComponents const& compDefaults, ACtxSceneRender &rScnRender) noexcept
     {
@@ -460,8 +459,7 @@ FeatureDef const ftrUniverseTestPlanetsDraw = feature_def("UniverseTestPlanetsDr
 
     rFB.task()
         .name       ("Add mesh and materials to universe stuff")
-        .run_on     ({windowApp.pl.sync(Run)})
-        .sync_with  ({uniPlanetsDraw.pl.resync(Run), scnRender.pl.drawEntResized(Done), scnRender.pl.drawEnt(Ready), scnRender.pl.entMesh(New), scnRender.pl.material(New)})
+        .sync_with  ({windowApp.pl.sync(Run), uniPlanetsDraw.pl.resync(Run), scnRender.pl.drawEnt(Ready), scnRender.pl.mesh(New), scnRender.pl.material(New)})
         .args       ({    uniPlanetsDraw.di.planetDraw,          uniCore.di.dataAccessors,               uniCore.di.satInst,        uniCore.di.dataSrcs,            uniCore.di.compDefaults, scnRender.di.scnRender, comScn.di.drawing, comScn.di.namedMeshes })
         .func       ([] (      PlanetDraw &rPlanetDraw, UCtxDataAccessors &rDataAccessors, UCtxSatelliteInstances &rSatInst, UCtxDataSources &rDataSrcs, UCtxDefaultComponents const& compDefaults, ACtxSceneRender &rScnRender, ACtxDrawing& rDrawing, NamedMeshes& rNamedMeshes) noexcept
     {
@@ -503,8 +501,7 @@ FeatureDef const ftrUniverseTestPlanetsDraw = feature_def("UniverseTestPlanetsDr
 
     rFB.task()
         .name       ("write draw transforms")
-        .run_on     ({windowApp.pl.sync(Run)})
-        .sync_with  ({uniPlanetsDraw.pl.resync(Run), scnRender.pl.drawEntResized(Done), scnRender.pl.drawEnt(Ready), scnRender.pl.entMesh(New), scnRender.pl.material(New)})
+        .sync_with  ({windowApp.pl.sync(Run), uniPlanetsDraw.pl.resync(Run), scnRender.pl.drawEnt(Ready), scnRender.pl.mesh(New), scnRender.pl.material(New)})
         .args       ({    uniPlanetsDraw.di.planetDraw,          uniCore.di.dataAccessors,              uniCore.di.deletedSats,               uniCore.di.satInst,        uniCore.di.dataSrcs,                   uniCore.di.compDefaults,      scnRender.di.scnRender })
         .func       ([] (      PlanetDraw &rPlanetDraw, UCtxDataAccessors &rDataAccessors, UCtxDeletedSatellites &rDeletedSats, UCtxSatelliteInstances &rSatInst, UCtxDataSources &rDataSrcs, UCtxDefaultComponents const& compDefaults, ACtxSceneRender &rScnRender) noexcept
     {
@@ -581,16 +578,13 @@ FeatureDef const ftrUniverseTestPlanetsDraw = feature_def("UniverseTestPlanetsDr
 
     rFB.task()
         .name       ("resync done")
-        .run_on     ({windowApp.pl.sync(Run)})
-        .sync_with  ({uniPlanetsDraw.pl.resync(Done)})
-        .args       ({uniPlanetsDraw.di.planetDraw })
+        .sync_with  ({windowApp.pl.sync(Run), uniPlanetsDraw.pl.resync(Done)})
+        .args       ({uniPlanetsDraw.di.planetDraw})
         .func       ([] (PlanetDraw &rPlanetDraw) noexcept
     {
         // for each
         rPlanetDraw.doResync = false;
     });
-
-
 
         #if 0
     auto const params = entt::any_cast<PlanetDrawParams>(userData);
@@ -1133,5 +1127,4 @@ FeatureDef const ftrSolarSystemDraw = feature_def("SolarSystemDraw", [] (
 #endif
 }); // ftrSolarSystemDraw
 
-#endif
 } // namespace adera
