@@ -108,7 +108,7 @@ public:
     {
         constexpr std::size_t stride = (sizeof(T) + ...);
 
-        (rInterleave.m_stride = ... = stride);
+        (rInterleave.stride = ... = stride);
 
         interleave_aux(m_totalSize, rInterleave ...);
 
@@ -125,7 +125,7 @@ private:
     template <typename FIRST_T, typename ... T>
     constexpr void interleave_aux(std::size_t const pos, BufAttribFormat<FIRST_T>& rInterleaveFirst, BufAttribFormat<T>& ... rInterleave)
     {
-        rInterleaveFirst.m_offset = pos;
+        rInterleaveFirst.offset = pos;
 
         if constexpr (sizeof...(T) != 0)
         {

@@ -175,14 +175,14 @@ ContextId make_scene_renderer(Framework &rFW, PkgId defaultPkg, ContextId mainCo
         rCamCtrl.m_orbitDistanceMin = 1.0f;
         rCamCtrl.m_moveSpeed = 0.5f;
     }
-/*
+
     if (rFW.get_interface_id<FIUniPlanets>(sceneCtx).has_value())
     {
         scnRdrCB.add_feature(ftrUniverseTestPlanetsDraw, PlanetDrawParams{
             .planetMat = matVisualizer,
             .axisMat   = matFlat });
     }
-
+/*
     if (rFW.get_interface_id<FISolarSys>(sceneCtx).has_value())
     {
         scnRdrCB.add_feature(ftrSolarSystemDraw, PlanetDrawParams{
