@@ -171,34 +171,6 @@ inline osp::PipelineTypeInfo const gc_infoForEStgLink
 };
 
 
-//enum class EStgUni: uint8_t
-//{
-//    /// step simulation forward in time; calculate new values (or just swap buffers) for EXISTING satellites
-//    Calculate       = 0,
-
-//    /// add/remove satellites from data buffers
-//    Transfer        = 1,
-
-//    ScheduleU       = 2,
-
-//    /// Ready
-//    ReadyU          = 3,
-//};
-//inline osp::PipelineTypeInfo const gc_infoForEStgUni
-//{
-//    .debugName = "EStgUniverse",
-//    .stages = {{
-//        { .name = "Calculate"                       },
-//        { .name = "Transfer",   .isSchedule = true  },
-//        { .name = "Schedule",                       },
-//        { .name = "Ready",                          }
-//    }},
-//    .initialStage = osp::StageId{0}
-//};
-
-
-
-
 namespace stages
 {
     using enum EStgOptn;
@@ -636,24 +608,56 @@ struct FITerrainDbgDraw {
 
 // Universe sessions
 
-struct FIUniSceneFrame {
+struct FIUniCore {
     struct DataIds {
-        DataId scnFrame;
+        DataId coordSpaces;
+        DataId compTypes;
+        DataId dataAccessors;
+        DataId stolenSats;
+        DataId dataSrcs;
+        DataId satInst;
+        DataId simulations;
     };
 
     struct Pipelines {
-        PipelineDef<EStgCont> sceneFrame        {"sceneFrame"};
+        PipelineDef<EStgOptn> update            {"update"};
+        PipelineDef<EStgCont> satIds            {"satIds"};
+        PipelineDef<EStgIntr> transfer          {"transfer"};
+        PipelineDef<EStgCont> accessorIds       {"accessorIds"};
+        PipelineDef<EStgCont> accessors         {"accessors"};
+        PipelineDef<EStgIntr> accessorDelete    {"accessorDelete"};
+        PipelineDef<EStgCont> stolenSats        {"stolenSats"};
+        PipelineDef<EStgCont> datasrcIds        {"datasrcIds"};
+        PipelineDef<EStgCont> datasrcs          {"datasrcs"};
+        PipelineDef<EStgCont> datasrcOf         {"datasrcOf"};
+        PipelineDef<EStgIntr> datasrcChanges    {"datasrcChanges"};
+        PipelineDef<EStgCont> simTimeBehindBy   {"simTimeBehindBy"};
+
     };
 };
 
-
-struct FIUniPlanets {
+struct FIUniTransfers {
     struct DataIds {
-        DataId planetMainSpace;
-        DataId satSurfaceSpaces;
+        DataId intakes;
+        DataId transferBufs;
     };
 
-    struct Pipelines { };
+    struct Pipelines {
+        PipelineDef<EStgIntr> requests          {"requests"};
+        PipelineDef<EStgIntr> requestAccessorIds{"requestAccessorIds"};
+        PipelineDef<EStgCont> midTransfer       {"midTransfer"};
+        PipelineDef<EStgIntr> midTransferDelete {"midTransferDelete"};
+    };
+};
+
+struct FIUniSceneInUniverse {
+    struct DataIds {
+        //DataId scnFrame;
+    };
+
+    struct Pipelines {
+        //PipelineDef<EStgCont> sceneFrame        {"sceneFrame"};
+    };
 };
 
 

@@ -94,12 +94,14 @@ struct UCtxCoordSpaces
 
 struct ComponentTypeInfo
 {
+    // TODO: maybe put specific data type info or hash here
     std::string name;
     std::size_t size;
 };
 
 struct DefaultComponents
 {
+    // 19 of these btw
     ComponentTypeId satId;
     ComponentTypeId posX;
     ComponentTypeId posY;
@@ -123,10 +125,42 @@ struct DefaultComponents
 
 struct UCtxComponentTypes
 {
+    UCtxComponentTypes()
+    {
+        auto gen = ids.generator();
+        defaults = {
+                gen.create(), gen.create(), gen.create(), gen.create(), gen.create(),
+                gen.create(), gen.create(), gen.create(), gen.create(), gen.create(),
+                gen.create(), gen.create(), gen.create(), gen.create(), gen.create(),
+                gen.create(), gen.create(), gen.create(), gen.create() };
+
+        info.resize(ids.capacity());
+        info[defaults.satId]    = {"SatelliteID", sizeof(SatelliteId)};
+        info[defaults.posX]     = {"PosX",      sizeof(spaceint_t)};
+        info[defaults.posY]     = {"PosY",      sizeof(spaceint_t)};
+        info[defaults.posZ]     = {"PosZ",      sizeof(spaceint_t)};
+        info[defaults.velX]     = {"VelX",      sizeof(float)};
+        info[defaults.velY]     = {"VelY",      sizeof(float)};
+        info[defaults.velZ]     = {"VelZ",      sizeof(float)};
+        info[defaults.velXd]    = {"VelXd",     sizeof(double)};
+        info[defaults.velYd]    = {"VelYd",     sizeof(double)};
+        info[defaults.velZd]    = {"VelZd",     sizeof(double)};
+        info[defaults.accelX]   = {"AccelX",    sizeof(float)};
+        info[defaults.accelY]   = {"AccelY",    sizeof(float)};
+        info[defaults.accelZ]   = {"AccelZ",    sizeof(float)};
+        info[defaults.rotX]     = {"RotX",      sizeof(float)};
+        info[defaults.rotY]     = {"RotY",      sizeof(float)};
+        info[defaults.rotZ]     = {"RotZ",      sizeof(float)};
+        info[defaults.rotW]     = {"RotW",      sizeof(float)};
+        info[defaults.radius]   = {"Radius",    sizeof(float)}; // not used anywhere
+        info[defaults.surface]  = {"Surface",   sizeof(float)}; // not used anywhere
+    }
+
     lgrn::IdRegistryStl<ComponentTypeId>            ids;
     KeyedVec<ComponentTypeId, ComponentTypeInfo>    info;
     DefaultComponents                               defaults;
 };
+
 
 
 //-----------------------------------------------------------------------------
@@ -226,13 +260,17 @@ struct DataAccessor
     IterationMethod     iterMethod  { IterationMethod::SkipNullSatellites };
 };
 
+template <typename T>
+inline DataAccessor::Component make_comp(T const* ptr, std::ptrdiff_t stride)
+{
+    return {reinterpret_cast<std::byte const*>(ptr), stride};
+}
+
 struct UCtxDataAccessors
 {
     lgrn::IdRegistryStl<DataAccessorId>         ids;
-    //lgrn::IdRefCount<DataAccessorId>            refCounts;
     osp::KeyedVec<DataAccessorId, DataAccessor> instances;
-
-    std::vector<DataAccessorId> accessorDelete;
+    std::vector<DataAccessorId>                 accessorDelete;
 };
 
 /**
@@ -420,47 +458,6 @@ struct UCtxIntakes
     lgrn::IdRegistryStl<IntakeId>           ids;
     osp::KeyedVec<IntakeId, Intake>         instances;
 
-
-//    static bool components_match(lgrn::IdSetStl<ComponentTypeId> const& lhs, lgrn::IdSetStl<ComponentTypeId> const& rhs)
-//    {
-//        // pretty much just std::equal
-
-//        auto       lhsIt     = lhs.begin();
-//        auto const lhsItLast = lhs.end();
-//        auto       rhsIt     = rhs.begin();
-//        auto const rhsItLast = rhs.end();
-
-//        while (true)
-//        {
-//            bool const lhsEnded = lhsIt == lhsItLast;
-//            bool const rhsEnded = rhsIt == rhsItLast;
-
-//            if ( ! lhsEnded && ! rhsEnded )
-//            {
-//                if (*lhsIt != *rhsIt)
-//                {
-//                    return false;
-//                }
-//                else
-//                {
-//                    ++lhsIt;
-//                    ++rhsIt;
-//                }
-//            }
-//            else if ( lhsEnded != rhsEnded )
-//            {
-//                return false;
-//            }
-//            else if ( lhsEnded && rhsEnded )
-//            {
-//                return true;
-//            }
-//            // else { unreachable }
-//        }
-
-//        return true;
-//    }
-
     IntakeId find_intake_at(CoSpaceId cospaceId, ComponentTypeIdSet_t const& comps) const
     {
         for (IntakeId const intakeId : ids)
@@ -513,32 +510,19 @@ struct TransferRequest
 };
 
 /**
- * @brief intermediate buffers to help transfer satellites across different simulations
+ * @brief Intermediate buffers to help transfer satellites across two simulations
  *
- * simulations update at different rates and potentially not in sync. If a fast-updating simulation
+ * Simulations update at different rates and may not be in sync. If a fast-updating simulation
  * pushes a satellite into a slow-updating simulation, there is a brief moment the satellite is
- * mid-transfer, waiting for the slow-updating simulation to update.
+ * 'mid-transfer', waiting for the slow-updating simulation to update.
  *
  * Transfer Buffer stops mid-transfer satellites from popping out of existance for a short time,
- * by storing a mid-transfer satellite data in a buffer accessible through DataAccessors
- *
- *
- *
+ * by storing a mid-transfer satellite data in a buffer accessible as its own Simulation.
  */
 struct UCtxTransferBuffers
 {
-    UCtxTransferBuffers() = default;
+    UCtxTransferBuffers(SimulationId const id) : simId{id} {}
     OSP_MOVE_ONLY_CTOR_ASSIGN(UCtxTransferBuffers)
-//    class Inserter : public ISatelliteInserter
-//    {
-//    public:
-//        Contract reserve(std::size_t amount) override
-//        {
-//        }
-//        void add(Contract &rContract, ArrayView<std::byte const> data) override
-//        {
-//        }
-//    };
 
     SimulationId simId{};
 
@@ -549,53 +533,7 @@ struct UCtxTransferBuffers
     std::vector<DataAccessorId>  requestAccessorIds;
 };
 
-
-
-//class SimpleSatelliteBuffer
-//{
-//public:
-
-//    //SatelliteInserter make_inserter();
-
-//private:
-//    DataAccessorId                  m_accessor;
-//    std::vector<ComponentTypeId>    m_components;
-
-//    /// Total of ComponentTypeInfo::size of all component types in m_components
-//    std::size_t                     m_totalComponentSize;
-
-//    ///
-//    std::unique_ptr<std::byte[]>    m_data;
-//};
-
-
-
-
-
 //-----------------------------------------------------------------------------
-
-//struct UCtxTime
-//{
-//    std::uint64_t time;
-//};
-
-//struct Universe
-//{
-//    Universe() = default;
-//    OSP_MOVE_ONLY_CTOR_ASSIGN(Universe);
-
-//    UniverseSimulations     simulations;
-//    UniverseCoordSpaces     coords;
-//    UniverseComponentTypes  components;
-//    UniverseDataAccessors   accessors;
-//    UniverseDataSources     sources;
-//    UniverseSatelliteSets   satsets;
-//};
-
-//
-
-//-----------------------------------------------------------------------------
-
 
 static ComponentTypeIdSet_t component_type_set(std::initializer_list<ComponentTypeId const> typeIds)
 {
@@ -606,150 +544,6 @@ static ComponentTypeIdSet_t component_type_set(std::initializer_list<ComponentTy
         out.emplace(typeId);
     }
     return out;
-}
-
-
-//-----------------------------------------------------------------------------
-
-template<typename ID_T, std::size_t COUNT>
-using FixedIdReg_t = lgrn::BitViewIdRegistry<lgrn::BitView<std::array<std::uint64_t, lgrn::div_ceil(COUNT, 64u)>>, ID_T>;
-
-/**
- * @brief all created IDs must be destroyed or else this will assert
- */
-template <typename ID_T>
-class NoLeakIdRegistry : private lgrn::IdRegistryStl<ID_T>
-{
-    using Base_t = lgrn::IdRegistryStl<ID_T>;
-public:
-    using Owner_t = lgrn::IdOwner<ID_T, NoLeakIdRegistry>;
-
-    using Base_t::Base_t;
-    using Base_t::begin;
-    using Base_t::bitview;
-    using Base_t::capacity;
-    using Base_t::end;
-    using Base_t::exists;
-    using Base_t::reserve;
-    using Base_t::size;
-
-    ~NoLeakIdRegistry()
-    {
-        std::size_t const remainingSubscribers = Base_t::size();
-        LGRN_ASSERTMV(remainingSubscribers == 0,
-                      "All IDs from NoLeakIdRegistry must be removed before NoLeakIdRegistry is destructed",
-                      remainingSubscribers,
-                      Base_t::bitview().ints()[0]);
-    }
-
-    Owner_t create()
-    {
-        Owner_t out;
-        out.m_id = Base_t::create();
-        return out;
-    }
-
-    void remove(Owner_t&& owner)
-    {
-        if (owner.m_id.has_value())
-        {
-            LGRN_ASSERT(Base_t::exists(owner.m_id));
-            Base_t::remove(owner.m_id);
-
-            [[maybe_unused]] Owner_t moved = std::move(owner);
-            moved.m_id = {};
-            // destruct 'moved'
-        }
-    }
-};
-
-template <typename T, typename MSG_T, typename SUBSCRIPTION_INFO_T>
-class SPMC
-{
-    struct ConsumerIdDummy {};
-
-    using Mailbox_t = std::vector<MSG_T>;
-
-    struct ConsumerData
-    {
-        SUBSCRIPTION_INFO_T subInfo;
-        Mailbox_t mailbox;
-    };
-
-public:
-    using ConsumerId      = osp::StrongId<std::uint32_t, SPMC::ConsumerIdDummy>;
-    using ConsumerOwner_t = typename NoLeakIdRegistry<ConsumerId>::Owner_t;
-
-    // TODO: some kind of system to enforce that there's only one producer
-    //struct ProducerToken
-    //{
-    //    OSP_MOVE_ONLY_CTOR_ASSIGN_CONSTEXPR_NOEXCEPT(ProducerToken);
-    //private:
-    //    ProducerToken() {};
-    //};
-
-    template<typename FUNC_T> requires
-            ( requires(FUNC_T &&func, SUBSCRIPTION_INFO_T const& info, Mailbox_t &rMailbox)
-              { func(info, rMailbox); } )
-    void send(FUNC_T &&func)
-    {
-        for (ConsumerId const id : m_consumers)
-        {
-            ConsumerData &rData = m_data[id];
-            SUBSCRIPTION_INFO_T const& info = rData.subInfo;
-            func(info, rData.mailbox);
-        }
-    }
-
-    ConsumerOwner_t subscribe()
-    {
-        ConsumerOwner_t out = m_consumers.create();
-        return out;
-    }
-
-    void unsubscribe(ConsumerOwner_t&& owner)
-    {
-        m_consumers.destroy(owner);
-    }
-
-private:
-    NoLeakIdRegistry<ConsumerId> m_consumers;
-    osp::KeyedVec<ConsumerId, ConsumerData> m_data;
-};
-
-
-struct SceneFrame : CoSpaceTransform
-{
-    Vector3g m_scenePosition;
-};
-
-
-/**
- * @brief Get StridedArrayView1Ds from all components of a SatVectorDesc
- *
- * @param strideDescArray   [in] Array of stride description for data in rData
- * @param rData             [in] unsigned char* Satellite data, optionally const
- * @param satCount          [in] Range of valid satellites
- *
- * @return std::array of views, intended to work with structured bindings
- */
-template <typename T, std::size_t DIMENSIONS_T, typename DATA_T, std::size_t ... COUNT_T>
-constexpr auto sat_views(
-        BufferAttribArray_t<T, DIMENSIONS_T> const& strideDescArray,
-        DATA_T &rData,
-        std::size_t satCount) noexcept
-{
-    // Recursive call to make COUNT_T a range of numbers from 0 to DIMENSIONS_T
-    // This is unpacked into strideDescArray[COUNT_T].view(...) to access components
-    constexpr int countUp = sizeof...(COUNT_T);
-    if constexpr (countUp != DIMENSIONS_T)
-    {
-        return sat_views<T, DIMENSIONS_T, DATA_T, COUNT_T ..., countUp>(strideDescArray, rData, satCount);
-    }
-    else
-    {
-        return std::array{ strideDescArray[COUNT_T].view(Corrade::Containers::arrayView(rData), satCount) ... };
-    }
 }
 
 

@@ -1,6 +1,6 @@
 /**
  * Open Space Program
- * Copyright © 2019-2024 Open Space Program Project
+ * Copyright © 2019-2025 Open Space Program Project
  *
  * MIT License
  *
@@ -31,61 +31,45 @@
 #include <osp/universe/universe.h>
 #include <osp/drawing/drawing.h>
 
-
 namespace ftr_inter
 {
 
+struct FIUniPlanets {
+    struct DataIds {
+        DataId planetMainSpace;
+        DataId satSurfaceSpaces;
+    };
+
+    struct Pipelines { };
+};
+
+
+struct FIUniSimpleSims
+{
+    struct DataIds {
+        DataId circlePath;
+        DataId constantSpin;
+        DataId simpleGravity;
+    };
+
+    struct Pipelines { };
+};
+
 
 };
+
 
 namespace adera
 {
 
 
-// Universe Scenario
-
-/**
- * @brief Core Universe struct with addressable Coordinate Spaces
- */
-extern osp::fw::FeatureDef const ftrUniverseCore;
+extern osp::fw::FeatureDef const ftrUniverseSimpleSimulators;
 
 
 /**
- * @brief Represents the physics scene's presence in a Universe
+ * @brief Unrealistic planets test, allows SceneFrame to move around and get captured into planets
  */
-extern osp::fw::FeatureDef const ftrSceneInUniverse;
-
-
-/**
- * @brief Draw universe, specifically designed for setup_uni_test_planets
- */
-extern osp::fw::FeatureDef const ftrUniverseTestPlanetsDraw;
-
-
-// Solar System Scenario
-
-struct CoSpaceNBody
-{
-    osp::BufAttribFormat<float> mass;
-    osp::BufAttribFormat<float> radius;
-    osp::BufAttribFormat<Magnum::Color3> color;
-};
-
-/**
- * @brief Initializes planet information, position, mass etc...
- */
-extern osp::fw::FeatureDef const ftrSolarSystem;
-
-struct PlanetDrawParams
-{
-    osp::draw::MaterialId planetMat;
-    osp::draw::MaterialId axisMat;
-};
-
-/**
- * @brief Draw Solar System, specifically designed for ftrSolarSystemPlanets
- */
-extern osp::fw::FeatureDef const ftrSolarSystemDraw;
+extern osp::fw::FeatureDef const ftrUniverseTestPlanets;
 
 } // namespace adera
 
