@@ -27,40 +27,25 @@
 #include <osp/universe/universe.h>
 #include <osp/core/math_types.h>
 
-#include <memory>
-
-namespace adera::sims
+namespace adera
 {
-
-using osp::Quaternion;
-using osp::Vector3;
-using osp::Vector3d;
-
-using osp::universe::DataAccessor;
-using osp::universe::SatelliteId;
-using osp::universe::SimulationId;
-using osp::universe::Vector3g;
 
 struct CirclePathSim
 {
     struct SatData
     {
-        Vector3g        position;
-        Vector3         velocity;
-        Vector3         accel;
-        double          radius;
-        std::uint64_t   period;
-        std::uint64_t   initTime;
-        SatelliteId     id;
+        osp::universe::Vector3g     position;
+        osp::Vector3                velocity;
+        osp::Vector3                accel;
+        double                      radius;
+        std::uint64_t               period{};
+        std::uint64_t               cycleTime{};
+        osp::universe::SatelliteId  id;
     };
 
-    void update(std::uint64_t time) noexcept;
+    void update(std::uint64_t deltaTime) noexcept;
 
     std::vector<SatData>            m_data;
-    std::uint64_t                   m_prevUpdateTime{0u};
-
-    std::shared_ptr<DataAccessor>   m_accessor;
-    SimulationId                    m_id;
 };
 
 
@@ -68,43 +53,36 @@ struct ConstantSpinSim
 {
     struct SatData
     {
-        Quaternion      rot;
-        Vector3         axis;
-        std::uint64_t   period;
-        std::uint64_t   initTime;
-        SatelliteId     id;
+        osp::Quaternion             rot;
+        osp::Vector3                axis;
+        std::uint64_t               period{};
+        std::uint64_t               cycleTime{};
+        osp::universe::SatelliteId  id;
     };
 
-    void update(std::uint64_t time) noexcept;
+    void update(std::uint64_t deltaTime) noexcept;
 
     std::vector<SatData>            m_data;
-    std::uint64_t                   m_prevUpdateTime;
-
-    std::shared_ptr<DataAccessor>   m_accessor;
-    SimulationId                    m_id;
 };
 
 
-struct KinematicSim
+struct SimpleGravitySim
 {
     struct SatData
     {
-        Vector3g        position;
-        Vector3d        velocity;
-        Vector3d        accel;
-        float           mass;
-        SatelliteId     id;
+        osp::universe::Vector3g     position;
+        osp::Vector3d               velocity;
+        osp::Vector3d               accel;
+        float                       mass;
+        osp::universe::SatelliteId  id;
     };
 
-    void update(std::uint64_t time) noexcept;
+    void update(std::uint64_t deltaTime) noexcept;
 
     std::vector<SatData>            m_data;
-    std::uint64_t                   m_prevUpdateTime;
+    //std::uint64_t                   m_prevUpdateTime;
     double                          m_metersPerPosUnit;
     double                          m_secPerTimeUnit;
-
-    std::shared_ptr<DataAccessor>   m_accessor;
-    SimulationId                    m_id;
 };
 
 

@@ -338,6 +338,7 @@ static ScenarioMap_t make_scenarios()
 
         sceneCB.add_feature(ftrUniverseCore);
         sceneCB.add_feature(ftrUniverseSceneFrame);
+        sceneCB.add_feature(ftrUniverseSimpleSimulators);
         sceneCB.add_feature(ftrUniverseTestPlanets);
         ContextBuilder::finalize(std::move(sceneCB));
 

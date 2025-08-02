@@ -170,6 +170,35 @@ inline osp::PipelineTypeInfo const gc_infoForEStgLink
     .initialStage = osp::StageId{0}
 };
 
+
+//enum class EStgUni: uint8_t
+//{
+//    /// step simulation forward in time; calculate new values (or just swap buffers) for EXISTING satellites
+//    Calculate       = 0,
+
+//    /// add/remove satellites from data buffers
+//    Transfer        = 1,
+
+//    ScheduleU       = 2,
+
+//    /// Ready
+//    ReadyU          = 3,
+//};
+//inline osp::PipelineTypeInfo const gc_infoForEStgUni
+//{
+//    .debugName = "EStgUniverse",
+//    .stages = {{
+//        { .name = "Calculate"                       },
+//        { .name = "Transfer",   .isSchedule = true  },
+//        { .name = "Schedule",                       },
+//        { .name = "Ready",                          }
+//    }},
+//    .initialStage = osp::StageId{0}
+//};
+
+
+
+
 namespace stages
 {
     using enum EStgOptn;

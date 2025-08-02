@@ -51,6 +51,8 @@ extern osp::fw::FeatureDef const ftrUniverseSceneFrame;
  */
 extern osp::fw::FeatureDef const ftrUniverseTestPlanets;
 
+extern osp::fw::FeatureDef const ftrUniverseSimpleSimulators;
+
 
 /**
  * @brief Draw universe, specifically designed for setup_uni_test_planets

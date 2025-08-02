@@ -40,6 +40,51 @@
 #include <unordered_set>
 
 
+/*
+ *
+ * accessor create/deletes?
+ *
+ * when simulations update, they can delete and create a dataaccessor right then and now
+ * but this can't happen. consider yoinking operations.
+ * we have 'dataaccessordelete' so that we can steal from dataacessors without needing to modify it.
+ * steal from it, then mark the transferbuf/accessor as deleted. set an isNowEmpty flag on
+ * accessor delete
+ *
+ * How to steal a satellite from a dataacessor
+ * * Task must sync with {uniCore.pl.accessors(Ready),  uniTransfers.pl.requests(Modify_)}
+ *
+ * stolensats can only be modified around the same time as accessors. intended to update satellites that don't update
+ *
+ * can't modify the 'current frame'. transfer requests can only be processed next frame.
+ *
+ * kikiki issue when multiple try to steal at the same time
+ *
+ * dataacessor create can't steal satellites.
+ *
+ * dataacessor modify can't steal satellites
+ *
+ * dataaccesor ready can steal satellites. ONLY to make transfer requests
+ *
+ * dataacessor delete reads steal satellites
+ *
+ *
+ * process when midtransfer is taken
+ * * simulation update has {uniCore.pl.accessors(Modify), uniCore.pl.stolenSats(Modify_)}
+ *   * steals and updates its own accessor accordingly
+ *   * pushes to accessorDelete and midtransfer delete
+ * * next frame on dataaccessor delete, accessorid is deleted and shit.
+ *
+ *
+ *
+ *
+ *
+ *
+ *
+ */
+
+
+
+
 using namespace adera;
 using namespace ftr_inter::stages;
 using namespace ftr_inter;
@@ -55,19 +100,11 @@ namespace adera
 
 // Universe Scenario
 
-struct FIUniCore {
+
+
+struct FIUniDirector {
     struct DataIds {
         DataId coordSpaces;
-        DataId compTypes;
-        DataId compDefaults;
-        DataId dataAccessors;
-        DataId deletedSats;
-        DataId dataSrcs;
-        DataId satInst;
-        DataId simulations;
-        DataId time;
-        DataId intakes;
-        DataId deltaTimeIn;
     };
 
     struct Pipelines {
@@ -76,38 +113,441 @@ struct FIUniCore {
     };
 };
 
+struct FIUniSimulator {
+    struct DataIds {
+        DataId coordSpaces;
+    };
+
+    struct Pipelines {
+//        PipelineDef<EStgOptn> update            {"update    "};
+//        PipelineDef<EStgIntr> transfer          {"transfer"};
+    };
+};
+
+struct FIUniCore {
+    struct DataIds {
+        DataId coordSpaces;
+        DataId compTypes;
+        //DataId compDefaults;
+        DataId dataAccessors;
+        DataId stolenSats;
+        DataId dataSrcs;
+        DataId satInst;
+        DataId simulations;
+    };
+
+    struct Pipelines {
+        PipelineDef<EStgOptn> update            {"update            - Universe update"};
+        PipelineDef<EStgCont> satIds            {"satIds"};
+        PipelineDef<EStgIntr> transfer          {"transfer"};
+        PipelineDef<EStgCont> accessorIds       {"accessorIds"};
+        PipelineDef<EStgCont> accessors         {"accessors"};
+        PipelineDef<EStgIntr> accessorDelete    {"accessorDelete"};
+        PipelineDef<EStgCont> stolenSats        {"stolenSats"};
+        PipelineDef<EStgCont> datasrcIds        {"datasrcIds"};
+        PipelineDef<EStgCont> datasrcs          {"datasrcs"};
+        PipelineDef<EStgCont> datasrcOf         {"datasrcOf"};
+        PipelineDef<EStgIntr> datasrcChanges    {"datasrcChanges"};
+        PipelineDef<EStgCont> simTimeBehindBy   {"simTimeBehindBy"};
+
+    };
+};
+
+struct FIUniTransfers {
+    struct DataIds {
+        DataId intakes;
+        DataId transferBufs;
+    };
+
+    struct Pipelines {
+        PipelineDef<EStgIntr> requests          {"requests"};
+        PipelineDef<EStgIntr> requestAccessorIds{"requestAccessorIds"};
+        PipelineDef<EStgCont> midTransfer       {"midTransfer"};
+        PipelineDef<EStgIntr> midTransferDelete {"midTransferDelete"};
+    };
+};
+
+struct YakSong
+{
+    //ComponentTypeI
+};
+
 FeatureDef const ftrUniverseCore = feature_def("UniverseCore", [] (
         FeatureBuilder              &rFB,
         Implement<FIUniCore>        uniCore,
+        Implement<FIUniTransfers>   uniTransfers,
+        DependOn<FICleanupContext>  cleanup,
         DependOn<FIMainApp>         mainApp,
         entt::any                   userData)
 {
-    rFB.data_emplace< float >       (uniCore.di.deltaTimeIn, 1.0f / 60.0f);
+    //rFB.data_emplace< std::int64_t >       (uniCore.di.deltaTimeIn, 15);
 
     auto &rCoordSpaces      = rFB.data_emplace< UCtxCoordSpaces >       (uniCore.di.coordSpaces);
     auto &rCompTypes        = rFB.data_emplace< UCtxComponentTypes >    (uniCore.di.compTypes);
-    auto &rCompDefaults     = rFB.data_emplace< UCtxDefaultComponents > (uniCore.di.compDefaults);
     auto &rDataAccessors    = rFB.data_emplace< UCtxDataAccessors >     (uniCore.di.dataAccessors);
-    auto &rDeletedSats      = rFB.data_emplace< UCtxDeletedSatellites > (uniCore.di.deletedSats);
-    auto &rDataSrcs         = rFB.data_emplace< UCtxDataSources >       (uniCore.di.dataSrcs);
+    auto &rDeletedSats      = rFB.data_emplace< UCtxStolenSatellites >  (uniCore.di.stolenSats);
+    auto &rDataSrcss        = rFB.data_emplace< UCtxDataSources >       (uniCore.di.dataSrcs);
     auto &rSatInst          = rFB.data_emplace< UCtxSatelliteInstances >(uniCore.di.satInst);
     auto &rSimulations      = rFB.data_emplace< UCtxSimulations >       (uniCore.di.simulations);
-    auto &rTime             = rFB.data_emplace< UCtxTime >              (uniCore.di.time);
+    auto &rIntakes          = rFB.data_emplace< UCtxIntakes >           (uniTransfers.di.intakes);
+    auto &rTransferBufs     = rFB.data_emplace< UCtxTransferBuffers >   (uniTransfers.di.transferBufs);
 
-    auto &rIntakes          = rFB.data_emplace< UCtxIntakes >           (uniCore.di.intakes);
+    rFB.pipeline(uniCore.pl.update)                 .parent(mainApp.loopblks.mainLoop);
+    rFB.pipeline(uniCore.pl.satIds)                 .parent(mainApp.loopblks.mainLoop);
+    rFB.pipeline(uniCore.pl.transfer)               .parent(mainApp.loopblks.mainLoop);
+    rFB.pipeline(uniCore.pl.accessorIds)            .parent(mainApp.loopblks.mainLoop);
+    rFB.pipeline(uniCore.pl.accessors)              .parent(mainApp.loopblks.mainLoop);
+    rFB.pipeline(uniCore.pl.stolenSats)             .parent(mainApp.loopblks.mainLoop);
+    rFB.pipeline(uniCore.pl.accessorDelete)         .parent(mainApp.loopblks.mainLoop).initial_stage(UseOrRun);
+    rFB.pipeline(uniCore.pl.datasrcIds)             .parent(mainApp.loopblks.mainLoop);
+    rFB.pipeline(uniCore.pl.datasrcs)               .parent(mainApp.loopblks.mainLoop);
+    rFB.pipeline(uniCore.pl.datasrcOf)              .parent(mainApp.loopblks.mainLoop);
+    rFB.pipeline(uniCore.pl.datasrcChanges)         .parent(mainApp.loopblks.mainLoop);
+    rFB.pipeline(uniCore.pl.simTimeBehindBy)        .parent(mainApp.loopblks.mainLoop);
+    rFB.pipeline(uniTransfers.pl.requests)          .parent(mainApp.loopblks.mainLoop).initial_stage(UseOrRun);
+    rFB.pipeline(uniTransfers.pl.requestAccessorIds).parent(mainApp.loopblks.mainLoop);
+    rFB.pipeline(uniTransfers.pl.midTransfer)       .parent(mainApp.loopblks.mainLoop);
+    rFB.pipeline(uniTransfers.pl.midTransferDelete) .parent(mainApp.loopblks.mainLoop).initial_stage(UseOrRun);
 
     {
+        auto &rDC = rCompTypes.defaults;
         auto gen = rCompTypes.ids.generator();
-        rCompDefaults = {
-            gen.create(), gen.create(), gen.create(), gen.create(), gen.create(),
-            gen.create(), gen.create(), gen.create(), gen.create(), gen.create(),
-            gen.create(), gen.create(), gen.create()};
+        rDC = {
+            gen.create(), gen.create(), gen.create(), gen.create(), gen.create(), gen.create(),
+            gen.create(), gen.create(), gen.create(), gen.create(), gen.create(), gen.create(),
+            gen.create(), gen.create(), gen.create(), gen.create(), gen.create(), gen.create(), gen.create()};
+
+        rCompTypes.info.resize(rCompTypes.ids.capacity());
+        rCompTypes.info[rDC.satId]      = {"SatelliteID", sizeof(SatelliteId)};
+        rCompTypes.info[rDC.posX]       = {"PosX",   sizeof(spaceint_t)};
+        rCompTypes.info[rDC.posY]       = {"PosY",   sizeof(spaceint_t)};
+        rCompTypes.info[rDC.posZ]       = {"PosZ",   sizeof(spaceint_t)};
+        rCompTypes.info[rDC.velX]       = {"VelX",   sizeof(float)};
+        rCompTypes.info[rDC.velY]       = {"VelY",   sizeof(float)};
+        rCompTypes.info[rDC.velZ]       = {"VelZ",   sizeof(float)};
+        rCompTypes.info[rDC.velXd]      = {"VelXd",  sizeof(double)};
+        rCompTypes.info[rDC.velYd]      = {"VelYd",  sizeof(double)};
+        rCompTypes.info[rDC.velZd]      = {"VelZd",  sizeof(double)};
+        rCompTypes.info[rDC.accelX]     = {"AccelX", sizeof(float)};
+        rCompTypes.info[rDC.accelY]     = {"AccelY", sizeof(float)};
+        rCompTypes.info[rDC.accelZ]     = {"AccelZ", sizeof(float)};
+        rCompTypes.info[rDC.rotX]       = {"RotX",   sizeof(float)};
+        rCompTypes.info[rDC.rotY]       = {"RotY",   sizeof(float)};
+        rCompTypes.info[rDC.rotZ]       = {"RotZ",   sizeof(float)};
+        rCompTypes.info[rDC.rotW]       = {"RotW",   sizeof(float)};
+        //radius; surface;
     }
+
+    rTransferBufs.simId = rSimulations.ids.create();
 
     //auto const updateOn = entt::any_cast<PipelineId>(userData);
 
-    rFB.pipeline(uniCore.pl.update)  .parent(mainApp.loopblks.mainLoop);
-    rFB.pipeline(uniCore.pl.transfer).parent(mainApp.loopblks.mainLoop);
+
+    rFB.task()
+        .name       ("resize accessors")
+        .sync_with  ({uniCore.pl.accessors(Resize_), uniCore.pl.accessorIds(Ready)})
+        .args       ({            uniCore.di.dataAccessors})
+        .func       ([] (UCtxDataAccessors &rDataAccessors) noexcept
+    {
+        rDataAccessors.instances.resize(rDataAccessors.ids.capacity());
+    });
+
+    rFB.task()
+        .name       ("Delete DataAccessors and DataAccessorIds from accessorDelete")
+        .sync_with  ({uniCore.pl.accessorDelete(UseOrRun), uniCore.pl.accessors(Delete), uniCore.pl.accessorIds(Delete)})
+        .args       ({            uniCore.di.dataAccessors})
+        .func       ([] (UCtxDataAccessors &rDataAccessors) noexcept
+    {
+        for (DataAccessorId const id : rDataAccessors.accessorDelete)
+        {
+            rDataAccessors.instances[id] = {};
+            rDataAccessors.ids.remove(id);
+        }
+    });
+
+    rFB.task()
+        .name       ("clear accessorDelete")
+        .sync_with  ({ uniCore.pl.accessorDelete(Clear) })
+        .args       ({            uniCore.di.dataAccessors})
+        .func       ([] (UCtxDataAccessors &rDataAccessors) noexcept
+    {
+        rDataAccessors.accessorDelete.clear();
+    });
+
+
+    rFB.task()
+        .name       ("clear midTransferDelete")
+        .sync_with  ({ uniTransfers.pl.midTransferDelete(Clear)})
+        .args       ({         uniTransfers.di.transferBufs})
+        .func       ([] (UCtxTransferBuffers &rTransferBufs) noexcept
+    {
+        rTransferBufs.midTransferDelete.clear();
+    });
+
+    rFB.task()
+        .name       ("make transferbufs DataAccessorIds")
+        .sync_with  ({uniCore.pl.accessorIds(New), uniTransfers.pl.requestAccessorIds(Modify_), uniTransfers.pl.requests(UseOrRun)})
+        .args       ({         uniTransfers.di.transferBufs, uniTransfers.di.intakes,          uniCore.di.compTypes,  uniCore.di.dataAccessors,        uniCore.di.simulations })
+        .func       ([] (UCtxTransferBuffers &rTransferBufs,   UCtxIntakes &rIntakes, UCtxComponentTypes &rCompTypes, UCtxDataAccessors &rDataAccessors, UCtxSimulations &rSimulations) noexcept
+    {
+        rTransferBufs.requestAccessorIds.resize(rTransferBufs.requests.size());
+        rDataAccessors.ids.create(rTransferBufs.requestAccessorIds.begin(),
+                                  rTransferBufs.requestAccessorIds.end());
+    });
+
+    rFB.task()
+        .name       ("Resize midTransfersOf ")
+        .sync_with  ({/*uniCore.pl.sim(New)*/ uniTransfers.pl.midTransfer(Resize_)})
+        .args       ({         uniTransfers.di.transferBufs,        uniCore.di.simulations })
+        .func       ([] (UCtxTransferBuffers &rTransferBufs, UCtxSimulations &rSimulations) noexcept
+    {
+        rTransferBufs.midTransfersOf.resize(rSimulations.ids.capacity());
+    });
+
+    rFB.task()
+        .name       ("Make midTransfer DataAccessor data")
+        .sync_with  ({uniCore.pl.accessors(New), uniTransfers.pl.requestAccessorIds(UseOrRun), uniTransfers.pl.midTransfer(New), uniTransfers.pl.requests(Clear), uniCore.pl.datasrcChanges(Modify_)})
+        .args       ({         uniTransfers.di.transferBufs, uniTransfers.di.intakes,                 uniCore.di.compTypes,          uniCore.di.dataAccessors,        uniCore.di.dataSrcs,        uniCore.di.simulations })
+        .func       ([] (UCtxTransferBuffers &rTransferBufs,   UCtxIntakes &rIntakes, UCtxComponentTypes const &rCompTypes, UCtxDataAccessors &rDataAccessors, UCtxDataSources &rDataSrcs, UCtxSimulations &rSimulations) noexcept
+    {
+        LGRN_ASSERT(rTransferBufs.requests.size() == rTransferBufs.requestAccessorIds.size());
+
+        for (std::size_t i = 0; i < rTransferBufs.requests.size(); ++i)
+        {
+            TransferRequest       &rRequest  = rTransferBufs.requests[i];
+            DataAccessorId  const accessorId = rTransferBufs.requestAccessorIds[i];
+            Intake          const &rTarget   = rIntakes.instances[rRequest.target];
+
+            DataAccessor::CompMap_t components;
+
+            std::ptrdiff_t stride = 0;
+            for (ComponentTypeId const compTypeId : rTarget.components)
+            {
+                stride += rCompTypes.info[compTypeId].size;
+            }
+
+            SatelliteId const* satIdFirst = nullptr;
+
+            for (std::byte const* pos = rRequest.data.get();
+                 ComponentTypeId const compTypeId : rTarget.components)
+            {
+                if (compTypeId == rCompTypes.defaults.satId)
+                {
+                    satIdFirst = reinterpret_cast<SatelliteId const*>(pos);
+                }
+                components.emplace(compTypeId, DataAccessor::Component{pos, stride});
+                pos += rCompTypes.info[compTypeId].size;
+            }
+
+            LGRN_ASSERT(satIdFirst != nullptr);
+
+            rDataAccessors.instances[accessorId] = DataAccessor{
+                .debugName  = fmt::format("TransferBuffer to intake{}", rRequest.target.value),
+                .components = std::move(components),
+                .satToIndex = {}, // TODO
+                //.time       = 0, // TODO
+                .count      = rRequest.count,
+                .owner      = rTransferBufs.simId,
+                .cospace    = rTarget.cospace,
+                .iterMethod = DataAccessor::IterationMethod::SkipNullSatellites
+            };
+
+            using Corrade::Containers::StridedArrayView1D;
+
+            auto const data       = ArrayView<void const>(rRequest.data.get(), stride * rRequest.count);
+            auto const dataSatIds = StridedArrayView1D<SatelliteId const>(data, satIdFirst, rRequest.count, stride);
+
+            std::vector<SatelliteId> sats;
+            sats.resize(rRequest.count);
+
+            for (std::size_t i = 0; i < rRequest.count; ++i)
+            {
+                sats[i] = dataSatIds[i];
+            }
+
+            rDataSrcs.changes.push_back(DataSourceChange{
+                .satsAffected   = std::move(sats),
+                .components     = rTarget.components,
+                .accessor       = accessorId
+            });
+
+            rTransferBufs.midTransfersOf[rTarget.owner].push_back(MidTransfer{
+                .data           = std::move(rRequest.data),
+                .accessor       = accessorId,
+                .target         = rRequest.target
+            });
+        }
+
+        rTransferBufs.requests.clear();
+    });
+
+    rFB.task()
+        .name       ("Delete midTransfers")
+        .sync_with  ({uniCore.pl.accessors(Delete), uniTransfers.pl.midTransferDelete(UseOrRun), uniTransfers.pl.midTransfer(Delete)})
+        .args       ({         uniTransfers.di.transferBufs,          uniCore.di.dataAccessors})
+        .func       ([] (UCtxTransferBuffers &rTransferBufs, UCtxDataAccessors &rDataAccessors) noexcept
+    {
+        for (SimulationId const simId : rTransferBufs.midTransferDelete)
+        {
+            auto &rVec = rTransferBufs.midTransfersOf[simId];
+            rVec.clear();
+        }
+    });
+
+    rFB.task()
+        .name       ("clear midTransferDelete")
+        .sync_with  ({ uniTransfers.pl.midTransferDelete(Clear)})
+        .args       ({         uniTransfers.di.transferBufs})
+        .func       ([] (UCtxTransferBuffers &rTransferBufs) noexcept
+    {
+        rTransferBufs.midTransferDelete.clear();
+    });
+
+    rFB.task()
+        .name       ("clear requestAccessorIds")
+        .sync_with  ({uniTransfers.pl.requestAccessorIds(Clear)})
+        .args       ({         uniTransfers.di.transferBufs })
+        .func       ([] (UCtxTransferBuffers &rTransferBufs) noexcept
+    {
+        //rTransferBufs.requests.clear();
+        rTransferBufs.requestAccessorIds.clear();
+    });
+
+    rFB.task()
+        .name       ("Resize datasrcOf")
+        .sync_with  ({uniCore.pl.datasrcOf(Resize_), uniCore.pl.satIds(Ready)  })
+        .args       ({          uniCore.di.dataSrcs,               uniCore.di.satInst })
+        .func       ([] (UCtxDataSources &rDataSrcs, UCtxSatelliteInstances &rSatInst) noexcept
+    {
+        rDataSrcs.datasrcOf.resize(rSatInst.ids.capacity());
+    });
+
+    rFB.task()
+        .name       ("create datasources")
+        .sync_with  ({ uniCore.pl.datasrcChanges(UseOrRun), uniCore.pl.datasrcOf(Modify), uniCore.pl.datasrcs(New) })
+        .args       ({          uniCore.di.dataSrcs })
+        .func       ([] (UCtxDataSources &rDataSrcs) noexcept
+    {
+        if (rDataSrcs.changes.empty()) { return; }
+
+        // keep a scratchpad component list
+        // iterate satsAffected.
+        //    copy existing datasource component list to scratchpad
+        //    apply changes
+        //    remove from datasource
+        //    find/create new datasource
+        // optimization: temporary oldDatasrc->newDatasrc map, to prevent searching too much
+
+        DataSource scratchpad;
+
+
+        for (DataSourceChange const& dsc : rDataSrcs.changes)
+        {
+            for (SatelliteId const satId : dsc.satsAffected)
+            {
+                DataSourceOwner_t &rSatDsOwner = rDataSrcs.datasrcOf[satId];
+                DataSourceId newDsId;
+
+                scratchpad.entries.clear();
+
+                if (rSatDsOwner.has_value())
+                {
+                    // Satellite already has a DataSource, copy it into scratchpad then modify it.
+
+                    DataSourceId const satDsId = rSatDsOwner.value();
+                    rDataSrcs.refCounts.ref_release(std::exchange(rSatDsOwner, {}));
+                    auto const refCount = rDataSrcs.refCounts[satDsId.value];
+
+                    DataSource &rSatDs = rDataSrcs.instances[satDsId];
+
+
+
+                    scratchpad.entries.assign(rSatDs.entries.begin(), rSatDs.entries.end());
+
+                    bool added = false;
+
+                    // remove occurances of ComponentTypeIds used in dsc.components from scratchpad
+                    auto const newLast = std::remove_if(
+                            scratchpad.entries.begin(),
+                            scratchpad.entries.end(),
+                            [&dsc, &added] (DataSource::Entry &rSpEntry) -> bool
+                    {
+                        if (rSpEntry.accessor == dsc.accessor)
+                        {
+                            for (ComponentTypeId const ctId : dsc.components)
+                            {
+                                rSpEntry.components.insert(ctId);
+                            }
+                            LGRN_ASSERT(added == false);
+                            added = true;
+
+                            return false;
+                        }
+                        else
+                        {
+                            for (ComponentTypeId const ctId : dsc.components)
+                            {
+                                rSpEntry.components.erase(ctId);
+                            }
+
+                            return rSpEntry.components.empty(); // remove if true
+                        }
+                    });
+                    scratchpad.entries.resize(std::distance(scratchpad.entries.begin(), newLast));
+
+                    if ( ! added )
+                    {
+                        scratchpad.entries.push_back(DataSource::Entry{
+                            .components = dsc.components,
+                            .accessor   = dsc.accessor
+                        });
+                    }
+                    scratchpad.sort();
+                }
+                else
+                {
+                    // No existing data source, likely that the satellite is newly added.
+                    scratchpad.entries.push_back(DataSource::Entry{
+                        .components = dsc.components,
+                        .accessor   = dsc.accessor
+                    });
+                }
+
+                newDsId = rDataSrcs.find_datasource(scratchpad);
+
+                if ( ! newDsId.has_value() )
+                {
+                    newDsId = rDataSrcs.ids.create();
+                    rDataSrcs.instances.resize(rDataSrcs.ids.capacity());
+                    rDataSrcs.instances[newDsId] = std::exchange(scratchpad, {});
+                }
+
+                rDataSrcs.datasrcOf[satId] = rDataSrcs.refCounts.ref_add(newDsId);
+            }
+        }
+    });
+
+    rFB.task()
+        .name       ("Clear rDataSrcs.changes ")
+        .sync_with  ({ uniCore.pl.datasrcChanges(Clear) })
+        .args       ({          uniCore.di.dataSrcs })
+        .func       ([] (UCtxDataSources &rDataSrcs) noexcept
+    {
+        rDataSrcs.changes.clear();
+    });
+
+    rFB.task()
+        .name       ("Clean up UCtxDataSources IdOwners")
+        .sync_with  ({cleanup.pl.cleanup(Run_)})
+        .args       ({          uniCore.di.dataSrcs })
+        .func       ([] (UCtxDataSources &rDataSrcs) noexcept
+    {
+        for (DataSourceOwner_t &rOwner : rDataSrcs.datasrcOf)
+        {
+            rDataSrcs.refCounts.ref_release(std::exchange(rOwner, {}));
+        }
+    });
+
 
 }); // setup_uni_core
 
@@ -123,158 +563,552 @@ FeatureDef const ftrUniverseSceneFrame = feature_def("UniverseSceneFrame", [] (
 }); // ftrUniverseSceneFrame
 
 
-using adera::sims::CirclePathSim;
-using adera::sims::ConstantSpinSim;
-
-struct FITestSims {
-    struct DataIds {
-        DataId circleSim;
-        DataId spinSim;
-    };
-
-    struct Pipelines { };
-};
-
 template <typename T>
 DataAccessor::Component make_comp(T const* ptr, std::ptrdiff_t stride)
 {
     return {reinterpret_cast<std::byte const*>(ptr), stride};
 }
 
-DataSourceId find_datasource(UCtxDataSources const& dataSrcs, DataSource const& query)
+
+
+using CirclePathSimId   = osp::StrongId< std::uint32_t, struct DummyForCirclePathSimId >;
+using ConstantSpinSimId = osp::StrongId< std::uint32_t, struct DummyForConstantSpinSimId >;
+using SimpleGravitySimId = osp::StrongId< std::uint32_t, struct DummyForSimpleGravitySimId >;
+
+// simple simulators only have 1 buffer / accessor
+
+struct UCtxCirclePathSims
 {
-    std::size_t const size = query.entries.size();
-    for (DataSourceId const dataSrcId : dataSrcs.ids)
+    struct Instance
     {
-        DataSource const& candidate = dataSrcs.instances[dataSrcId];
-        if (candidate.entries.size() != size)
+        SimulationId            simId;
+        CirclePathSim           sim;
+        std::int64_t            updateInterval;
+        DataAccessorId          accessorId;
+        CoSpaceId               cospaceId;
+        IntakeId                intakeId;
+    };
+
+    lgrn::IdRegistryStl<CirclePathSimId>        ids;
+    osp::KeyedVec<CirclePathSimId, Instance>    instOf;
+};
+
+struct UCtxConstantSpinSims
+{
+    struct Instance
+    {
+        ConstantSpinSim         sim;
+        SimulationId            simId;
+        std::int64_t            updateInterval;
+        DataAccessorId          accessorId;
+        CoSpaceId               cospaceId;
+        IntakeId                intakeId;
+    };
+
+    lgrn::IdRegistryStl<ConstantSpinSimId>      ids;
+    osp::KeyedVec<ConstantSpinSimId, Instance>  instOf;
+};
+
+struct UCtxSimpleGravitySims
+{
+    struct Instance
+    {
+        SimpleGravitySim        sim;
+        SimulationId            simId;
+        std::int64_t            updateInterval;
+        DataAccessorId          accessorId;
+        CoSpaceId               cospaceId;
+        IntakeId                intakeId;
+    };
+
+    lgrn::IdRegistryStl<SimpleGravitySimId>         ids;
+    osp::KeyedVec<SimpleGravitySimId, Instance>     instOf;
+};
+
+
+struct FIUniSimpleSims
+{
+    struct DataIds {
+        DataId circlePath;
+        DataId constantSpin;
+        DataId simpleGravity;
+    };
+
+    struct Pipelines { };
+};
+
+FeatureDef const ftrUniverseSimpleSimulators = feature_def("UniverseSimpleSimulators", [] (
+        FeatureBuilder              &rFB,
+        Implement<FIUniSimpleSims>  uniSimpleSims,
+        DependOn<FIMainApp>         mainApp,
+        DependOn<FIUniCore>         uniCore,
+        DependOn<FIUniTransfers>    uniTransfers,
+        entt::any                   userData)
+{
+    rFB.data_emplace< UCtxCirclePathSims >      (uniSimpleSims.di.circlePath);
+    rFB.data_emplace< UCtxConstantSpinSims >    (uniSimpleSims.di.constantSpin);
+    rFB.data_emplace< UCtxSimpleGravitySims >       (uniSimpleSims.di.simpleGravity);
+
+
+    rFB.task()
+        .name       ("make accessors")
+        .sync_with  ({uniCore.pl.accessors(New), uniCore.pl.datasrcChanges(Modify_)})
+        .args       ({            uniCore.di.dataAccessors,        uniCore.di.dataSrcs,                 uniCore.di.compTypes,     uniSimpleSims.di.circlePath,       uniSimpleSims.di.constantSpin,        uniSimpleSims.di.simpleGravity })
+        .func       ([] (UCtxDataAccessors &rDataAccessors, UCtxDataSources &rDataSrcs, UCtxComponentTypes const& rCompTypes, UCtxCirclePathSims &rCirclePath, UCtxConstantSpinSims &rConstantSpin, UCtxSimpleGravitySims &rSimpleGravity) noexcept
+    {
+        auto const &dc = rCompTypes.defaults;
+
+        for (CirclePathSimId localSimId : rCirclePath.ids)
         {
-            continue;
+            auto &rInst = rCirclePath.instOf[localSimId];
+            DataAccessorId const &rAccessorId = rInst.accessorId;
+
+            LGRN_ASSERT(rAccessorId.has_value());
+
+            DataAccessor &rAccessor = rDataAccessors.instances[rAccessorId];
+
+            if ( ! rAccessor.owner.has_value() )
+            {
+                rAccessor.debugName = fmt::format("CirclePath_{} sim{}", localSimId.value, rInst.simId.value);
+                rAccessor.cospace = rInst.cospaceId;
+                rAccessor.owner = rInst.simId;
+                rAccessor.count = rInst.sim.m_data.size();
+
+                constexpr std::size_t stride = sizeof(CirclePathSim::SatData);
+                CirclePathSim::SatData const *pFirst = rInst.sim.m_data.data();
+                rAccessor.components[dc.posX]  = make_comp(&pFirst->position.data()[0], stride);
+                rAccessor.components[dc.posY]  = make_comp(&pFirst->position.data()[1], stride);
+                rAccessor.components[dc.posZ]  = make_comp(&pFirst->position.data()[2], stride);
+                rAccessor.components[dc.velX]  = make_comp(&pFirst->velocity.data()[0], stride);
+                rAccessor.components[dc.velY]  = make_comp(&pFirst->velocity.data()[1], stride);
+                rAccessor.components[dc.velZ]  = make_comp(&pFirst->velocity.data()[2], stride);
+                rAccessor.components[dc.satId] = make_comp(&pFirst->id, stride);
+
+                if ( ! rInst.sim.m_data.empty() )
+                {
+                    std::vector<SatelliteId> satsAffected;
+                    satsAffected.reserve(rInst.sim.m_data.size());
+                    for (CirclePathSim::SatData const& satData : rInst.sim.m_data)
+                    {
+                        satsAffected.push_back(satData.id);
+                    }
+
+                    rDataSrcs.changes.push_back(DataSourceChange{
+                        .satsAffected = std::move(satsAffected),
+                        .components   = component_type_set({dc.posX, dc.posY, dc.posZ,
+                                                            dc.velX, dc.velY, dc.velZ, dc.satId}),
+                        .accessor     = rAccessorId,
+                    });
+                }
+            }
         }
 
-        if (std::memcmp(candidate.entries.data(), query.entries.data(), size * sizeof(DataSource::Entry)) != 0)
+        for (SimpleGravitySimId localSimId : rSimpleGravity.ids)
         {
-            continue;
+            auto &rInst = rSimpleGravity.instOf[localSimId];
+            DataAccessorId const &rAccessorId = rInst.accessorId;
+
+            LGRN_ASSERT(rAccessorId.has_value());
+
+            DataAccessor &rAccessor = rDataAccessors.instances[rAccessorId];
+
+            if ( ! rAccessor.owner.has_value() )
+            {
+                rAccessor.debugName = fmt::format("SimpleGravitySim_{} sim{}", localSimId.value, rInst.simId.value);
+                rAccessor.cospace = rInst.cospaceId;
+                rAccessor.owner = rInst.simId;
+                rAccessor.count = rInst.sim.m_data.size();
+
+                constexpr std::size_t stride = sizeof(SimpleGravitySim::SatData);
+                SimpleGravitySim::SatData const *pFirst = rInst.sim.m_data.data();
+                rAccessor.components[dc.posX]  = make_comp(&pFirst->position.data()[0], stride);
+                rAccessor.components[dc.posY]  = make_comp(&pFirst->position.data()[1], stride);
+                rAccessor.components[dc.posZ]  = make_comp(&pFirst->position.data()[2], stride);
+                rAccessor.components[dc.velXd] = make_comp(&pFirst->velocity.data()[0], stride);
+                rAccessor.components[dc.velYd] = make_comp(&pFirst->velocity.data()[1], stride);
+                rAccessor.components[dc.velZd] = make_comp(&pFirst->velocity.data()[2], stride);
+                rAccessor.components[dc.satId] = make_comp(&pFirst->id, stride);
+
+                if ( ! rInst.sim.m_data.empty() )
+                {
+                    std::vector<SatelliteId> satsAffected;
+                    satsAffected.reserve(rInst.sim.m_data.size());
+                    for (SimpleGravitySim::SatData const& satData : rInst.sim.m_data)
+                    {
+                        satsAffected.push_back(satData.id);
+                    }
+
+                    rDataSrcs.changes.push_back(DataSourceChange{
+                        .satsAffected = std::move(satsAffected),
+                        .components   = component_type_set({
+                                                dc.satId,
+                                                dc.posX, dc.posY, dc.posZ,
+                                                dc.velXd, dc.velYd, dc.velZd,
+                                                dc.accelX, dc.accelY, dc.accelZ}),
+                        .accessor     = rAccessorId,
+                    });
+                }
+            }
         }
 
-        return dataSrcId;
-    }
-    return {};
+        for (ConstantSpinSimId localSimId : rConstantSpin.ids)
+        {
+            auto &rInst = rConstantSpin.instOf[localSimId];
+            DataAccessorId &rAccessorId = rInst.accessorId;
+
+            DataAccessor &rAccessor = rDataAccessors.instances[rAccessorId];
+
+            if ( ! rAccessor.owner.has_value() )
+            {
+                rAccessor.debugName = fmt::format("ConstantSpinSim_{} sim{}", localSimId.value, rInst.simId.value);
+                rAccessor.cospace = rInst.cospaceId;
+                rAccessor.owner = rInst.simId;
+                rAccessor.count = 1;
+
+                constexpr std::size_t stride = sizeof(ConstantSpinSim::SatData);
+                ConstantSpinSim::SatData const *pFirst = rInst.sim.m_data.data();
+
+                rAccessor.components[dc.rotX]  = make_comp(&pFirst->rot.data()[0], stride);
+                rAccessor.components[dc.rotY]  = make_comp(&pFirst->rot.data()[1], stride);
+                rAccessor.components[dc.rotZ]  = make_comp(&pFirst->rot.data()[2], stride);
+                rAccessor.components[dc.rotW]  = make_comp(&pFirst->rot.data()[3], stride);
+                rAccessor.components[dc.satId] = make_comp(&pFirst->id, stride);
+            }
+        }
+    });
+
+    static int counter = 0;
+
+    counter =0;
+
+    rFB.task()
+        .name       ("update simple simulations")
+        .sync_with  ({uniCore.pl.accessors(Modify), uniCore.pl.accessorDelete(Modify_), uniCore.pl.simTimeBehindBy(Ready), uniCore.pl.datasrcChanges(Modify_), uniCore.pl.stolenSats(Modify), uniTransfers.pl.midTransfer(Ready), uniTransfers.pl.midTransferDelete(Modify_)})
+        .args       ({
+            uniCore.di          .simulations,
+            uniCore.di          .dataSrcs,
+            uniCore.di          .dataAccessors,
+            uniCore.di          .compTypes,
+            uniCore.di          .stolenSats,
+            uniTransfers.di     .transferBufs,
+            uniSimpleSims.di    .circlePath,
+            uniSimpleSims.di    .constantSpin,
+            uniSimpleSims.di    .simpleGravity })
+        .func       ([] (
+            UCtxSimulations             &rSimulations,
+            UCtxDataSources             &rDataSrcs,
+            UCtxDataAccessors           &rDataAccessors,
+            UCtxComponentTypes    const &rCompTypes,
+            UCtxStolenSatellites        &rStolenSats,
+            UCtxTransferBuffers         &rTransferBufs,
+            UCtxCirclePathSims          &rCirclePath,
+            UCtxConstantSpinSims        &rConstantSpin,
+            UCtxSimpleGravitySims       &rSimpleGravity) noexcept
+    {
+        auto const &dc = rCompTypes.defaults;
+
+        for (CirclePathSimId localSimId : rCirclePath.ids)
+        {
+            auto &rInst = rCirclePath.instOf[localSimId];
+            std::int64_t &rTimeBehindBy = rSimulations.simulationOf[rInst.simId].timeBehindBy;
+
+            while (rTimeBehindBy >= rInst.updateInterval)
+            {
+                rTimeBehindBy -= rInst.updateInterval;
+                rInst.sim.update(rInst.updateInterval);
+            }
+        }
+
+        for (ConstantSpinSimId localSimId : rConstantSpin.ids)
+        {
+            auto &rInst = rConstantSpin.instOf[localSimId];
+            std::int64_t &rTimeBehindBy = rSimulations.simulationOf[rInst.simId].timeBehindBy;
+
+            while (rTimeBehindBy >= rInst.updateInterval)
+            {
+                rTimeBehindBy -= rInst.updateInterval;
+                rInst.sim.update(rInst.updateInterval);
+            }
+        }
+
+
+
+        counter++;
+
+        for (SimpleGravitySimId const localSimId : rSimpleGravity.ids)
+        {
+            auto &rInst = rSimpleGravity.instOf[localSimId];
+            std::int64_t &rTimeBehindBy = rSimulations.simulationOf[rInst.simId].timeBehindBy;
+
+            while (rTimeBehindBy >= rInst.updateInterval)
+            {
+                rTimeBehindBy -= rInst.updateInterval;
+
+                rInst.sim.update(rInst.updateInterval);
+
+                std::vector<MidTransfer> &rTransfers = rTransferBufs.midTransfersOf[rInst.simId];
+
+                if (!rTransfers.empty() && counter == 60*5)
+                {
+                    rTransferBufs.midTransferDelete.push_back(rInst.simId);
+
+                    std::vector<SatelliteId> satsAffected;
+
+                    std::int64_t const transferbufTimeBehind = rSimulations.simulationOf[rTransferBufs.simId].timeBehindBy;
+
+                    for (MidTransfer const& midTransfer : rTransfers)
+                    {
+                        auto const& rAccessor = rDataAccessors.instances[midTransfer.accessor];
+                        auto iter = rAccessor.iterate(std::array{
+                                dc.satId,
+                                dc.posX, dc.posY, dc.posZ,
+                                dc.velXd, dc.velYd, dc.velZd,
+                                dc.accelX, dc.accelY, dc.accelZ});
+
+                        float const timeDiff = (transferbufTimeBehind + rAccessor.time - rTimeBehindBy) * 0.001f;
+
+                        satsAffected.resize(rAccessor.count);
+                        for (std::size_t i = 0; i < rAccessor.count; ++i)
+                        {
+                            SatelliteId const satId = iter.get<SatelliteId>(0);
+                            Vector3d const velocity = Vector3d{iter.get<double>(4), iter.get<double>(5), iter.get<double>(6)};
+                            Vector3g const moved = Vector3g((velocity * timeDiff) / rInst.sim.m_metersPerPosUnit);
+                            rInst.sim.m_data.push_back(SimpleGravitySim::SatData{
+                                .position   = Vector3g{ iter.get<spaceint_t>(1), iter.get<spaceint_t>(2), iter.get<spaceint_t>(3) } + moved,
+                                .velocity   = velocity,
+                                .accel      = Vector3d{iter.get<float>(7), iter.get<float>(8), iter.get<float>(9)},
+                                .mass       = 50.0f,
+                                .id         = satId
+                            });
+
+                            satsAffected[i] = satId;
+
+                            iter.next();
+                        }
+
+                        rStolenSats.of[midTransfer.accessor].allStolen = true;
+                        rDataAccessors.accessorDelete.push_back(midTransfer.accessor);
+
+                        rDataSrcs.changes.push_back(DataSourceChange{
+                            .satsAffected = std::exchange(satsAffected, {}),
+                            .components   = component_type_set({
+                                                dc.satId,
+                                                dc.posX, dc.posY, dc.posZ,
+                                                dc.velXd, dc.velYd, dc.velZd,
+                                                dc.accelX, dc.accelY, dc.accelZ}),
+                            .accessor     = rInst.accessorId,
+                        });
+                    }
+
+                    auto &rAccessor = rDataAccessors.instances[rInst.accessorId];
+
+                    constexpr std::size_t stride = sizeof(SimpleGravitySim::SatData);
+                    SimpleGravitySim::SatData const *pFirst = rInst.sim.m_data.data();
+                    rAccessor.components[dc.posX]  = make_comp(&pFirst->position.data()[0], stride);
+                    rAccessor.components[dc.posY]  = make_comp(&pFirst->position.data()[1], stride);
+                    rAccessor.components[dc.posZ]  = make_comp(&pFirst->position.data()[2], stride);
+                    rAccessor.components[dc.velXd]  = make_comp(&pFirst->velocity.data()[0], stride);
+                    rAccessor.components[dc.velYd]  = make_comp(&pFirst->velocity.data()[1], stride);
+                    rAccessor.components[dc.velZd]  = make_comp(&pFirst->velocity.data()[2], stride);
+                    rAccessor.components[dc.satId] = make_comp(&pFirst->id, stride);
+                    rAccessor.count = rInst.sim.m_data.size();
+                }
+            }
+        }
+    });
+
+}); // setup_uni_core
+
+struct TestPlanet
+{
+    SatelliteId satId;
+    CoSpaceId   withinSOI;
+    IntakeId    intake;
+};
+
+struct Love
+{
+    //CirclePathSimId rootCirclePathSimId;
+};
+
+
+template <typename T>
+void write_bytes(ArrayView<std::byte>& rRemaining, T const& value)
+{
+    LGRN_ASSERT(rRemaining.size() >= sizeof(T));
+    std::memcpy(rRemaining.begin(), &value, sizeof(T));
+    rRemaining = rRemaining.exceptPrefix(sizeof(T));
 }
 
 FeatureDef const ftrUniverseTestPlanets = feature_def("UniverseTestPlanets", [] (
         FeatureBuilder              &rFB,
         Implement<FIUniPlanets>     uniPlanets,
-        Implement<FITestSims>       sim,
+        DependOn<FIUniSimpleSims>   uniSimpleSims,
         DependOn<FIUniSceneFrame>   uniScnFrame,
-        DependOn<FIUniCore>         uniCore)
+        DependOn<FIUniCore>         uniCore,
+        DependOn<FIUniTransfers>    uniTransfers)
 {
     using CoSpaceIdVec_t = std::vector<CoSpaceId>;
 
     auto &rCoordSpaces      = rFB.data_get< UCtxCoordSpaces >       (uniCore.di.coordSpaces);
     auto &rCompTypes        = rFB.data_get< UCtxComponentTypes >    (uniCore.di.compTypes);
-    auto &rCompDefaults     = rFB.data_get< UCtxDefaultComponents > (uniCore.di.compDefaults);
     auto &rDataAccessors    = rFB.data_get< UCtxDataAccessors >     (uniCore.di.dataAccessors);
-    auto &rDeletedSats      = rFB.data_get< UCtxDeletedSatellites > (uniCore.di.deletedSats);
+    auto &rStolenSats       = rFB.data_get< UCtxStolenSatellites >  (uniCore.di.stolenSats);
     auto &rDataSrcs         = rFB.data_get< UCtxDataSources >       (uniCore.di.dataSrcs);
     auto &rSatInst          = rFB.data_get< UCtxSatelliteInstances >(uniCore.di.satInst);
     auto &rSimulations      = rFB.data_get< UCtxSimulations >       (uniCore.di.simulations);
-    auto &rTime             = rFB.data_get< UCtxTime >              (uniCore.di.time);
-    auto &rIntakes          = rFB.data_get< UCtxIntakes >           (uniCore.di.intakes);
+    auto &rIntakes          = rFB.data_get< UCtxIntakes >           (uniTransfers.di.intakes);
+    auto &rTransferBufs     = rFB.data_get< UCtxTransferBuffers >   (uniTransfers.di.transferBufs);
 
-    // Create coordinate spaces
-    CoSpaceId const mainSpace = rCoordSpaces.ids.create();
+    auto &rCirclePathSims   = rFB.data_get< UCtxCirclePathSims >    (uniSimpleSims.di.circlePath);
+    auto &rConstantSpinSims = rFB.data_get< UCtxConstantSpinSims >  (uniSimpleSims.di.constantSpin);
+    auto &rSimpleGravitySims = rFB.data_get< UCtxSimpleGravitySims >(uniSimpleSims.di.simpleGravity);
 
+    CoSpaceId rootSpace = rCoordSpaces.ids.create();
+
+    std::vector<TestPlanet> planets;
+
+    planets.emplace_back(TestPlanet{});
+
+    for (TestPlanet &rTestPlanet : planets)
     {
-        // add 1 satellite
-        SatelliteId const satId = rSatInst.ids.create();
-
-        DataSourceId const srcId = rDataSrcs.ids.create();
-        rDataSrcs.instances.resize(rDataSrcs.ids.capacity());
-
-        DataSource &rDataSrc = rDataSrcs.instances[srcId];
-
-        // Make circular path simulator for the satellite's position
-        auto &rCircleSim = rFB.data_emplace< CirclePathSim >(sim.di.circleSim);
-        rCircleSim.m_id = rSimulations.ids.create();
-        rCircleSim.m_data.resize(1);
-        rCircleSim.m_data[0].radius     = 4.0 * 1024.0;
-        rCircleSim.m_data[0].initTime   = 0;
-        rCircleSim.m_data[0].period     = 10000;
-        rCircleSim.m_data[0].id         = satId;
-
-        // setup data accessor to expose position and stuff
-        {
-            DataAccessor accessor;
-
-            accessor.cospace = mainSpace;
-            accessor.owner = rCircleSim.m_id;
-            accessor.count = 1;
-
-            constexpr std::size_t stride = sizeof(CirclePathSim::SatData);
-            CirclePathSim::SatData const *pFirst = rCircleSim.m_data.data();
-            accessor.components[rCompDefaults.posX]  = make_comp(&pFirst->position.data()[0], stride);
-            accessor.components[rCompDefaults.posY]  = make_comp(&pFirst->position.data()[1], stride);
-            accessor.components[rCompDefaults.posZ]  = make_comp(&pFirst->position.data()[2], stride);
-            accessor.components[rCompDefaults.satId] = make_comp(&pFirst->id, stride);
-
-            rCircleSim.m_accessor = std::make_shared<DataAccessor>(std::move(accessor));
-            DataAccessorId const accessorId = rDataAccessors.ids.create();
-            rDataAccessors.instances.resize(rDataAccessors.ids.size());
-            rDataAccessors.instances[accessorId] = rCircleSim.m_accessor;
-
-            DataSource::ComponentTypeSet_t comps;
-            comps.emplace(rCompDefaults.posX);
-            comps.emplace(rCompDefaults.posY);
-            comps.emplace(rCompDefaults.posZ);
-            comps.emplace(rCompDefaults.satId);
-            rDataSrc.entries.push_back(DataSource::Entry{comps, accessorId});
-        }
-
-        // Make constant spin simulator to control the satellite's rotation
-        auto &rSpinSim = rFB.data_emplace< ConstantSpinSim >(sim.di.spinSim);
-        rSpinSim.m_id = rSimulations.ids.create();
-        rSpinSim.m_data.resize(1);
-        rSpinSim.m_data[0].initTime   = 0;
-        rSpinSim.m_data[0].period     = 1000;
-        rSpinSim.m_data[0].axis       = {0.0f, 0.0f, 1.0f};
-        rSpinSim.m_data[0].id         = satId;
-
-        {
-            DataAccessor accessor;
-
-            accessor.cospace = mainSpace;
-            accessor.owner = rSpinSim.m_id;
-            accessor.count = 1;
-
-            constexpr std::size_t stride = sizeof(ConstantSpinSim::SatData);
-            ConstantSpinSim::SatData const *pFirst = rSpinSim.m_data.data();
-
-            accessor.components[rCompDefaults.rotX]  = make_comp(&pFirst->rot.data()[0], stride);
-            accessor.components[rCompDefaults.rotY]  = make_comp(&pFirst->rot.data()[1], stride);
-            accessor.components[rCompDefaults.rotZ]  = make_comp(&pFirst->rot.data()[2], stride);
-            accessor.components[rCompDefaults.rotW]  = make_comp(&pFirst->rot.data()[3], stride);
-            accessor.components[rCompDefaults.satId] = make_comp(&pFirst->id, stride);
-
-            rSpinSim.m_accessor = std::make_shared<DataAccessor>(std::move(accessor));
-            DataAccessorId const accessorId = rDataAccessors.ids.create();
-            rDataAccessors.instances.resize(rDataAccessors.ids.size());
-            rDataAccessors.instances[accessorId] = rSpinSim.m_accessor;
-
-            DataSource::ComponentTypeSet_t comps;
-            comps.emplace(rCompDefaults.rotX);
-            comps.emplace(rCompDefaults.rotY);
-            comps.emplace(rCompDefaults.rotZ);
-            comps.emplace(rCompDefaults.rotW);
-            comps.emplace(rCompDefaults.satId);
-            rDataSrc.entries.push_back(DataSource::Entry{comps, accessorId});
-        }
-
-        rSatInst.dataSrc.resize(rSatInst.ids.capacity());
-        rSatInst.dataSrc[satId] = srcId;
+        rTestPlanet = TestPlanet{
+            .satId      = rSatInst.ids.create(),
+            .withinSOI  = rCoordSpaces.ids.create(),
+            //.intake     = rIntakes.ids.create()
+        };
     }
 
-    rDeletedSats.sets.resize(rDataAccessors.ids.capacity());
+    auto const &dc = rCompTypes.defaults;
+
+    ComponentTypeIdSet_t const intakeComps = component_type_set({
+            dc.satId,
+            dc.posX, dc.posY, dc.posZ,
+            dc.velXd, dc.velYd, dc.velZd,
+            dc.accelX, dc.accelY, dc.accelZ});
+
+    CirclePathSimId const rootSimAId = rCirclePathSims.ids.create();
+    rCirclePathSims.instOf.resize(rCirclePathSims.ids.size());
+
+    UCtxCirclePathSims::Instance &rSimInstA = rCirclePathSims.instOf[rootSimAId];
+    rSimInstA = UCtxCirclePathSims::Instance{
+        .simId             = rSimulations.ids.create(),
+        .updateInterval    = 200,
+        .accessorId        = rDataAccessors.ids.create(),
+        .cospaceId         = rootSpace,
+        //.intakeId          = rIntakes.make_intake(rCirclePathSims.instOf[rootSimAId].simId, rootSpace, arrayView(positionComps))
+    };
+
+    // add 1 satellite
+    rSimInstA.sim.m_data.resize(1);
+    rSimInstA.sim.m_data[0].radius     = 20.0 * 1024.0;
+    rSimInstA.sim.m_data[0].period     = 20000;
+    rSimInstA.sim.m_data[0].id         = rSatInst.ids.create();
+
+    SimpleGravitySimId const rootSimBId = rSimpleGravitySims.ids.create();
+    rSimpleGravitySims.instOf.resize(rSimpleGravitySims.ids.size());
+    rSimpleGravitySims.instOf.resize(rSimpleGravitySims.ids.size());
+    SimulationId const simBId = rSimulations.ids.create();
+
+    UCtxSimpleGravitySims::Instance &rSimInstB = rSimpleGravitySims.instOf[rootSimBId];
+    rSimInstB = UCtxSimpleGravitySims::Instance{
+        .simId             = simBId,
+        .updateInterval    = 500,
+        .accessorId        = rDataAccessors.ids.create(),
+        .intakeId          = rIntakes.make_intake(simBId, rootSpace, intakeComps)
+    };
+
+    rSimInstB.sim.m_data.push_back(SimpleGravitySim::SatData{
+        .position   = {1000, 1000, 1000},
+        .velocity   = {1.0f, 0.0f, 0.0f},
+        .accel      = {},
+        .mass       = 10.0f,
+        .id = rSatInst.ids.create()
+    });
+    rSimInstB.sim.m_metersPerPosUnit = 1/1024.0f;
+    rSimInstB.sim.m_secPerTimeUnit = 0.001f;
+
+    rSimulations.simulationOf.resize(rSimulations.ids.capacity());
+
+    IntakeId const 什么 = rIntakes.find_intake_at(rootSpace, intakeComps);
+    LGRN_ASSERT(什么.has_value());
+
+    static constexpr std::size_t c_reqDataSize = sizeof(SatelliteId) + sizeof(spaceint_t) * 3u + sizeof(double) * 3u + sizeof(float) * 3u;
+
+    std::unique_ptr<std::byte[]> reqData = std::make_unique<std::byte[]>(c_reqDataSize);
+
+    auto remaining = ArrayView<std::byte>(reqData.get(), c_reqDataSize);
+
+    auto sat = rSatInst.ids.create();
+
+    write_bytes<SatelliteId>    (remaining, sat); // satId
+    write_bytes<spaceint_t>     (remaining, 10); // posX
+    write_bytes<spaceint_t>     (remaining, 10); // posY
+    write_bytes<spaceint_t>     (remaining, 5000); // posZ
+    write_bytes<double>         (remaining, 0.0); // velXd
+    write_bytes<double>         (remaining, -1.0); // velYd
+    write_bytes<double>         (remaining, 0.0); // velZd
+    write_bytes<float>          (remaining, 10.0f); // accelX
+    write_bytes<float>          (remaining, 10.0f); // accelY
+    write_bytes<float>          (remaining, 10.0f); // accelZ
+
+    rTransferBufs.requests.push_back(TransferRequest{
+        .data   = std::move(reqData),
+        .count  = 1,
+        .time = 0u,
+        .target = 什么
+    });
+
+
+
+
+    //rIntakes.find_intake_at()
+    // We have two simulators in the same spot. how to intake specifically into the circleSim instead of the other thing????
+    // circlePath is hard-code only. kinematic and rotation sim should be able to handle
+    // either way, there should be more tags and filters that can be used to discriminate between which components are passed arund?
+    // maybe just a string name filter?
+    // dispatch to which input?
+
+    // find intake
+
+    // push satellite data
+
+    // TODO: make transfer buffer
+    // is a simulation
+    // when we push stuff into its inserter, it will create a dataaccessor for it next update
+
+    // create an intake to allow pushing satellite xyz position data into rootSimB
+    // to pass a satellite into a simulation
+    // create a transfer medium
+    //
+
+
+//    ConstantSpinSimId const spinSimId = rConstantSpinSims.ids.create();
+//    rConstantSpinSims.instOf.resize(rConstantSpinSims.ids.size());
+//    rConstantSpinSims.instOf[rootSimBId] = {
+//        .simId             = rSimulations.ids.create(),
+//        .updateInterval    = 15,
+//        .accessorId        = rDataAccessors.ids.create()
+//    };
+
+
+
+//    rSimInstB.sim.m_data.resize(1);
+//    rSimInstB.sim.m_data[0].period     = 1000;
+//    rSimInstB.sim.m_data[0].axis       = {0.0f, 0.0f, 1.0f};
+//    rSimInstB.sim.m_data[0].id         = satId;
+
+
+//    DataSourceId const srcId = rDataSrcs.ids.create();
+//    rDataSrcs.instances.resize(rDataSrcs.ids.capacity());
+
+
+//    rDataSrc.entries.push_back(DataSource::Entry{
+//            DataSource::make_type_set({rCompDefaults.rotX, rCompDefaults.rotY,
+//                                       rCompDefaults.rotZ, rCompDefaults.rotW,
+//                                       rCompDefaults.satId}), rSimInstB.accessorId});
+
+    rStolenSats.of.resize(rDataAccessors.ids.capacity());
 
     constexpr int           precision       = 10;
     constexpr int           planetCount     = 64;
@@ -282,6 +1116,7 @@ FeatureDef const ftrUniverseTestPlanets = feature_def("UniverseTestPlanets", [] 
     constexpr spaceint_t    maxDist         = math::mul_2pow<spaceint_t, int>(20000ul, precision);
     constexpr float         maxVel          = 800.0f;
 
+    CoSpaceId const mainSpace = rCoordSpaces.ids.create();
 
     std::vector<CoSpaceId> satSurfaceSpaces(planetCount);
     rCoordSpaces.ids.create(satSurfaceSpaces.begin(), satSurfaceSpaces.end());
@@ -298,17 +1133,17 @@ FeatureDef const ftrUniverseTestPlanets = feature_def("UniverseTestPlanets", [] 
     rCoordSpaces.idToTreePos[mainSpace] = 0;
 
     rFB.task()
-        .name       ("Update planets")
-        .sync_with  ({uniCore.pl.update(Run), uniScnFrame.pl.sceneFrame(Modify)})
-        .args       ({            sim.di.circleSim,            sim.di.spinSim })
-        .func       ([] (CirclePathSim &rCircleSim, ConstantSpinSim &rSpinSim) noexcept
+        .name       ("Tell all simulations to advance forward in time")
+        .sync_with  ({uniCore.pl.simTimeBehindBy(Modify)})
+        .args       ({           uniCore.di.simulations })
+        .func       ([] ( UCtxSimulations &rSimulations) noexcept
     {
-        static std::uint64_t time = 0;
-
-        time+=15;
-        rCircleSim.update(time);
-        rSpinSim.update(time);
+        for (SimulationId simId : rSimulations.ids)
+        {
+            rSimulations.simulationOf[simId].timeBehindBy += 15;
+        }
     });
+
 }); // ftrUniverseTestPlanets
 
 struct FIUniPlanetsDraw {
@@ -318,31 +1153,25 @@ struct FIUniPlanetsDraw {
 
     struct Pipelines {
         PipelineDef<EStgOptn> resync  {"resync - Resync planet drawer with universe"};
+        PipelineDef<EStgCont> trackedSats  {"trackedSats"};
     };
 };
 
 struct PlanetDraw
 {
 
-    struct SatelliteToDraw
+    struct TrackedSatellite
     {
         DrawEnt drawEnt;
+        bool    isTracking{false};
     };
 
-    struct TrackedCoordspace
-    {
-        std::unordered_set<DataAccessorId> accessors;
-        osp::KeyedVec<SatelliteId, std::optional<SatelliteToDraw>> sats;
-    };
-
-    bool connected = false;
+    //bool connected = false;
     bool doResync = false;
 
 
-    // [coordspace][satset]-> (list of dataacessors)
-
-    //std::unordered_map<SatelliteSetId, TrackedSatSet> trackedsatInst;
-    std::unordered_map<CoSpaceId, TrackedCoordspace> cospaces;
+    osp::KeyedVec<SatelliteId, TrackedSatellite>    trackedSats;
+    lgrn::IdSetStl<DataAccessorId>                  trackedAccessors;
 
     DrawEntVec_t            drawEnts;
     std::array<DrawEnt, 3>  axis;
@@ -369,99 +1198,97 @@ FeatureDef const ftrUniverseTestPlanetsDraw = feature_def("UniverseTestPlanetsDr
     auto const &params = entt::any_cast<PlanetDrawParams>(userData);
 
     rFB.pipeline(uniPlanetsDraw.pl.resync).parent(mainApp.loopblks.mainLoop);
+    rFB.pipeline(uniPlanetsDraw.pl.trackedSats).parent(mainApp.loopblks.mainLoop);
 
     auto &rPlanetDraw  = rFB.data_emplace<PlanetDraw>(uniPlanetsDraw.di.planetDraw);
 
 
     rPlanetDraw.planetMat = params.planetMat;
 
-
-    rFB.task()
-        .name       ("Read universe changes")
-        .sync_with  ({windowApp.pl.sync(Run), uniPlanetsDraw.pl.resync(ModifyOrSignal)})
-        .args       ({uniPlanetsDraw.di.planetDraw,          uniCore.di.dataAccessors,               uniCore.di.satInst,        uniCore.di.dataSrcs,                   uniCore.di.compDefaults})
-        .func       ([] (  PlanetDraw &rPlanetDraw, UCtxDataAccessors &rDataAccessors, UCtxSatelliteInstances &rSatInst, UCtxDataSources &rDataSrcs, UCtxDefaultComponents const& compDefaults) noexcept
+     rFB.task()
+        .name       ("Read universe datasource changes")
+        .sync_with  ({uniPlanetsDraw.pl.trackedSats(Modify), uniPlanetsDraw.pl.resync(ModifyOrSignal), uniCore.pl.accessorIds(Ready), uniCore.pl.satIds(Ready)})
+        .args       ({uniPlanetsDraw.di.planetDraw,          uniCore.di.dataAccessors,               uniCore.di.satInst,        uniCore.di.dataSrcs})
+        .func       ([] (  PlanetDraw &rPlanetDraw, UCtxDataAccessors &rDataAccessors, UCtxSatelliteInstances &rSatInst, UCtxDataSources &rDataSrcs) noexcept
     {
-        if ( ! rPlanetDraw.connected)
+        if (true)
         {
-            rPlanetDraw.connected = true;
+            //std::cout << "salkjdsabfkjdsafdsaf\n";
+            rPlanetDraw.doResync = true;
 
-            DataSource::ComponentTypeSet_t compsRequired;
-            compsRequired.emplace(compDefaults.posX);
-            compsRequired.emplace(compDefaults.posY);
-            compsRequired.emplace(compDefaults.posZ);
+            //ComponentTypeIdSet_t compsRequired = component_type_set({compDefaults.posX, compDefaults.posY, compDefaults.posZ});
 
-            rPlanetDraw.cospaces.clear();
+            // TODO: right now this just tracks everything. add conditions later
 
-            for (DataSourceId const id : rDataSrcs.ids)
+            rPlanetDraw.trackedAccessors.clear();
+            rPlanetDraw.trackedAccessors.resize(rDataAccessors.ids.capacity());
+            for (DataAccessorId const accessorId : rDataAccessors.ids)
             {
-                DataSource const rSrc = rDataSrcs.instances[id];
-                DataSource::ComponentTypeSet_t compsRemaining = compsRequired;
+                rPlanetDraw.trackedAccessors.emplace(accessorId);
+            }
 
-                for (DataSource::Entry const& entry : rSrc.entries)
-                {
-                    std::shared_ptr<DataAccessor> pAccessor = rDataAccessors.instances[entry.accessor].lock();
-
-                    bool hasComponentsWeCareAbout = true;
-
-                    // TODO
-                    // for (ComponentTypeId const comp : entry.components)
-                    // {
-                    // }
-
-                    if (hasComponentsWeCareAbout)
-                    {
-                        PlanetDraw::TrackedCoordspace &rTrack = rPlanetDraw.cospaces[pAccessor->cospace];
-                        rTrack.accessors.emplace(entry.accessor);
-                    }
-                }
+            rPlanetDraw.trackedSats.resize(rSatInst.ids.capacity());
+            for (SatelliteId const satId : rSatInst.ids)
+            {
+                rPlanetDraw.trackedSats[satId].isTracking = true;
             }
 
             rPlanetDraw.doResync = true;
-
-            // TODO: Subscribe to events
-            // TODO: somehow modify pipelines to connect to universe?
         }
-
-        // on subscriber added, just push them all events so they don't directly just read?
-
-        // deal with events. satellites added/removed/transfered and stuff
-
-        // loop through all dataaccessors that we can and actually read positions
-        // the problem here is the 'resync' stage.
-        // how to initially discover all the stuff in the universe?
     });
 
+
+//    rFB.task()
+//        .name       ("Read universe changes")
+//        .sync_with  ({windowApp.pl.sync(Run), uniPlanetsDraw.pl.resync(ModifyOrSignal), uniCore.pl.datasrcs(Ready), uniCore.pl.accessors(Ready), uniCore.pl.accessorIds(Ready)})
+//        .args       ({uniPlanetsDraw.di.planetDraw,          uniCore.di.dataAccessors,               uniCore.di.satInst,        uniCore.di.dataSrcs,                   uniCore.di.compDefaults})
+//        .func       ([] (  PlanetDraw &rPlanetDraw, UCtxDataAccessors &rDataAccessors, UCtxSatelliteInstances &rSatInst, UCtxDataSources &rDataSrcs, UCtxDefaultComponents const& compDefaults) noexcept
+//    {
+//        if ( ! rPlanetDraw.connected)
+//        {
+//            rPlanetDraw.connected = true;
+//            // TODO: Subscribe to events
+//            // TODO: somehow modify pipelines to connect to universe?
+//        }
+//        // on subscriber added, just push them all events so they don't directly just read?
+
+//        // deal with events. satellites added/removed/transfered and stuff
+
+//        // loop through all dataaccessors that we can and actually read positions
+//        // the problem here is the 'resync' stage.
+//        // how to initially discover all the stuff in the universe?
+//    });
+
     rFB.task()
-        .name       ("create draw entities")
-        .sync_with  ({windowApp.pl.sync(Run), uniPlanetsDraw.pl.resync(Run), scnRender.pl.drawEnt(New)})
-        .args       ({    uniPlanetsDraw.di.planetDraw,  uniCore.di.dataAccessors,   uniCore.di.satInst, uniCore.di.dataSrcs,            uniCore.di.compDefaults, scnRender.di.scnRender })
-        .func       ([] (      PlanetDraw &rPlanetDraw, UCtxDataAccessors &rDataAccessors, UCtxSatelliteInstances &rSatInst, UCtxDataSources &rDataSrcs, UCtxDefaultComponents const& compDefaults, ACtxSceneRender &rScnRender) noexcept
+        .name       ("Create universe draw entities")
+        .sync_with  ({windowApp.pl.sync(Run), uniPlanetsDraw.pl.resync(Run), scnRender.pl.drawEnt(New), uniPlanetsDraw.pl.trackedSats(Ready)})
+        .args       ({    uniPlanetsDraw.di.planetDraw,          uniCore.di.dataAccessors,               uniCore.di.satInst, uniCore.di.dataSrcs,                       uniCore.di.compTypes,      scnRender.di.scnRender })
+        .func       ([] (      PlanetDraw &rPlanetDraw, UCtxDataAccessors &rDataAccessors, UCtxSatelliteInstances &rSatInst, UCtxDataSources &rDataSrcs, UCtxComponentTypes const& compTypes, ACtxSceneRender &rScnRender) noexcept
     {
         if (rPlanetDraw.doResync)
         {
-            // create draw ents?
-
             auto drawEntGen = rScnRender.m_drawIds.generator();
 
-            for (auto & [cospaceId, rTrackedCospace] : rPlanetDraw.cospaces)
+            for (SatelliteId const satId : rSatInst.ids)
             {
-                rTrackedCospace.sats.resize(rSatInst.ids.capacity());
-                for (SatelliteId const satId : rSatInst.ids)
+                PlanetDraw::TrackedSatellite &rTrackedSat = rPlanetDraw.trackedSats[satId];
+
+                if (rTrackedSat.isTracking)
                 {
-                    PlanetDraw::SatelliteToDraw &rSatToDraw = rTrackedCospace.sats[satId].emplace(PlanetDraw::SatelliteToDraw{});
-                    rSatToDraw.drawEnt = drawEntGen.create();
+                    if ( ! rTrackedSat.drawEnt.has_value() )
+                    {
+                        rTrackedSat.drawEnt = drawEntGen.create();
+                    }
                 }
             }
         }
-
     });
 
     rFB.task()
         .name       ("Add mesh and materials to universe stuff")
-        .sync_with  ({windowApp.pl.sync(Run), uniPlanetsDraw.pl.resync(Run), scnRender.pl.drawEnt(Ready), scnRender.pl.mesh(New), scnRender.pl.material(New)})
-        .args       ({    uniPlanetsDraw.di.planetDraw,          uniCore.di.dataAccessors,               uniCore.di.satInst,        uniCore.di.dataSrcs,            uniCore.di.compDefaults, scnRender.di.scnRender, comScn.di.drawing, comScn.di.namedMeshes })
-        .func       ([] (      PlanetDraw &rPlanetDraw, UCtxDataAccessors &rDataAccessors, UCtxSatelliteInstances &rSatInst, UCtxDataSources &rDataSrcs, UCtxDefaultComponents const& compDefaults, ACtxSceneRender &rScnRender, ACtxDrawing& rDrawing, NamedMeshes& rNamedMeshes) noexcept
+        .sync_with  ({windowApp.pl.sync(Run), uniPlanetsDraw.pl.resync(Run), scnRender.pl.drawEnt(Ready), scnRender.pl.mesh(New), scnRender.pl.material(New), uniPlanetsDraw.pl.trackedSats(Ready)})
+        .args       ({    uniPlanetsDraw.di.planetDraw,               uniCore.di.satInst,      scnRender.di.scnRender, comScn.di.drawing, comScn.di.namedMeshes })
+        .func       ([] (      PlanetDraw &rPlanetDraw, UCtxSatelliteInstances &rSatInst, ACtxSceneRender &rScnRender, ACtxDrawing& rDrawing, NamedMeshes& rNamedMeshes) noexcept
     {
         if (rPlanetDraw.doResync)
         {
@@ -479,21 +1306,28 @@ FeatureDef const ftrUniverseTestPlanetsDraw = feature_def("UniverseTestPlanetsDr
 
             // loop through all dataacessors, and write positions and stuff
             //
-            for (auto & [cospaceId, rTrackedCospace] : rPlanetDraw.cospaces)
+
+            MeshId const sphereMeshId = rNamedMeshes.m_shapeToMesh.at(EShape::Sphere);
+
+            for (SatelliteId const satId : rSatInst.ids)
             {
-                for (SatelliteId const satId : rSatInst.ids)
+                PlanetDraw::TrackedSatellite &rTrackedSat = rPlanetDraw.trackedSats[satId];
+
+                if (rTrackedSat.isTracking)
                 {
-                    PlanetDraw::SatelliteToDraw &rSatToDraw = rTrackedCospace.sats[satId].value();
-                    rScnRender.m_visible.insert(rSatToDraw.drawEnt);
-                    rScnRender.m_opaque .insert(rSatToDraw.drawEnt);
-                    MeshId const sphereMeshId = rNamedMeshes.m_shapeToMesh.at(EShape::Sphere);
-                    rScnRender.m_mesh[rSatToDraw.drawEnt] = rDrawing.m_meshRefCounts.ref_add(sphereMeshId);
-                    rScnRender.m_meshDirty.push_back(rSatToDraw.drawEnt);
+                    rScnRender.m_visible.insert(rTrackedSat.drawEnt);
+                    rScnRender.m_opaque .insert(rTrackedSat.drawEnt);
 
-                    rScnRender.m_color[rSatToDraw.drawEnt] = {1.0f, 1.0f, 1.0f, 1.0f};
+                    if ( ! rScnRender.m_mesh[rTrackedSat.drawEnt].has_value() )
+                    {
+                        rScnRender.m_mesh[rTrackedSat.drawEnt] = rDrawing.m_meshRefCounts.ref_add(sphereMeshId);
+                        rScnRender.m_meshDirty.push_back(rTrackedSat.drawEnt);
 
-                    rScnRender.m_materials[rPlanetDraw.planetMat].m_ents.insert(rSatToDraw.drawEnt);
-                    rScnRender.m_materials[rPlanetDraw.planetMat].m_dirty.push_back(rSatToDraw.drawEnt);
+                        rScnRender.m_color[rTrackedSat.drawEnt] = {1.0f, 1.0f, 1.0f, 1.0f};
+
+                        rScnRender.m_materials[rPlanetDraw.planetMat].m_ents.insert(rTrackedSat.drawEnt);
+                        rScnRender.m_materials[rPlanetDraw.planetMat].m_dirty.push_back(rTrackedSat.drawEnt);
+                    }
                 }
             }
         }
@@ -501,76 +1335,88 @@ FeatureDef const ftrUniverseTestPlanetsDraw = feature_def("UniverseTestPlanetsDr
 
     rFB.task()
         .name       ("write draw transforms")
-        .sync_with  ({windowApp.pl.sync(Run), uniPlanetsDraw.pl.resync(Run), scnRender.pl.drawEnt(Ready), scnRender.pl.mesh(New), scnRender.pl.material(New)})
-        .args       ({    uniPlanetsDraw.di.planetDraw,          uniCore.di.dataAccessors,              uniCore.di.deletedSats,               uniCore.di.satInst,        uniCore.di.dataSrcs,                   uniCore.di.compDefaults,      scnRender.di.scnRender })
-        .func       ([] (      PlanetDraw &rPlanetDraw, UCtxDataAccessors &rDataAccessors, UCtxDeletedSatellites &rDeletedSats, UCtxSatelliteInstances &rSatInst, UCtxDataSources &rDataSrcs, UCtxDefaultComponents const& compDefaults, ACtxSceneRender &rScnRender) noexcept
+        .sync_with  ({windowApp.pl.sync(Run), uniPlanetsDraw.pl.resync(Run), scnRender.pl.drawEnt(Ready), scnRender.pl.mesh(New), scnRender.pl.material(New), uniCore.pl.accessors(Ready), uniCore.pl.accessorIds(Ready), uniPlanetsDraw.pl.trackedSats(Ready)})
+        .args       ({    uniPlanetsDraw.di.planetDraw,          uniCore.di.dataAccessors,        uniCore.di.simulations,             uniCore.di.stolenSats,               uniCore.di.satInst,        uniCore.di.dataSrcs,                uniCore.di.compTypes,      scnRender.di.scnRender })
+        .func       ([] (      PlanetDraw &rPlanetDraw, UCtxDataAccessors &rDataAccessors, UCtxSimulations &rSimulations, UCtxStolenSatellites &rStolenSats, UCtxSatelliteInstances &rSatInst, UCtxDataSources &rDataSrcs, UCtxComponentTypes const& compTypes, ACtxSceneRender &rScnRender) noexcept
     {
-        for (auto & [cospaceId, rTrackedCospace] : rPlanetDraw.cospaces)
+        auto const &dc = compTypes.defaults;
+        for (DataAccessorId const accessorId : rPlanetDraw.trackedAccessors)
         {
-            for (DataAccessorId const accessorId : rTrackedCospace.accessors)
+            DataAccessor &rAccessor = rDataAccessors.instances[accessorId];
+
+            UCtxStolenSatellites::Accessor const& deleted = rStolenSats.of[accessorId];
+
+            if (rAccessor.iterMethod == DataAccessor::IterationMethod::SkipNullSatellites)
             {
-                std::shared_ptr<DataAccessor> rInstance = rDataAccessors.instances[accessorId].lock();
+                auto iter = rAccessor.iterate(std::array{
+                        dc.posX,  dc.posY,  dc.posZ,            // 0, 1, 2
+                        dc.velX,  dc.velY,  dc.velZ,            // 3, 4, 5
+                        dc.velXd, dc.velYd, dc.velZd,           // 6, 7, 8
+                        dc.rotX,  dc.rotY,  dc.rotZ, dc.rotW,   // 9, 10, 11, 12
+                        dc.satId});                             // 13
 
-                UCtxDeletedSatellites::Accessor const& deleted = rDeletedSats.sets[accessorId];
+                bool const hasPosXYZ  = iter.has(0) && iter.has(1) && iter.has(2);
+                bool const hasVelXYZ  = iter.has(3) && iter.has(4) && iter.has(5);
+                bool const hasVelXYZd = iter.has(6) && iter.has(7) && iter.has(8);
+                bool const hasRotXYZW = iter.has(9) && iter.has(10) && iter.has(11) && iter.has(12);
 
-                if (rInstance->iterMethod == DataAccessor::IterationMethod::SkipNullSatellites)
+                LGRN_ASSERTM(iter.has(13), "other iteration methods not yet supported");
+
+                float const timeBehindBy = rAccessor.owner.has_value() ? rSimulations.simulationOf[rAccessor.owner].timeBehindBy * 0.001f : 0.0f;
+
+
+                for (std::size_t i = 0; i < rAccessor.count; ++i)
                 {
-                    static constexpr auto indices = std::array<std::size_t const, 8u>{0u, 1u, 2u, 3u, 4u, 5u, 6u, 7u};
-                    auto const [idxPosX, idxPosY, idxPosZ, idxRotX, idxRotY, idxRotZ, idxRotW, idxSatId] = indices;
+                    SatelliteId const satId = iter.get<SatelliteId>(13);
 
-                    auto iter = rInstance->iterate(std::array{
-                            compDefaults.posX, compDefaults.posY, compDefaults.posZ,
-                            compDefaults.rotX, compDefaults.rotY, compDefaults.rotZ, compDefaults.rotW,
-                            compDefaults.satId});
-
-                    bool const hasPosXYZ  = iter.has(idxPosX) && iter.has(idxPosY) && iter.has(idxPosZ);
-                    bool const hasRotXYZW = iter.has(idxRotX) && iter.has(idxRotY) && iter.has(idxRotZ) && iter.has(idxRotW);
-
-                    LGRN_ASSERTM(iter.has(idxSatId), "other iteration methods not yet supported");
-
-
-
-                    for (std::size_t i = 0; i < rInstance->count; ++i)
+                    if (deleted.dirty && deleted.sats.contains(satId))
                     {
-                        SatelliteId const satId = iter.get<SatelliteId>(idxSatId);
-
-                        if (deleted.dirty && deleted.set.contains(satId))
-                        {
-                            continue;
-                        }
-
-                        if (hasPosXYZ)
-                        {
-                            Vector3g const pos {iter.get<spaceint_t>(idxPosX),
-                                                iter.get<spaceint_t>(idxPosY),
-                                                iter.get<spaceint_t>(idxPosZ)};
-
-                            Vector3d const d = Vector3d(pos);
-                            Vector3 const qux = Vector3(d / 1024.0);
-
-                            PlanetDraw::SatelliteToDraw const &rSatToDraw = rTrackedCospace.sats[satId].value();
-
-                            LGRN_ASSERT(rSatToDraw.drawEnt.has_value());
-
-                            rScnRender.m_drawTransform[rSatToDraw.drawEnt].translation() = qux;
-                        }
-
-                        if (hasRotXYZW)
-                        {
-                            Quaternion const rot { {iter.get<float>(idxRotX), iter.get<float>(idxRotY), iter.get<float>(idxRotZ)}, iter.get<float>(idxRotW)};
-
-                            PlanetDraw::SatelliteToDraw const &rSatToDraw = rTrackedCospace.sats[satId].value();
-
-                            LGRN_ASSERT(rSatToDraw.drawEnt.has_value());
-
-                            Matrix3 const foo = rot.toMatrix();
-                            rScnRender.m_drawTransform[rSatToDraw.drawEnt][0].xyz() = foo[0];
-                            rScnRender.m_drawTransform[rSatToDraw.drawEnt][1].xyz() = foo[1];
-                            rScnRender.m_drawTransform[rSatToDraw.drawEnt][2].xyz() = foo[2];
-                        }
-
-                        iter.next();
+                        continue;
                     }
+
+                    Vector3 moved{0.0f, 0.0f, 0.0f};
+
+                    if (hasVelXYZ)
+                    {
+                        Vector3 const velocity {iter.get<float>(3), iter.get<float>(4), iter.get<float>(5)};
+                        moved = velocity * timeBehindBy;
+                    }
+
+                    if (hasVelXYZd)
+                    {
+                        Vector3d const velocity {iter.get<double>(6), iter.get<double>(7), iter.get<double>(8)};
+                        moved = Vector3(velocity * timeBehindBy);
+                    }
+
+                    if (hasPosXYZ)
+                    {
+                        Vector3g const pos {iter.get<spaceint_t>(0), iter.get<spaceint_t>(1), iter.get<spaceint_t>(2)};
+
+                        Vector3d const d = Vector3d(pos);
+                        Vector3 const qux = Vector3(d / 1024.0) + moved;
+
+                        PlanetDraw::TrackedSatellite &rTrackedSat = rPlanetDraw.trackedSats[satId];
+
+                        LGRN_ASSERT(rTrackedSat.drawEnt.has_value());
+
+                        rScnRender.m_drawTransform[rTrackedSat.drawEnt].translation() = qux;
+                    }
+
+                    if (hasRotXYZW)
+                    {
+                        Quaternion const rot { {iter.get<float>(9), iter.get<float>(10), iter.get<float>(11)}, iter.get<float>(12)};
+
+                        PlanetDraw::TrackedSatellite &rTrackedSat = rPlanetDraw.trackedSats[satId];
+
+                        LGRN_ASSERT(rTrackedSat.drawEnt.has_value());
+
+                        Matrix3 const foo = rot.toMatrix();
+                        rScnRender.m_drawTransform[rTrackedSat.drawEnt][0].xyz() = foo[0];
+                        rScnRender.m_drawTransform[rTrackedSat.drawEnt][1].xyz() = foo[1];
+                        rScnRender.m_drawTransform[rTrackedSat.drawEnt][2].xyz() = foo[2];
+                    }
+
+                    iter.next();
                 }
             }
         }

@@ -27,35 +27,45 @@
 #include <Magnum/Math/Math.h>
 #include <Magnum/Math/Functions.h>
 
+using osp::Quaternion;
+using osp::Vector3d;
+using osp::universe::Vector3g;
 using osp::universe::spaceint_t;
 
-namespace adera::sims
+namespace adera
 {
 
 static constexpr double pi = Magnum::Math::Constants<double>::pi();
 
-void CirclePathSim::update(std::uint64_t time) noexcept
+void CirclePathSim::update(std::uint64_t deltaTime) noexcept
 {
-    using Magnum::Math::cos;
-
     for (SatData &rSat : m_data)
     {
-        double const cycleTime = double((time + rSat.initTime) % rSat.period) / double(rSat.period);
+        rSat.cycleTime = (rSat.cycleTime + deltaTime) % rSat.period;
+
+        double const cycleTime = double(rSat.cycleTime) / double(rSat.period);
 
         auto const theta = Magnum::Radd(2.0 * pi * cycleTime);
 
-        rSat.position.x() = spaceint_t(cos(theta) * rSat.radius);
-        rSat.position.y() = spaceint_t(sin(theta) * rSat.radius);
+        rSat.position.x() = spaceint_t(Magnum::Math::cos(theta) * rSat.radius);
+        rSat.position.y() = spaceint_t(Magnum::Math::sin(theta) * rSat.radius);
         rSat.position.z() = 0;
+
+        float const tangentialSpeed = 2.0 * pi * (rSat.radius/1024.0f) / (double(rSat.period)/1000.0f);
+
+        rSat.velocity.x() = -Magnum::Math::sin(theta) * tangentialSpeed;
+        rSat.velocity.y() = Magnum::Math::cos(theta) * tangentialSpeed;
+        rSat.velocity.z() = 0;
     }
 }
 
 
-void ConstantSpinSim::update(std::uint64_t time) noexcept
+void ConstantSpinSim::update(std::uint64_t deltaTime) noexcept
 {
     for (SatData &rSat : m_data)
     {
-        double const cycleTime = double((time + rSat.initTime) % rSat.period) / double(rSat.period);
+        rSat.cycleTime = (rSat.cycleTime + deltaTime) % rSat.period;
+        double const cycleTime = double(rSat.cycleTime) / double(rSat.period);
         auto const theta = Magnum::Rad(2.0f * pi * cycleTime);
 
         rSat.rot = Quaternion::rotation(theta, rSat.axis);
@@ -63,9 +73,9 @@ void ConstantSpinSim::update(std::uint64_t time) noexcept
 }
 
 
-void KinematicSim::update(std::uint64_t time) noexcept
+void SimpleGravitySim::update(std::uint64_t deltaTime) noexcept
 {
-    double const deltaTimeSec = (time - m_prevUpdateTime) * m_secPerTimeUnit;
+    double const deltaTimeSec = deltaTime * m_secPerTimeUnit;
 
     // Units: s/(m/PosUnit) = PosUnit/(m/s)
     // Used to get position delta from velocity: (m/s) * PosUnit/(m/s) = PosUnit

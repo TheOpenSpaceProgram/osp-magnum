@@ -29,6 +29,7 @@
 #include "../core/math_types.h"
 #include "../core/buffer_format.h"
 #include "../core/keyed_vector.h"
+#include "../core/copymove_macros.h"
 #include "../core/array_view.h"
 
 #include <longeron/id_management/bitview_id_set.hpp>
@@ -41,6 +42,7 @@
 #include <cstdint>
 #include <cstring>
 
+#include <algorithm>
 #include <array>
 #include <memory>
 #include <set>
@@ -61,7 +63,7 @@ using StaticIdSet_t = lgrn::BitViewIdSet<lgrn::BitView<std::array<std::uint64_t,
 
 struct CoSpaceTransform
 {
-    SatelliteId parentSat;
+    SatelliteId     parentSat;
 
     // Position and rotation is relative to m_parent
     // Ignore and use parentSat's position and rotation instead if non-null
@@ -96,13 +98,7 @@ struct ComponentTypeInfo
     std::size_t size;
 };
 
-struct UCtxComponentTypes
-{
-    lgrn::IdRegistryStl<ComponentTypeId>         ids;
-    KeyedVec<ComponentTypeId, ComponentTypeInfo> info;
-};
-
-struct UCtxDefaultComponents
+struct DefaultComponents
 {
     ComponentTypeId satId;
     ComponentTypeId posX;
@@ -111,6 +107,12 @@ struct UCtxDefaultComponents
     ComponentTypeId velX;
     ComponentTypeId velY;
     ComponentTypeId velZ;
+    ComponentTypeId velXd;
+    ComponentTypeId velYd;
+    ComponentTypeId velZd;
+    ComponentTypeId accelX;
+    ComponentTypeId accelY;
+    ComponentTypeId accelZ;
     ComponentTypeId rotX;
     ComponentTypeId rotY;
     ComponentTypeId rotZ;
@@ -119,11 +121,18 @@ struct UCtxDefaultComponents
     ComponentTypeId surface;
 };
 
+struct UCtxComponentTypes
+{
+    lgrn::IdRegistryStl<ComponentTypeId>            ids;
+    KeyedVec<ComponentTypeId, ComponentTypeInfo>    info;
+    DefaultComponents                               defaults;
+};
+
+
 //-----------------------------------------------------------------------------
 
 // Data Accessors
 
-// simulations have std::shared_ptr<DataAccessor>
 struct DataAccessor
 {
     using SatToIndexMap_t = std::unordered_map<SatelliteId, std::uint32_t>;
@@ -137,7 +146,7 @@ struct DataAccessor
         //ComponentTypeId     type    {};
     };
 
-    // optimization: tiny map with tiny elements. maybe switch away from unordered_map
+    // TODO optimization: tiny map with tiny elements. maybe switch away from unordered_map
     using CompMap_t = std::unordered_map<ComponentTypeId, Component>;
 
     template<std::size_t SIZE>
@@ -207,6 +216,7 @@ struct DataAccessor
         return out;
     }
 
+    std::string         debugName;
     CompMap_t           components;
     SatToIndexMap_t     satToIndex;
     std::uint64_t       time{0};
@@ -220,70 +230,110 @@ struct UCtxDataAccessors
 {
     lgrn::IdRegistryStl<DataAccessorId>         ids;
     //lgrn::IdRefCount<DataAccessorId>            refCounts;
-    osp::KeyedVec<DataAccessorId, std::weak_ptr<DataAccessor>> instances;
+    osp::KeyedVec<DataAccessorId, DataAccessor> instances;
+
+    std::vector<DataAccessorId> accessorDelete;
 };
 
 /**
- * @brief allow marking satellites in a DataAccessorId for deletion.
+ * @brief allow marking satellites in a DataAccessor as stolen, and no longer part of that accessor
  *
  * separated out as UCtxDataAccessors are expected to be read as const most of the time, and this is mutable
+ *
+ *
+ * stolenSats.of[accessorId]
  */
-struct UCtxDeletedSatellites
+struct UCtxStolenSatellites
 {
     struct Accessor
     {
-        std::set<SatelliteId> set;
-        bool dirty = false;
+        std::set<SatelliteId>   sats;
+        bool                    allStolen = false;
+        bool                    dirty = false;
     };
 
-    osp::KeyedVec<DataAccessorId, Accessor> sets;
+    osp::KeyedVec<DataAccessorId, Accessor> of;
 };
 
 //-----------------------------------------------------------------------------
 
 // Data Sources
 
+using ComponentTypeIdSet_t = StaticIdSet_t<ComponentTypeId, 128>;
+
 /**
  * @brief Determines what components a satellite has and which data accessors it uses.
+ *
+ *
+ * ComponentTypeIds contained in every entries[n].components must be unique.
+ *
+ * if entries[i].components contains X, then another entry entries[j].components cannot contain X
  */
 struct DataSource
 {
-    using ComponentTypeSet_t = StaticIdSet_t<ComponentTypeId, 128>;
 
     struct Entry
     {
-        ComponentTypeSet_t      components{}; // zero init;
+        ComponentTypeIdSet_t    components{}; // zero init;
         DataAccessorId          accessor{};
         std::uint32_t           _padding{0};
+
+        friend auto operator<=>(Entry const& lhs, Entry const& rhs)
+        {
+            if (lhs.accessor.value != rhs.accessor.value)
+            {
+                return lhs.accessor.value <=> rhs.accessor.value;
+            }
+            else
+            {
+                return std::memcmp(&lhs.components, &rhs.components, sizeof(ComponentTypeIdSet_t)) <=> 0;
+            }
+        }
     };
-    static_assert(sizeof(ComponentTypeSet_t) == 16);
+    static_assert(sizeof(ComponentTypeIdSet_t) == 16);
     static_assert(sizeof(DataAccessorId) == 4);
     static_assert(sizeof(Entry) == 24);
 
     void sort()
     {
-        std::sort(entries.begin(), entries.end(), [] (Entry const& lhs, Entry const& rhs) noexcept
-        {
-            if (lhs.accessor.value < rhs.accessor.value)
-            {
-                return true;
-            }
-            else if (lhs.accessor.value > rhs.accessor.value)
-            {
-                return false;
-            }
-            return std::memcmp(&lhs.components, &rhs.components, sizeof(ComponentTypeSet_t)) < 0;
-        });
+        std::sort(entries.begin(), entries.end());
     }
 
     std::vector<Entry> entries;
 };
 
+using DataSourceOwner_t = lgrn::IdRefCount<DataSourceId>::Owner_t;
+
+struct DataSourceChange
+{
+    std::vector<SatelliteId>            satsAffected;
+    ComponentTypeIdSet_t                components;
+    DataAccessorId                      accessor;
+};
+
 struct UCtxDataSources
 {
-    lgrn::IdRegistryStl<DataSourceId>       ids;
-    lgrn::IdRefCount<DataSourceId>          refCounts;
-    osp::KeyedVec<DataSourceId, DataSource> instances;
+    lgrn::IdRegistryStl<DataSourceId>               ids;
+    lgrn::IdRefCount<DataSourceId>                  refCounts;
+    osp::KeyedVec<DataSourceId, DataSource>         instances;
+    osp::KeyedVec<SatelliteId, DataSourceOwner_t>   datasrcOf;
+    std::vector<DataSourceChange>                   changes;
+
+    DataSourceId find_datasource(DataSource const& query)
+    {
+        std::size_t const size = query.entries.size();
+        for (DataSourceId const dataSrcId : ids)
+        {
+            DataSource const& candidate = instances[dataSrcId];
+            if (   candidate.entries.size() == size
+                && std::memcmp(candidate.entries.data(), query.entries.data(), size * sizeof(DataSource::Entry)) == 0)
+            {
+                return dataSrcId;
+            }
+        }
+        return {};
+    }
+
 };
 
 //-----------------------------------------------------------------------------
@@ -292,17 +342,29 @@ struct UCtxDataSources
 
 struct UCtxSatelliteInstances
 {
-    lgrn::IdRegistryStl<SatelliteId>            ids;
-    osp::KeyedVec<SatelliteId, DataSourceId>    dataSrc;
+    UCtxSatelliteInstances() = default;
+    OSP_MOVE_ONLY_CTOR_ASSIGN(UCtxSatelliteInstances);
+
+    lgrn::IdRegistryStl<SatelliteId>                ids;
+
 };
 
 //-----------------------------------------------------------------------------
 
 // Simulations
 
+struct Simulation
+{
+    /// in milliseconds. whoever controls time adds to timeBehindBy. simulation update logic reads
+    /// this, checks if its behind enough to justify updating (i.e. threshold for time interval),
+    /// then updates data buffers and subtracts passed time from timeBehindBy
+    std::int64_t timeBehindBy{};
+};
+
 struct UCtxSimulations
 {
-    lgrn::IdRegistryStl<SimulationId> ids;
+    lgrn::IdRegistryStl<SimulationId>       ids;
+    osp::KeyedVec<SimulationId, Simulation> simulationOf;
 };
 
 struct UCtxSimulationsDelete
@@ -314,65 +376,208 @@ struct UCtxSimulationsDelete
 
 // Intakes
 
-struct SatelliteInserter
-{
-    class Contract
-    {
-    public:
-        ~Contract()
-        {
-            LGRN_ASSERT(remaining == 0);
-        }
-    private:
-        std::size_t remaining;
-    };
+//class ISatelliteInserter
+//{
+//public:
+//    class Contract
+//    {
+//    public:
+//        ~Contract()
+//        {
+//            LGRN_ASSERT(remaining == 0);
+//        }
+//    private:
+//        std::size_t remaining;
+//    };
 
-    using UserData_t = std::array<std::byte, 32>;
+//    virtual Contract reserve(std::size_t amount) = 0;
 
-    using ReserveFunc_t = Contract(*)(std::size_t amount, UserData_t&);
-    ReserveFunc_t reserve{nullptr};
+//    virtual void add(Contract &rContract, ArrayView<std::byte const> data) = 0;
+//};
 
-    using NextFunc_t = ArrayView<std::byte>(*)(Contract &rContract, UserData_t&);
-    NextFunc_t next{nullptr};
-};
+//struct SatelliteInserter
+//{
+
+//    using UserData_t = std::array<std::byte, 32>;
+
+
+//    ReserveFunc_t reserve{nullptr};
+
+//    using NextFunc_t = ArrayView<std::byte>(*)(, UserData_t&);
+//    NextFunc_t next{nullptr};
+//};
 
 struct Intake
 {
-    std::vector<ComponentTypeId>    components;
-    SatelliteInserter               inserter;
-    SimulationId                    owner;
-    CoSpaceId                       cospace;
+    ComponentTypeIdSet_t                components;
+    //std::unique_ptr<ISatelliteInserter> inserter;
+    SimulationId                        owner;
+    CoSpaceId                           cospace;
 };
 
 struct UCtxIntakes
 {
     lgrn::IdRegistryStl<IntakeId>           ids;
     osp::KeyedVec<IntakeId, Intake>         instances;
+
+
+//    static bool components_match(lgrn::IdSetStl<ComponentTypeId> const& lhs, lgrn::IdSetStl<ComponentTypeId> const& rhs)
+//    {
+//        // pretty much just std::equal
+
+//        auto       lhsIt     = lhs.begin();
+//        auto const lhsItLast = lhs.end();
+//        auto       rhsIt     = rhs.begin();
+//        auto const rhsItLast = rhs.end();
+
+//        while (true)
+//        {
+//            bool const lhsEnded = lhsIt == lhsItLast;
+//            bool const rhsEnded = rhsIt == rhsItLast;
+
+//            if ( ! lhsEnded && ! rhsEnded )
+//            {
+//                if (*lhsIt != *rhsIt)
+//                {
+//                    return false;
+//                }
+//                else
+//                {
+//                    ++lhsIt;
+//                    ++rhsIt;
+//                }
+//            }
+//            else if ( lhsEnded != rhsEnded )
+//            {
+//                return false;
+//            }
+//            else if ( lhsEnded && rhsEnded )
+//            {
+//                return true;
+//            }
+//            // else { unreachable }
+//        }
+
+//        return true;
+//    }
+
+    IntakeId find_intake_at(CoSpaceId cospaceId, ComponentTypeIdSet_t const& comps) const
+    {
+        for (IntakeId const intakeId : ids)
+        {
+            Intake const &intake = instances[intakeId];
+
+            if (std::memcmp(&comps, &intake.components, sizeof(ComponentTypeIdSet_t)) == 0)
+            {
+                return intakeId;
+            }
+        }
+        return {};
+    }
+
+    IntakeId make_intake(SimulationId owner, CoSpaceId cospaceId, ComponentTypeIdSet_t components)
+    {
+        IntakeId id = ids.create();
+        instances.resize(ids.size());
+
+        instances[id] = Intake{
+            .components = std::move(components),
+            .owner      = owner,
+            .cospace    = cospaceId
+        };
+
+        return id;
+    }
 };
 
-class SimpleSatelliteBuffer
-{
-public:
+// (cospace, components) -> intake ID
 
-    SatelliteInserter make_inserter();
 
-private:
-    DataAccessorId                  m_accessor;
-    std::vector<ComponentTypeId>    m_components;
 
-    /// Total of ComponentTypeInfo::size of all component types in m_components
-    std::size_t                     m_totalComponentSize;
-
-    ///
-    std::unique_ptr<std::byte[]>    m_data;
-};
 
 //-----------------------------------------------------------------------------
 
-struct UCtxTime
+struct MidTransfer
 {
-    std::uint64_t time;
+    std::unique_ptr<std::byte const[]> data{nullptr};
+    DataAccessorId accessor;
+    IntakeId target{};
 };
+
+struct TransferRequest
+{
+    std::unique_ptr<std::byte const[]> data{nullptr};
+    std::size_t count;
+    std::int64_t time;
+    IntakeId target{};
+};
+
+/**
+ * @brief intermediate buffers to help transfer satellites across different simulations
+ *
+ * simulations update at different rates and potentially not in sync. If a fast-updating simulation
+ * pushes a satellite into a slow-updating simulation, there is a brief moment the satellite is
+ * mid-transfer, waiting for the slow-updating simulation to update.
+ *
+ * Transfer Buffer stops mid-transfer satellites from popping out of existance for a short time,
+ * by storing a mid-transfer satellite data in a buffer accessible through DataAccessors
+ *
+ *
+ *
+ */
+struct UCtxTransferBuffers
+{
+    UCtxTransferBuffers() = default;
+    OSP_MOVE_ONLY_CTOR_ASSIGN(UCtxTransferBuffers)
+//    class Inserter : public ISatelliteInserter
+//    {
+//    public:
+//        Contract reserve(std::size_t amount) override
+//        {
+//        }
+//        void add(Contract &rContract, ArrayView<std::byte const> data) override
+//        {
+//        }
+//    };
+
+    SimulationId simId{};
+
+    osp::KeyedVec<SimulationId, std::vector<MidTransfer>> midTransfersOf;
+    std::vector<SimulationId>    midTransferDelete;
+
+    std::vector<TransferRequest> requests;
+    std::vector<DataAccessorId>  requestAccessorIds;
+};
+
+
+
+//class SimpleSatelliteBuffer
+//{
+//public:
+
+//    //SatelliteInserter make_inserter();
+
+//private:
+//    DataAccessorId                  m_accessor;
+//    std::vector<ComponentTypeId>    m_components;
+
+//    /// Total of ComponentTypeInfo::size of all component types in m_components
+//    std::size_t                     m_totalComponentSize;
+
+//    ///
+//    std::unique_ptr<std::byte[]>    m_data;
+//};
+
+
+
+
+
+//-----------------------------------------------------------------------------
+
+//struct UCtxTime
+//{
+//    std::uint64_t time;
+//};
 
 //struct Universe
 //{
@@ -388,6 +593,20 @@ struct UCtxTime
 //};
 
 //
+
+//-----------------------------------------------------------------------------
+
+
+static ComponentTypeIdSet_t component_type_set(std::initializer_list<ComponentTypeId const> typeIds)
+{
+    ComponentTypeIdSet_t out{};
+    out.clear(); // paranoid this might not zero-init, so just clear to zero
+    for (ComponentTypeId const typeId : typeIds)
+    {
+        out.emplace(typeId);
+    }
+    return out;
+}
 
 
 //-----------------------------------------------------------------------------
