@@ -62,30 +62,12 @@ extern osp::fw::FeatureDef const ftrSceneInUniverse;
 extern osp::fw::FeatureDef const ftrUniverseTestPlanetsDraw;
 
 
-// Solar System Scenario
-
-struct CoSpaceNBody
-{
-    osp::BufAttribFormat<float> mass;
-    osp::BufAttribFormat<float> radius;
-    osp::BufAttribFormat<Magnum::Color3> color;
-};
-
-/**
- * @brief Initializes planet information, position, mass etc...
- */
-extern osp::fw::FeatureDef const ftrSolarSystem;
-
 struct PlanetDrawParams
 {
     osp::draw::MaterialId planetMat;
     osp::draw::MaterialId axisMat;
 };
 
-/**
- * @brief Draw Solar System, specifically designed for ftrSolarSystemPlanets
- */
-extern osp::fw::FeatureDef const ftrSolarSystemDraw;
 
 } // namespace adera
 

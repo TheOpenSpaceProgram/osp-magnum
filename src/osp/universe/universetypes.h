@@ -25,6 +25,7 @@
 #pragma once
 
 #include "../core/strong_id.h"
+#include "../core/math_types.h"
 
 #include <longeron/id_management/refcount.hpp>
 
@@ -60,11 +61,10 @@ using SatelliteId       = osp::StrongId<std::uint32_t, struct DummyForSatId>;
 using IntakeId          = osp::StrongId<std::uint32_t, struct DummyForIntakeId>;
 
 
-//using ComponentTypeIdReg_t = osp::GlobalIdReg<ComponentTypeId>;
-
 using spaceint_t = std::int64_t;
 
 // A Vector3 for space
 using Vector3g = Magnum::Math::Vector3<spaceint_t>;
+
 
 }

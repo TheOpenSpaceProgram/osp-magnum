@@ -61,16 +61,18 @@ using StaticIdSet_t = lgrn::BitViewIdSet<lgrn::BitView<std::array<std::uint64_t,
 
 // Coordinate spaces
 
-struct CoSpaceTransform
+struct CospaceTransform
 {
-    SatelliteId     parentSat;
+    osp::Quaterniond    rotation;
+    Vector3g            position;       ///< using parent cospace's precision
+    Vector3g            velocity;
+    int                 precision{10};  ///< for child satellites and child cospaces. 1m = 2^precision
 
-    // Position and rotation is relative to m_parent
-    // Ignore and use parentSat's position and rotation instead if non-null
-    Quaterniond     m_rotation;
-    Vector3g        m_position;
+    SatelliteId parentSat;
 
-    int             m_precision{10}; // 1 meter = 2^m_precision
+    /// Rotate with parent satellite/coordspace.
+    /// Set true for a planet surface coordspace so landed satellites rotate with the planet.
+    bool inheritRotation{false};
 };
 
 struct UCtxCoordSpaces
@@ -80,11 +82,50 @@ struct UCtxCoordSpaces
     lgrn::IdRegistryStl<CoSpaceId>              ids;
     lgrn::IdRefCount<CoSpaceId>                 refCounts;
 
-    osp::KeyedVec<CoSpaceId, CoSpaceTransform>  transforms;
+    void resize()
+    {
+        auto cospaceCapacity = ids.capacity();
+        idToTreePos    .resize(cospaceCapacity);
+        transformOf    .resize(cospaceCapacity);
+    }
 
+    void insert(CoSpaceId parent, CoSpaceId addme)
+    {
+        if (parent.has_value())
+        {
+            TreePos_t const parentPos = idToTreePos[parent];
+            TreePos_t const addmePos  = parentPos + 1;
+
+            // pushes all positions right of addmePos right by 1
+            treeToId       .insert(treeToId.begin()        + addmePos, addme);
+            treeDescendants.insert(treeDescendants.begin() + addmePos, 0);
+            ++ treeDescendants[parentPos];
+
+            for (TreePos_t pos = addmePos; pos < treeDescendants.size(); ++pos)
+            {
+                idToTreePos[treeToId[pos]] = pos;
+            }
+        }
+        else
+        {
+            LGRN_ASSERT( ! treeToId[0].has_value() );
+            treeToId       .resize(1);
+            treeDescendants.resize(1);
+            treeToId[0]        = addme;
+            treeDescendants[0] = 0;
+            idToTreePos[addme] = 0;
+
+        }
+
+
+
+        // start at root and step right
+    }
+
+    osp::KeyedVec<CoSpaceId, CospaceTransform>  transformOf;
     osp::KeyedVec<TreePos_t, CoSpaceId>         treeToId{{lgrn::id_null<CoSpaceId>()}};
     osp::KeyedVec<TreePos_t, std::uint32_t>     treeDescendants{std::initializer_list<std::uint32_t>{0}};
-    osp::KeyedVec<CoSpaceId, CoSpaceId>         idParent;
+    //osp::KeyedVec<CoSpaceId, CoSpaceId>         idParent;
     osp::KeyedVec<CoSpaceId, TreePos_t>         idToTreePos;
 };
 
@@ -167,10 +208,14 @@ struct UCtxComponentTypes
 
 // Data Accessors
 
+struct SatIdIndexPair
+{
+    SatelliteId     sat;
+    std::uint32_t   accessorIdx;
+};
+
 struct DataAccessor
 {
-    using SatToIndexMap_t = std::unordered_map<SatelliteId, std::uint32_t>;
-
     enum class IterationMethod : std::uint8_t { Dense, SkipNullSatellites, IndexOnly };
 
     struct Component
@@ -250,9 +295,9 @@ struct DataAccessor
         return out;
     }
 
+    //std::vector<SatIdIndexPair> todo;
     std::string         debugName;
     CompMap_t           components;
-    SatToIndexMap_t     satToIndex;
     std::uint64_t       time{0};
     std::size_t         count{0};
     SimulationId        owner;
@@ -268,9 +313,12 @@ inline DataAccessor::Component make_comp(T const* ptr, std::ptrdiff_t stride)
 
 struct UCtxDataAccessors
 {
+    using AccessorVec_t = std::vector<DataAccessorId>;
+
     lgrn::IdRegistryStl<DataAccessorId>         ids;
     osp::KeyedVec<DataAccessorId, DataAccessor> instances;
     std::vector<DataAccessorId>                 accessorDelete;
+    osp::KeyedVec<CoSpaceId, AccessorVec_t>     accessorsOfCospace;
 };
 
 /**
@@ -283,14 +331,16 @@ struct UCtxDataAccessors
  */
 struct UCtxStolenSatellites
 {
-    struct Accessor
+    struct OfAccessor
     {
         std::set<SatelliteId>   sats;
         bool                    allStolen = false;
         bool                    dirty = false;
+
+        bool has(SatelliteId satId) const noexcept { return dirty && sats.contains(satId); }
     };
 
-    osp::KeyedVec<DataAccessorId, Accessor> of;
+    osp::KeyedVec<DataAccessorId, OfAccessor> of;
 };
 
 //-----------------------------------------------------------------------------
@@ -313,7 +363,7 @@ struct DataSource
     struct Entry
     {
         ComponentTypeIdSet_t    components{}; // zero init;
-        DataAccessorId          accessor{};
+        DataAccessorId          accessor{}; ///< can't be null
         std::uint32_t           _padding{0};
 
         friend auto operator<=>(Entry const& lhs, Entry const& rhs)

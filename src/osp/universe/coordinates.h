@@ -59,7 +59,7 @@ struct CospaceRelationship
  * @brief Describes a mathematical function used to transform positions between
  *        coordinate spaces
  *
- * 2D example:
+ * 1D example:
  *
  * Parent: ... -O-----|-----|-----|-----|-----|-----|-----|-----|-----|-----|
  *              0     1     2     3     4     5     6     7     8     9    10
@@ -88,7 +88,7 @@ struct CospaceRelationship
  *
  * C->P(x) = 2^(-precDiff) * x + childPos
  *           substitute:    n = -precDiff;       c = childPos;     m = 0;
- * C->P(x) = x * 2^n * + c * 2^m
+ * C->P(x) = x * 2^n + c * 2^m
  *
  * This form generalizes both operations, as well as make them easier to
  * combine.
@@ -169,7 +169,7 @@ struct CoordTransformer
     }
 
     /**
-     * @brief Calculate algebraic function composition of two CoordTransformers
+     * @brief Calculate algebraic function composition of two CoordTransformers: f1( f2(x) )
      *
      * Manually chaining transforms between spaces of different precisions can lead
      * to loss of information due to rounding.

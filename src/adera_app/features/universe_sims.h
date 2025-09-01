@@ -55,21 +55,21 @@ struct FIUniSimpleSims
     struct Pipelines { };
 };
 
-
 };
-
 
 namespace adera
 {
-
 
 extern osp::fw::FeatureDef const ftrUniverseSimpleSimulators;
 
 
 /**
- * @brief Unrealistic planets test, allows SceneFrame to move around and get captured into planets
+ * @brief Initializes planet information, position, mass etc...
  */
-extern osp::fw::FeatureDef const ftrUniverseTestPlanets;
+extern osp::fw::FeatureDef const ftrSolarSystem;
+
+
+extern osp::fw::FeatureDef const ftrUniverseCospaceTest;
 
 } // namespace adera
 

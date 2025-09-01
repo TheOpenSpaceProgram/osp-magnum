@@ -80,7 +80,6 @@ struct SimpleGravitySim
     void update(std::uint64_t deltaTime) noexcept;
 
     std::vector<SatData>            m_data;
-    //std::uint64_t                   m_prevUpdateTime;
     double                          m_metersPerPosUnit;
     double                          m_secPerTimeUnit;
 };

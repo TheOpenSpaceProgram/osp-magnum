@@ -623,6 +623,8 @@ struct FIUniCore {
         PipelineDef<EStgOptn> update            {"update"};
         PipelineDef<EStgCont> satIds            {"satIds"};
         PipelineDef<EStgIntr> transfer          {"transfer"};
+        PipelineDef<EStgCont> cospaceTransform  {"cospaceTransform"};
+        PipelineDef<EStgCont> accessorsOfCospace{"accessorsOfCospace"};
         PipelineDef<EStgCont> accessorIds       {"accessorIds"};
         PipelineDef<EStgCont> accessors         {"accessors"};
         PipelineDef<EStgIntr> accessorDelete    {"accessorDelete"};
@@ -650,9 +652,9 @@ struct FIUniTransfers {
     };
 };
 
-struct FIUniSceneInUniverse {
+struct FISceneInUniverse {
     struct DataIds {
-        //DataId scnFrame;
+        DataId scnCospace;
     };
 
     struct Pipelines {
