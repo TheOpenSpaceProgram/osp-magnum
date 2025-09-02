@@ -22,6 +22,11 @@
  * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
  * SOFTWARE.
  */
+
+ /**
+ * @file
+ * @brief Core Universe. see docs/universe.md
+ */
 #pragma once
 
 #include "universetypes.h"
@@ -30,7 +35,6 @@
 #include "../core/buffer_format.h"
 #include "../core/keyed_vector.h"
 #include "../core/copymove_macros.h"
-#include "../core/array_view.h"
 
 #include <longeron/id_management/bitview_id_set.hpp>
 #include <longeron/id_management/id_set_stl.hpp>
@@ -65,7 +69,8 @@ struct CospaceTransform
 {
     osp::Quaterniond    rotation;
     Vector3g            position;       ///< using parent cospace's precision
-    Vector3g            velocity;
+    Vector3             velocity;
+    std::int64_t        timeBehindBy{};
     int                 precision{10};  ///< for child satellites and child cospaces. 1m = 2^precision
 
     SatelliteId parentSat;
@@ -79,31 +84,55 @@ struct UCtxCoordSpaces
 {
     using TreePos_t = std::uint32_t;
 
-    lgrn::IdRegistryStl<CoSpaceId>              ids;
-    lgrn::IdRefCount<CoSpaceId>                 refCounts;
-
     void resize()
     {
         auto cospaceCapacity = ids.capacity();
-        idToTreePos    .resize(cospaceCapacity);
-        transformOf    .resize(cospaceCapacity);
+        treeposOf  .resize(cospaceCapacity);
+        transformOf.resize(cospaceCapacity);
     }
 
     void insert(CoSpaceId parent, CoSpaceId addme)
     {
         if (parent.has_value())
         {
-            TreePos_t const parentPos = idToTreePos[parent];
+            TreePos_t const parentPos = treeposOf[parent];
             TreePos_t const addmePos  = parentPos + 1;
 
-            // pushes all positions right of addmePos right by 1
             treeToId       .insert(treeToId.begin()        + addmePos, addme);
             treeDescendants.insert(treeDescendants.begin() + addmePos, 0);
-            ++ treeDescendants[parentPos];
 
+            // Calls to insert(..) above pushed all positions right of addmePos right by 1.
+            // Tree positions of cospace IDs need to be updated.
             for (TreePos_t pos = addmePos; pos < treeDescendants.size(); ++pos)
             {
-                idToTreePos[treeToId[pos]] = pos;
+                treeposOf[treeToId[pos]] = pos;
+            }
+
+            // Starting from the root, walk down parent-child chain and increment descendant count
+            // of all ascendants of addmePos
+            TreePos_t ascendant = 0; // root
+            while (ascendant != addmePos)
+            {
+                ++ treeDescendants[ascendant];
+
+                // addmePos belongs to which child?
+                auto        const childLast = ascendant + 1 + treeDescendants[ascendant];
+                TreePos_t         child     = ascendant + 1;
+
+                while (child != childLast)
+                {
+                    TreePos_t const nextChild = child + 1 + treeDescendants[child];
+
+                    if (addmePos <= nextChild) // is 'addmePos' a descendent-of or is 'child'?
+                    {
+                        ascendant = child;
+                        break;
+                    }
+                    else
+                    {
+                       child = nextChild;
+                    }
+                }
             }
         }
         else
@@ -111,22 +140,20 @@ struct UCtxCoordSpaces
             LGRN_ASSERT( ! treeToId[0].has_value() );
             treeToId       .resize(1);
             treeDescendants.resize(1);
-            treeToId[0]        = addme;
-            treeDescendants[0] = 0;
-            idToTreePos[addme] = 0;
-
+            treeToId[0]         = addme;
+            treeDescendants[0]  = 0;
+            treeposOf[addme]    = 0;
         }
-
-
-
-        // start at root and step right
     }
 
+    lgrn::IdRegistryStl<CoSpaceId>              ids;
+    lgrn::IdRefCount<CoSpaceId>                 refCounts;
+
     osp::KeyedVec<CoSpaceId, CospaceTransform>  transformOf;
+    osp::KeyedVec<CoSpaceId, TreePos_t>         treeposOf;
+
     osp::KeyedVec<TreePos_t, CoSpaceId>         treeToId{{lgrn::id_null<CoSpaceId>()}};
     osp::KeyedVec<TreePos_t, std::uint32_t>     treeDescendants{std::initializer_list<std::uint32_t>{0}};
-    //osp::KeyedVec<CoSpaceId, CoSpaceId>         idParent;
-    osp::KeyedVec<CoSpaceId, TreePos_t>         idToTreePos;
 };
 
 //-----------------------------------------------------------------------------
@@ -322,10 +349,10 @@ struct UCtxDataAccessors
 };
 
 /**
- * @brief allow marking satellites in a DataAccessor as stolen, and no longer part of that accessor
+ * @brief Allows marking satellites in a DataAccessor as stolen/removed from the accessor.
  *
+ * This is useful for transferring satellite data across accessors.
  * separated out as UCtxDataAccessors are expected to be read as const most of the time, and this is mutable
- *
  *
  * stolenSats.of[accessorId]
  */
@@ -337,7 +364,10 @@ struct UCtxStolenSatellites
         bool                    allStolen = false;
         bool                    dirty = false;
 
-        bool has(SatelliteId satId) const noexcept { return dirty && sats.contains(satId); }
+        bool has(SatelliteId satId) const noexcept
+        {
+            return allStolen || (dirty && sats.contains(satId));
+        }
     };
 
     osp::KeyedVec<DataAccessorId, OfAccessor> of;
@@ -428,10 +458,10 @@ struct UCtxDataSources
 
 // Satellite instances
 
-struct UCtxSatelliteInstances
+struct UCtxSatellites
 {
-    UCtxSatelliteInstances() = default;
-    OSP_MOVE_ONLY_CTOR_ASSIGN(UCtxSatelliteInstances);
+    UCtxSatellites() = default;
+    OSP_MOVE_ONLY_CTOR_ASSIGN(UCtxSatellites);
 
     lgrn::IdRegistryStl<SatelliteId>                ids;
 
@@ -455,50 +485,14 @@ struct UCtxSimulations
     osp::KeyedVec<SimulationId, Simulation> simulationOf;
 };
 
-struct UCtxSimulationsDelete
-{
-
-};
 
 //-----------------------------------------------------------------------------
 
 // Intakes
 
-//class ISatelliteInserter
-//{
-//public:
-//    class Contract
-//    {
-//    public:
-//        ~Contract()
-//        {
-//            LGRN_ASSERT(remaining == 0);
-//        }
-//    private:
-//        std::size_t remaining;
-//    };
-
-//    virtual Contract reserve(std::size_t amount) = 0;
-
-//    virtual void add(Contract &rContract, ArrayView<std::byte const> data) = 0;
-//};
-
-//struct SatelliteInserter
-//{
-
-//    using UserData_t = std::array<std::byte, 32>;
-
-
-//    ReserveFunc_t reserve{nullptr};
-
-//    using NextFunc_t = ArrayView<std::byte>(*)(, UserData_t&);
-//    NextFunc_t next{nullptr};
-//};
-
 struct Intake
 {
     ComponentTypeIdSet_t                components;
-    //std::unique_ptr<ISatelliteInserter> inserter;
     SimulationId                        owner;
     CoSpaceId                           cospace;
 };
@@ -536,11 +530,6 @@ struct UCtxIntakes
         return id;
     }
 };
-
-// (cospace, components) -> intake ID
-
-
-
 
 //-----------------------------------------------------------------------------
 

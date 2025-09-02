@@ -48,7 +48,6 @@ using Corrade::Containers::Array;
 namespace adera
 {
 
-
 struct SatelliteTransform
 {
     osp::Quaterniond    rotation;
@@ -146,7 +145,7 @@ FeatureDef const ftrUniverseCore = feature_def("UniverseCore", [] (
     auto &rDataAccessors    = rFB.data_emplace< UCtxDataAccessors >     (uniCore.di.dataAccessors);
     auto &rDeletedSats      = rFB.data_emplace< UCtxStolenSatellites >  (uniCore.di.stolenSats);
     auto &rDataSrcss        = rFB.data_emplace< UCtxDataSources >       (uniCore.di.dataSrcs);
-    auto &rSatInst          = rFB.data_emplace< UCtxSatelliteInstances >(uniCore.di.satInst);
+    auto &rSatInst          = rFB.data_emplace< UCtxSatellites >(uniCore.di.satInst);
     auto &rSimulations      = rFB.data_emplace< UCtxSimulations >       (uniCore.di.simulations);
     auto &rIntakes          = rFB.data_emplace< UCtxIntakes >           (uniTransfers.di.intakes);
     auto &rTransferBufs     = rFB.data_emplace< UCtxTransferBuffers >   (uniTransfers.di.transferBufs, rSimulations.ids.create());
@@ -259,9 +258,10 @@ FeatureDef const ftrUniverseCore = feature_def("UniverseCore", [] (
 
             if (rTf.parentSat.has_value())
             {
-                SatelliteTransform const okay = get_satellite_transform(rTf.parentSat, rDataAccessors, rDataSrcs, rStolenSats, rSimulations, compTypes);
+                SatelliteTransform const satTf = get_satellite_transform(rTf.parentSat, rDataAccessors, rDataSrcs, rStolenSats, rSimulations, compTypes);
 
-                rTf.position = okay.position;
+                rTf.position = satTf.position;
+                rTf.velocity = satTf.velocity;
             }
         }
     });
@@ -272,7 +272,7 @@ FeatureDef const ftrUniverseCore = feature_def("UniverseCore", [] (
         .name       ("Resize datasrcOf")
         .sync_with  ({uniCore.pl.datasrcOf(Resize_), uniCore.pl.satIds(Ready)  })
         .args       ({          uniCore.di.dataSrcs,               uniCore.di.satInst })
-        .func       ([] (UCtxDataSources &rDataSrcs, UCtxSatelliteInstances &rSatInst) noexcept
+        .func       ([] (UCtxDataSources &rDataSrcs, UCtxSatellites &rSatInst) noexcept
     {
         rDataSrcs.datasrcOf.resize(rSatInst.ids.capacity());
     });
@@ -772,7 +772,7 @@ FeatureDef const ftrUniverseTestPlanetsDraw = feature_def("UniverseTestPlanetsDr
         .name       ("Read universe datasource changes")
         .sync_with  ({uniPlanetsDraw.pl.trackedSats(Modify), uniPlanetsDraw.pl.resync(ModifyOrSignal), uniCore.pl.accessorIds(Ready), uniCore.pl.satIds(Ready)})
         .args       ({uniPlanetsDraw.di.planetDraw,          uniCore.di.dataAccessors,               uniCore.di.satInst,        uniCore.di.dataSrcs, uniCore.di.coordSpaces, scnInUni.di.scnCospace})
-        .func       ([] (  PlanetDraw &rPlanetDraw, UCtxDataAccessors &rDataAccessors, UCtxSatelliteInstances &rSatInst, UCtxDataSources &rDataSrcs, UCtxCoordSpaces const& rCoordSpaces, CoSpaceId scnCospace) noexcept
+        .func       ([] (  PlanetDraw &rPlanetDraw, UCtxDataAccessors &rDataAccessors, UCtxSatellites &rSatInst, UCtxDataSources &rDataSrcs, UCtxCoordSpaces const& rCoordSpaces, CoSpaceId scnCospace) noexcept
     {
         if (true)
         {
@@ -804,33 +804,11 @@ FeatureDef const ftrUniverseTestPlanetsDraw = feature_def("UniverseTestPlanetsDr
         }
     });
 
-
-//    rFB.task()
-//        .name       ("Read universe changes")
-//        .sync_with  ({windowApp.pl.sync(Run), uniPlanetsDraw.pl.resync(ModifyOrSignal), uniCore.pl.datasrcs(Ready), uniCore.pl.accessors(Ready), uniCore.pl.accessorIds(Ready)})
-//        .args       ({uniPlanetsDraw.di.planetDraw,          uniCore.di.dataAccessors,               uniCore.di.satInst,        uniCore.di.dataSrcs,                   uniCore.di.compDefaults})
-//        .func       ([] (  PlanetDraw &rPlanetDraw, UCtxDataAccessors &rDataAccessors, UCtxSatelliteInstances &rSatInst, UCtxDataSources &rDataSrcs, UCtxDefaultComponents const& compDefaults) noexcept
-//    {
-//        if ( ! rPlanetDraw.connected)
-//        {
-//            rPlanetDraw.connected = true;
-//            // TODO: Subscribe to events
-//            // TODO: somehow modify pipelines to connect to universe?
-//        }
-//        // on subscriber added, just push them all events so they don't directly just read?
-
-//        // deal with events. satellites added/removed/transfered and stuff
-
-//        // loop through all dataaccessors that we can and actually read positions
-//        // the problem here is the 'resync' stage.
-//        // how to initially discover all the stuff in the universe?
-//    });
-
     rFB.task()
         .name       ("Create universe draw entities")
         .sync_with  ({windowApp.pl.sync(Run), uniPlanetsDraw.pl.resync(Run), scnRender.pl.drawEnt(New), uniPlanetsDraw.pl.trackedSats(Ready)})
         .args       ({    uniPlanetsDraw.di.planetDraw,          uniCore.di.dataAccessors,               uniCore.di.satInst, uniCore.di.dataSrcs,                       uniCore.di.compTypes,      scnRender.di.scnRender })
-        .func       ([] (      PlanetDraw &rPlanetDraw, UCtxDataAccessors &rDataAccessors, UCtxSatelliteInstances &rSatInst, UCtxDataSources &rDataSrcs, UCtxComponentTypes const& compTypes, ACtxSceneRender &rScnRender) noexcept
+        .func       ([] (      PlanetDraw &rPlanetDraw, UCtxDataAccessors &rDataAccessors, UCtxSatellites &rSatInst, UCtxDataSources &rDataSrcs, UCtxComponentTypes const& compTypes, ACtxSceneRender &rScnRender) noexcept
     {
         if (rPlanetDraw.doResync)
         {
@@ -855,7 +833,7 @@ FeatureDef const ftrUniverseTestPlanetsDraw = feature_def("UniverseTestPlanetsDr
         .name       ("Add mesh and materials to universe stuff")
         .sync_with  ({windowApp.pl.sync(Run), uniPlanetsDraw.pl.resync(Run), scnRender.pl.drawEnt(Ready), scnRender.pl.mesh(New), scnRender.pl.material(New), uniPlanetsDraw.pl.trackedSats(Ready)})
         .args       ({    uniPlanetsDraw.di.planetDraw,               uniCore.di.satInst,      scnRender.di.scnRender, comScn.di.drawing, comScn.di.namedMeshes })
-        .func       ([] (      PlanetDraw &rPlanetDraw, UCtxSatelliteInstances &rSatInst, ACtxSceneRender &rScnRender, ACtxDrawing& rDrawing, NamedMeshes& rNamedMeshes) noexcept
+        .func       ([] (      PlanetDraw &rPlanetDraw, UCtxSatellites &rSatInst, ACtxSceneRender &rScnRender, ACtxDrawing& rDrawing, NamedMeshes& rNamedMeshes) noexcept
     {
         if (rPlanetDraw.doResync)
         {
@@ -904,7 +882,7 @@ FeatureDef const ftrUniverseTestPlanetsDraw = feature_def("UniverseTestPlanetsDr
         .name       ("write draw transforms")
         .sync_with  ({windowApp.pl.sync(Run), uniPlanetsDraw.pl.resync(Run), scnRender.pl.drawEnt(Ready), scnRender.pl.mesh(New), scnRender.pl.material(New), uniCore.pl.accessors(Ready), uniCore.pl.accessorIds(Ready), uniCore.pl.cospaceTransform(Ready), uniPlanetsDraw.pl.trackedSats(Ready)})
         .args       ({    uniPlanetsDraw.di.planetDraw,          uniCore.di.dataAccessors,              uniCore.di.coordSpaces,        uniCore.di.simulations,             uniCore.di.stolenSats,               uniCore.di.satInst,        uniCore.di.dataSrcs,                uniCore.di.compTypes,      scnRender.di.scnRender, scnInUni.di.scnCospace})
-        .func       ([] (      PlanetDraw &rPlanetDraw, UCtxDataAccessors &rDataAccessors, UCtxCoordSpaces const& rCoordSpaces, UCtxSimulations &rSimulations, UCtxStolenSatellites &rStolenSats, UCtxSatelliteInstances &rSatInst, UCtxDataSources &rDataSrcs, UCtxComponentTypes const& compTypes, ACtxSceneRender &rScnRender,   CoSpaceId scnCospace) noexcept
+        .func       ([] (      PlanetDraw &rPlanetDraw, UCtxDataAccessors &rDataAccessors, UCtxCoordSpaces const& rCoordSpaces, UCtxSimulations &rSimulations, UCtxStolenSatellites &rStolenSats, UCtxSatellites &rSatInst, UCtxDataSources &rDataSrcs, UCtxComponentTypes const& compTypes, ACtxSceneRender &rScnRender,   CoSpaceId scnCospace) noexcept
     {
         rPlanetDraw.cospaceTransformToScnOf.resize(rCoordSpaces.ids.capacity());
 
@@ -914,7 +892,7 @@ FeatureDef const ftrUniverseTestPlanetsDraw = feature_def("UniverseTestPlanetsDr
             .mark = CospaceTransformCalculator{ rPlanetDraw.cospaceTransformToScnOf, rCoordSpaces },
             .rDescendants = rCoordSpaces.treeDescendants
         };
-        walker.run(rCoordSpaces.idToTreePos[scnCospace], {});
+        walker.run(rCoordSpaces.treeposOf[scnCospace], {});
 
         DefaultComponents const &dc = compTypes.defaults;
         for (DataAccessorId const accessorId : rPlanetDraw.trackedAccessors)

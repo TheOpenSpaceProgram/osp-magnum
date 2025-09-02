@@ -312,7 +312,7 @@ FeatureDef const ftrUniverseSimpleSimulators = feature_def("UniverseSimpleSimula
 
                 std::vector<MidTransfer> &rTransfers = rTransferBufs.midTransfersOf[rInst.simId];
 
-                // stupid transfer test
+                // stupid transfer test. TODO
                 /*
                 if (!rTransfers.empty() && counter == 60*5)
                 {
@@ -414,14 +414,14 @@ FeatureDef const ftrSolarSystem = feature_def("SolarSystem", [] (
     auto &rDataAccessors    = rFB.data_get< UCtxDataAccessors >     (uniCore.di.dataAccessors);
     auto &rStolenSats       = rFB.data_get< UCtxStolenSatellites >  (uniCore.di.stolenSats);
     auto &rDataSrcs         = rFB.data_get< UCtxDataSources >       (uniCore.di.dataSrcs);
-    auto &rSatInst          = rFB.data_get< UCtxSatelliteInstances >(uniCore.di.satInst);
+    auto &rSatInst          = rFB.data_get< UCtxSatellites >        (uniCore.di.satInst);
     auto &rSimulations      = rFB.data_get< UCtxSimulations >       (uniCore.di.simulations);
     auto &rIntakes          = rFB.data_get< UCtxIntakes >           (uniTransfers.di.intakes);
     auto &rTransferBufs     = rFB.data_get< UCtxTransferBuffers >   (uniTransfers.di.transferBufs);
     auto &rCirclePath       = rFB.data_get< UCtxCirclePathSims >    (uniSimpleSims.di.circlePath);
     auto &rConstantSpin     = rFB.data_get< UCtxConstantSpinSims >  (uniSimpleSims.di.constantSpin);
-    auto &rSimpleGravity    = rFB.data_get< UCtxSimpleGravitySims >(uniSimpleSims.di.simpleGravity);
-    auto &rScnCospace       = rFB.data_get< CoSpaceId >(scnInUni.di.scnCospace);
+    auto &rSimpleGravity    = rFB.data_get< UCtxSimpleGravitySims > (uniSimpleSims.di.simpleGravity);
+    auto &rScnCospace       = rFB.data_get< CoSpaceId >             (scnInUni.di.scnCospace);
 
     CoSpaceId const rootSpace = rCoordSpaces.ids.create();
     rCoordSpaces.resize();
@@ -552,14 +552,14 @@ FeatureDef const ftrUniverseCospaceTest = feature_def("UniverseCospaceTest", [] 
     auto &rDataAccessors    = rFB.data_get< UCtxDataAccessors >     (uniCore.di.dataAccessors);
     auto &rStolenSats       = rFB.data_get< UCtxStolenSatellites >  (uniCore.di.stolenSats);
     auto &rDataSrcs         = rFB.data_get< UCtxDataSources >       (uniCore.di.dataSrcs);
-    auto &rSatInst          = rFB.data_get< UCtxSatelliteInstances >(uniCore.di.satInst);
+    auto &rSatInst          = rFB.data_get< UCtxSatellites >        (uniCore.di.satInst);
     auto &rSimulations      = rFB.data_get< UCtxSimulations >       (uniCore.di.simulations);
     auto &rIntakes          = rFB.data_get< UCtxIntakes >           (uniTransfers.di.intakes);
     auto &rTransferBufs     = rFB.data_get< UCtxTransferBuffers >   (uniTransfers.di.transferBufs);
-    auto &rCirclePath   = rFB.data_get< UCtxCirclePathSims >    (uniSimpleSims.di.circlePath);
+    auto &rCirclePath       = rFB.data_get< UCtxCirclePathSims >    (uniSimpleSims.di.circlePath);
     auto &rConstantSpinSims = rFB.data_get< UCtxConstantSpinSims >  (uniSimpleSims.di.constantSpin);
-    auto &rSimpleGravity    = rFB.data_get< UCtxSimpleGravitySims >(uniSimpleSims.di.simpleGravity);
-    auto &rScnCospace       = rFB.data_get< CoSpaceId >(scnInUni.di.scnCospace);
+    auto &rSimpleGravity    = rFB.data_get< UCtxSimpleGravitySims > (uniSimpleSims.di.simpleGravity);
+    auto &rScnCospace       = rFB.data_get< CoSpaceId >             (scnInUni.di.scnCospace);
 
     CoSpaceId const rootSpace  = rCoordSpaces.ids.create();
     rCoordSpaces.resize();
@@ -604,19 +604,12 @@ FeatureDef const ftrUniverseCospaceTest = feature_def("UniverseCospaceTest", [] 
 
             CirclePathSim::SatData &rSatData = rCircleSim.sim.m_data[i];
             rSatData = CirclePathSim::SatData{
-                //.position   = Vector3g{},
-                //.velocity   = Vector3{},
-                //.accel      = Vector3{},
                 .radius     = r,
                 .period     = std::uint64_t(T),
                 .cycleTime  = std::uint64_t(dist(gen) * T),
                 .id         = rSatInst.ids.create()
             };
         }
-
-        //.position   = Vector3g{},
-        //.velocity   = Vector3{},
-        //.accel      = Vector3{},
         return circleSimId;
     };
 
@@ -625,7 +618,7 @@ FeatureDef const ftrUniverseCospaceTest = feature_def("UniverseCospaceTest", [] 
         0.0, 5.0, 20.0, 30.0, 38.0, 49.0, 60.0, 85.0, 90.0, 110.0
     });
 
-        CirclePathSimId const fnslfalfl = add_circle_orbit(rootSpace, rCirclePath.instOf[circleSimId].sim.m_data[4].id, Quaterniond({1.0, 0.0, 0.0}, 0.69*pi), 10.0*1024.0, 100.0*1024.0, 2000000000000.0,
+    CirclePathSimId const fnslfalfl = add_circle_orbit(rootSpace, rCirclePath.instOf[circleSimId].sim.m_data[4].id, Quaterniond({1.0, 0.0, 0.0}, 0.69*pi), 10.0*1024.0, 100.0*1024.0, 2000000000000.0,
     {
         2.0, 4.0
     });
