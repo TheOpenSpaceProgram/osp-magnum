@@ -118,7 +118,7 @@ struct CoordTransformer
     int             n{0};
     int             m{0};
 
-    Vector3g transforposition(Vector3g in) const noexcept
+    Vector3g transform_position(Vector3g in) const noexcept
     {
         using osp::math::mul_2pow;
 

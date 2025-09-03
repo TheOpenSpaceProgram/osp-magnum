@@ -37,7 +37,7 @@ struct CirclePathSim
         osp::universe::Vector3g     position;
         osp::Vector3                velocity;
         osp::Vector3                accel;
-        double                      radius;
+        double                      radius{};
         std::uint64_t               period{};
         std::uint64_t               cycleTime{};
         osp::universe::SatelliteId  id;
@@ -80,8 +80,8 @@ struct SimpleGravitySim
     void update(std::uint64_t deltaTime) noexcept;
 
     std::vector<SatData>            m_data;
-    double                          m_metersPerPosUnit;
-    double                          m_secPerTimeUnit;
+    double                          m_metersPerPosUnit{};
+    double                          m_secPerTimeUnit{};
 };
 
 

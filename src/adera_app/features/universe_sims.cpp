@@ -36,6 +36,7 @@
 #include <osp/util/logging.h>
 
 #include <random>
+#include <cmath>
 
 using namespace adera;
 using namespace ftr_inter::stages;
@@ -63,7 +64,7 @@ struct UCtxCirclePathSims
     {
         SimulationId            simId;
         CirclePathSim           sim;
-        std::int64_t            updateInterval;
+        std::int64_t            updateInterval{};
         DataAccessorId          accessorId;
         CoSpaceId               cospaceId;
         IntakeId                intakeId;
@@ -79,7 +80,7 @@ struct UCtxConstantSpinSims
     {
         ConstantSpinSim         sim;
         SimulationId            simId;
-        std::int64_t            updateInterval;
+        std::int64_t            updateInterval{};
         DataAccessorId          accessorId;
         CoSpaceId               cospaceId;
         IntakeId                intakeId;
@@ -95,7 +96,7 @@ struct UCtxSimpleGravitySims
     {
         SimpleGravitySim        sim;
         SimulationId            simId;
-        std::int64_t            updateInterval;
+        std::int64_t            updateInterval{};
         DataAccessorId          accessorId;
         CoSpaceId               cospaceId;
         IntakeId                intakeId;
@@ -471,7 +472,7 @@ FeatureDef const ftrSolarSystem = feature_def("SolarSystem", [] (
         { 0, 0, 0 },
         { 0.0, 0.0, 0.0 },
         Quaternion::rotation(Rad{ 0.0f }, Vector3{ 1.0f, 0.0f, 0.0f }),
-        1.0f * std::pow(10, 1),
+        1.0f * std::pow(10.0f, 1.0f),
         1000.0f,
         { 1.0f, 1.0f, 0.0f });
 
@@ -544,7 +545,6 @@ FeatureDef const ftrUniverseCospaceTest = feature_def("UniverseCospaceTest", [] 
         DependOn<FIUniCore>         uniCore,
         DependOn<FIUniTransfers>    uniTransfers)
 {
-    using std::numbers::pi;
     using CoSpaceIdVec_t = std::vector<CoSpaceId>;
 
     auto &rCoordSpaces      = rFB.data_get< UCtxCoordSpaces >       (uniCore.di.coordSpaces);
@@ -600,7 +600,7 @@ FeatureDef const ftrUniverseCospaceTest = feature_def("UniverseCospaceTest", [] 
         for (int i = 0; i < dists.size(); ++i)
         {
             double const r = *(dists.begin() + i) * 1000.0;
-            double const T = (r == 0.0) ? (123456.0) : (2 * pi * std::sqrt(r*r*r / GM) * 1000.0);
+            double const T = (r == 0.0) ? (123456.0) : (2 * 3.1415926536 * std::sqrt(r*r*r / GM) * 1000.0);
 
             CirclePathSim::SatData &rSatData = rCircleSim.sim.m_data[i];
             rSatData = CirclePathSim::SatData{
@@ -618,7 +618,7 @@ FeatureDef const ftrUniverseCospaceTest = feature_def("UniverseCospaceTest", [] 
         0.0, 5.0, 20.0, 30.0, 38.0, 49.0, 60.0, 85.0, 90.0, 110.0
     });
 
-    CirclePathSimId const fnslfalfl = add_circle_orbit(rootSpace, rCirclePath.instOf[circleSimId].sim.m_data[4].id, Quaterniond({1.0, 0.0, 0.0}, 0.69*pi), 10.0*1024.0, 100.0*1024.0, 2000000000000.0,
+    CirclePathSimId const fnslfalfl = add_circle_orbit(rootSpace, rCirclePath.instOf[circleSimId].sim.m_data[4].id, Quaterniond({1.0, 0.0, 0.0}, 0.69*3.1415926536), 10.0*1024.0, 100.0*1024.0, 2000000000000.0,
     {
         2.0, 4.0
     });

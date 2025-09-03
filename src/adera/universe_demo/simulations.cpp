@@ -51,11 +51,11 @@ void CirclePathSim::update(std::uint64_t deltaTime) noexcept
         rSat.position.y() = spaceint_t(Magnum::Math::sin(theta) * rSat.radius);
         rSat.position.z() = 0;
 
-        float const tangentialSpeed = 2.0 * pi * (rSat.radius/1024.0f) / (double(rSat.period)/1000.0f);
+        double const tangentialSpeed = 2.0 * pi * (rSat.radius/1024.0f) / (double(rSat.period)/1000.0f);
 
-        rSat.velocity.x() = -Magnum::Math::sin(theta) * tangentialSpeed;
-        rSat.velocity.y() = Magnum::Math::cos(theta) * tangentialSpeed;
-        rSat.velocity.z() = 0;
+        rSat.velocity.x() = float(-Magnum::Math::sin(theta) * tangentialSpeed);
+        rSat.velocity.y() = float( Magnum::Math::cos(theta) * tangentialSpeed);
+        rSat.velocity.z() = 0.0f;
     }
 }
 

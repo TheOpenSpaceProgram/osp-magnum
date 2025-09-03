@@ -195,12 +195,10 @@ struct UCtxComponentTypes
 {
     UCtxComponentTypes()
     {
-        auto gen = ids.generator();
-        defaults = {
-                gen.create(), gen.create(), gen.create(), gen.create(), gen.create(),
-                gen.create(), gen.create(), gen.create(), gen.create(), gen.create(),
-                gen.create(), gen.create(), gen.create(), gen.create(), gen.create(),
-                gen.create(), gen.create(), gen.create(), gen.create() };
+        auto const id = [this] () { return ids.create(); };
+
+        defaults = { id(), id(), id(), id(), id(), id(), id(), id(), id(), id(),
+                     id(), id(), id(), id(), id(), id(), id(), id(), id() };
 
         info.resize(ids.capacity());
         info[defaults.satId]    = {"SatelliteID", sizeof(SatelliteId)};
@@ -258,7 +256,7 @@ struct DataAccessor
     template<std::size_t SIZE>
     class MultiComponentIterator
     {
-        friend class DataAccessor;
+        friend struct DataAccessor;
 
     public:
 
@@ -287,13 +285,15 @@ struct DataAccessor
         template<typename T>
         [[nodiscard]] T get(std::size_t index) const noexcept
         {
-            return *std::bit_cast<T const*>(pos[index]);
+            T out;
+            std::memcpy(&out, pos[index], sizeof(T));
+            return out;
         }
 
     private:
 
-        std::array<std::byte const*, SIZE>  pos;
-        std::array<std::ptrdiff_t, SIZE>    stride;
+        std::array<std::byte const*, SIZE>  pos{};
+        std::array<std::ptrdiff_t, SIZE>    stride{};
         std::size_t remaining{};
     };
 

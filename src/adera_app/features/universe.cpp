@@ -252,9 +252,9 @@ FeatureDef const ftrUniverseCore = feature_def("UniverseCore", [] (
         // Loop through every coordinate space that has a parent satellite.
         // TODO: this is very inefficient. add a thing to subscribe to changes to dataaccessors
 
-        for (CoSpaceId const 识别号 : rCoordSpaces.ids)
+        for (CoSpaceId const cospaceId : rCoordSpaces.ids)
         {
-            CospaceTransform &rTf = rCoordSpaces.transformOf[识别号];
+            CospaceTransform &rTf = rCoordSpaces.transformOf[cospaceId];
 
             if (rTf.parentSat.has_value())
             {
@@ -612,6 +612,7 @@ struct TreeWalker
 
         while (child != childLast)
         {
+            // NOLINTNEXTLINE(readability-suspicious-call-argument) shush. it's called recursion >:3
             descend_recurse(child, initTarget, initState);
             child += 1 + rDescendants[child]; // next child
         }
@@ -679,6 +680,7 @@ struct TreeWalker
         {
             if (child != from) // don't accidentally go back down to where we ascended from
             {
+                // NOLINTNEXTLINE(readability-suspicious-call-argument)
                 descend_recurse(child, target, targetState);
             }
             child += 1 + rDescendants[child]; // next child
@@ -774,33 +776,28 @@ FeatureDef const ftrUniverseTestPlanetsDraw = feature_def("UniverseTestPlanetsDr
         .args       ({uniPlanetsDraw.di.planetDraw,          uniCore.di.dataAccessors,               uniCore.di.satInst,        uniCore.di.dataSrcs, uniCore.di.coordSpaces, scnInUni.di.scnCospace})
         .func       ([] (  PlanetDraw &rPlanetDraw, UCtxDataAccessors &rDataAccessors, UCtxSatellites &rSatInst, UCtxDataSources &rDataSrcs, UCtxCoordSpaces const& rCoordSpaces, CoSpaceId scnCospace) noexcept
     {
-        if (true)
+        // TODO: right now this just tracks everything and checks every update. add conditions later
+
+        rPlanetDraw.doResync = true;
+
+        rPlanetDraw.accessorsByCospace.clear();
+        for (DataAccessorId const accessorId : rDataAccessors.ids)
         {
-            //std::cout << "salkjdsabfkjdsafdsaf\n";
-            rPlanetDraw.doResync = true;
+            rPlanetDraw.accessorsByCospace.push_back(accessorId);
+        }
 
-            rPlanetDraw.accessorsByCospace.clear();
-            for (DataAccessorId const accessorId : rDataAccessors.ids)
-            {
-                rPlanetDraw.accessorsByCospace.push_back(accessorId);
-            }
 
-            // TODO: right now this just tracks everything. add conditions later
+        rPlanetDraw.trackedAccessors.clear();
+        rPlanetDraw.trackedAccessors.resize(rDataAccessors.ids.capacity());
+        for (DataAccessorId const accessorId : rDataAccessors.ids)
+        {
+            rPlanetDraw.trackedAccessors.emplace(accessorId);
+        }
 
-            rPlanetDraw.trackedAccessors.clear();
-            rPlanetDraw.trackedAccessors.resize(rDataAccessors.ids.capacity());
-            for (DataAccessorId const accessorId : rDataAccessors.ids)
-            {
-                rPlanetDraw.trackedAccessors.emplace(accessorId);
-            }
-
-            rPlanetDraw.trackedSats.resize(rSatInst.ids.capacity());
-            for (SatelliteId const satId : rSatInst.ids)
-            {
-                rPlanetDraw.trackedSats[satId].isTracking = true;
-            }
-
-            rPlanetDraw.doResync = true;
+        rPlanetDraw.trackedSats.resize(rSatInst.ids.capacity());
+        for (SatelliteId const satId : rSatInst.ids)
+        {
+            rPlanetDraw.trackedSats[satId].isTracking = true;
         }
     });
 
@@ -812,8 +809,6 @@ FeatureDef const ftrUniverseTestPlanetsDraw = feature_def("UniverseTestPlanetsDr
     {
         if (rPlanetDraw.doResync)
         {
-            auto drawEntGen = rScnRender.m_drawIds.generator();
-
             for (SatelliteId const satId : rSatInst.ids)
             {
                 PlanetDraw::TrackedSatellite &rTrackedSat = rPlanetDraw.trackedSats[satId];
@@ -822,7 +817,7 @@ FeatureDef const ftrUniverseTestPlanetsDraw = feature_def("UniverseTestPlanetsDr
                 {
                     if ( ! rTrackedSat.drawEnt.has_value() )
                     {
-                        rTrackedSat.drawEnt = drawEntGen.create();
+                        rTrackedSat.drawEnt = rScnRender.m_drawIds.create();
                     }
                 }
             }
@@ -837,21 +832,6 @@ FeatureDef const ftrUniverseTestPlanetsDraw = feature_def("UniverseTestPlanetsDr
     {
         if (rPlanetDraw.doResync)
         {
-            // eat everything
-            //std::cout << "eat";
-
-            // maybe for each satellite type?
-            // or each coordspace?
-            //
-            // which one makes the most sense?
-            // usually want to specify a coordspace. 'what is here'
-            // write to roughly the same physical space.
-            // better to have per satset/coordspace pair. or datasource
-            // (satset,coordspace)-> (list of dataacessors)
-
-            // loop through all dataacessors, and write positions and stuff
-            //
-
             MeshId const sphereMeshId = rNamedMeshes.m_shapeToMesh.at(EShape::Sphere);
 
             for (SatelliteId const satId : rSatInst.ids)
@@ -886,12 +866,14 @@ FeatureDef const ftrUniverseTestPlanetsDraw = feature_def("UniverseTestPlanetsDr
     {
         rPlanetDraw.cospaceTransformToScnOf.resize(rCoordSpaces.ids.capacity());
 
-        // update rPlanetDraw.transformerOf
+
         TreeWalker<CoordTransformer, CospaceTransformCalculator> walker
         {
             .mark = CospaceTransformCalculator{ rPlanetDraw.cospaceTransformToScnOf, rCoordSpaces },
             .rDescendants = rCoordSpaces.treeDescendants
         };
+
+        // writes to rPlanetDraw.cospaceTransformToScnOf
         walker.run(rCoordSpaces.treeposOf[scnCospace], {});
 
         DefaultComponents const &dc = compTypes.defaults;
@@ -919,7 +901,7 @@ FeatureDef const ftrUniverseTestPlanetsDraw = feature_def("UniverseTestPlanetsDr
 
                 LGRN_ASSERTM(iter.has(13), "SatelliteId missing");
 
-                float const timeBehindBy = rAccessor.owner.has_value() ? rSimulations.simulationOf[rAccessor.owner].timeBehindBy * 0.001f : 0.0f;
+                float const timeBehindBy = rAccessor.owner.has_value() ? float(rSimulations.simulationOf[rAccessor.owner].timeBehindBy) * 0.001f : 0.0f;
 
 
                 for (std::size_t i = 0; i < rAccessor.count; ++i, iter.next())
@@ -948,7 +930,7 @@ FeatureDef const ftrUniverseTestPlanetsDraw = feature_def("UniverseTestPlanetsDr
                     if (hasPosXYZ)
                     {
                         Vector3g const pos {iter.get<spaceint_t>(0), iter.get<spaceint_t>(1), iter.get<spaceint_t>(2)};
-                        Vector3d const d = Vector3d(transformer.transforposition(pos));
+                        Vector3d const d = Vector3d(transformer.transform_position(pos));
                         Vector3 const qux = Vector3(d / 1024.0) + moved;
 
                         PlanetDraw::TrackedSatellite &rTrackedSat = rPlanetDraw.trackedSats[satId];

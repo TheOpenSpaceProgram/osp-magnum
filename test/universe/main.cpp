@@ -134,24 +134,24 @@ TEST(Universe, CoordTransformer)
     expect_inverse(sunToMoon,       moonToSun);
 
     // Confirm Planet position in Sun's space == Planet's origin
-    EXPECT_EQ(sunToPlanet.transforposition(planet.position), gc_v3gZero);
-    EXPECT_EQ(planetToSun.transforposition(gc_v3gZero), planet.position);
+    EXPECT_EQ(sunToPlanet.transform_position(planet.position), gc_v3gZero);
+    EXPECT_EQ(planetToSun.transform_position(gc_v3gZero), planet.position);
 
     // Confirm Moon position in Planets's space == Moon's origin
-    EXPECT_EQ(planetToMoon.transforposition(moon.position), gc_v3gZero);
-    EXPECT_EQ(moonToPlanet.transforposition(gc_v3gZero), moon.position);
+    EXPECT_EQ(planetToMoon.transform_position(moon.position), gc_v3gZero);
+    EXPECT_EQ(moonToPlanet.transform_position(gc_v3gZero), moon.position);
 
     // Confirm point above Planet is consistent between spaces
-    EXPECT_EQ(sunToPlanet.transforposition(abovePlanetSun), abovePlanetPlanet);
-    EXPECT_EQ(planetToSun.transforposition(abovePlanetPlanet), abovePlanetSun);
-    EXPECT_EQ(moonToPlanet.transforposition(abovePlanetMoon), abovePlanetPlanet);
-    EXPECT_EQ(planetToMoon.transforposition(abovePlanetPlanet), abovePlanetMoon);
+    EXPECT_EQ(sunToPlanet   .transform_position(abovePlanetSun),    abovePlanetPlanet);
+    EXPECT_EQ(planetToSun   .transform_position(abovePlanetPlanet), abovePlanetSun);
+    EXPECT_EQ(moonToPlanet  .transform_position(abovePlanetMoon),   abovePlanetPlanet);
+    EXPECT_EQ(planetToMoon  .transform_position(abovePlanetPlanet), abovePlanetMoon);
 
     // Confirm point above Moon is consistent between spaces
-    EXPECT_EQ(planetToMoon.transforposition(aboveMoonPlanet), aboveMoonMoon);
-    EXPECT_EQ(moonToPlanet.transforposition(aboveMoonMoon), aboveMoonPlanet);
-    EXPECT_EQ(sunToMoon.transforposition(aboveMoonSun), aboveMoonMoon);
-    EXPECT_EQ(moonToSun.transforposition(aboveMoonMoon), aboveMoonSun);
+    EXPECT_EQ(planetToMoon  .transform_position(aboveMoonPlanet),   aboveMoonMoon);
+    EXPECT_EQ(moonToPlanet  .transform_position(aboveMoonMoon),     aboveMoonPlanet);
+    EXPECT_EQ(sunToMoon     .transform_position(aboveMoonSun),      aboveMoonMoon);
+    EXPECT_EQ(moonToSun     .transform_position(aboveMoonMoon),     aboveMoonSun);
 }
 
 // Test CoordTransformer with rotated coordinate spaces
@@ -211,15 +211,15 @@ TEST(Universe, CoordTransformerRotations)
     expect_inverse(planetToMoon,    moonToPlanet);
 
     // Confirm point ahead of planet is properly rotated
-    EXPECT_EQ(planetToSun.transforposition(aheadPlanetPlanet), aheadPlanetSun);
-    EXPECT_EQ(sunToPlanet.transforposition(aheadPlanetSun), aheadPlanetPlanet);
+    EXPECT_EQ(planetToSun.transform_position(aheadPlanetPlanet), aheadPlanetSun);
+    EXPECT_EQ(sunToPlanet.transform_position(aheadPlanetSun), aheadPlanetPlanet);
 
     // Confirm distance between planet and moon are consistent
     double const dist           = diff.length();
-    double const distSunPlanet  = Vector3d(sunToPlanet.transforposition(moon.position)).length() / int_2pow<int>(13);
-    double const distSunMoon    = Vector3d(sunToMoon.transforposition(planet.position)).length() / int_2pow<int>(15);
-    double const distMoonPlanet = Vector3d(moonToPlanet.transforposition({})).length() / int_2pow<int>(13);
-    double const distPlanetMoon = Vector3d(planetToMoon.transforposition({})).length() / int_2pow<int>(15);
+    double const distSunPlanet  = Vector3d(sunToPlanet.transform_position(moon.position)).length() / int_2pow<int>(13);
+    double const distSunMoon    = Vector3d(sunToMoon.transform_position(planet.position)).length() / int_2pow<int>(15);
+    double const distMoonPlanet = Vector3d(moonToPlanet.transform_position({})).length() / int_2pow<int>(13);
+    double const distPlanetMoon = Vector3d(planetToMoon.transform_position({})).length() / int_2pow<int>(15);
 
     EXPECT_NEAR(dist, distSunPlanet,  0.1f);
     EXPECT_NEAR(dist, distSunMoon,    0.1f);
@@ -227,12 +227,12 @@ TEST(Universe, CoordTransformerRotations)
     EXPECT_NEAR(dist, distMoonPlanet, 0.1f);
 
     // Moon's +X points directly at the planet. Expect X coordinate = distance
-    EXPECT_NEAR(dist, double(planetToMoon.transforposition({}).x()) / int_2pow<int>(15), 0.1f);
+    EXPECT_NEAR(dist, double(planetToMoon.transform_position({}).x()) / int_2pow<int>(15), 0.1f);
 
     // Expect (dist) meters +X of moon to be the Planet's position
     Vector3g const moonRay{spaceint_t(dist * int_2pow<int>(15)), 0, 0};
-    expect_near_vec(moonToPlanet.transforposition(moonRay), {}, 4);
-    expect_near_vec(moonToSun.transforposition(moonRay), planet.position, 4);
+    expect_near_vec(moonToPlanet.transform_position(moonRay), {}, 4);
+    expect_near_vec(moonToSun.transform_position(moonRay), planet.position, 4);
 }
 
 // TODO: Test CoordTransformer for hopping across nested rotated coordinate spaces
