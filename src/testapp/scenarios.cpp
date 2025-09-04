@@ -1,4 +1,4 @@
-/**
+﻿/**
  * Open Space Program
  * Copyright © 2019-2021 Open Space Program Project
  *
@@ -34,6 +34,7 @@
 #include <adera_app/features/shapes.h>
 #include <adera_app/features/terrain.h>
 #include <adera_app/features/universe.h>
+#include <adera_app/features/universe_sims.h>
 #include <adera_app/features/vehicles.h>
 #include <adera_app/features/vehicles_machines.h>
 #include <adera_app/features/vehicles_prebuilt.h>
@@ -305,77 +306,67 @@ static ScenarioMap_t make_scenarios()
     }});
 
 
-/*
 
     add_scenario({
-        .name        = "universe",
-        .brief       = "Universe test scenario with very unrealistic planets",
+        .name        = "universe-cospace",
+        .brief       = "Universe coordinate space test",
         .description = "Controls:\n"
                        "* [WASD]            - Move camera\n"
                        "* [QE]              - Move camera up/down\n"
                        "* [Drag MouseRight] - Orbit camera\n"
                        "* [Space]           - Throw spheres\n",
-        .loadFunc = [] (TestApp& rTestApp)
+        .loadFunc = [] (ScenarioArgs args)
     {
-        auto        &rFW      = rTestApp.m_framework;
-        auto  const mainApp   = rFW.get_interface<FIMainApp>  (rTestApp.m_mainContext);
+        auto  const mainApp   = args.rFW.get_interface<FIMainApp>(args.mainContext);
 
-        ContextId const sceneCtx = rFW.m_contextIds.create();
-        rFW.data_get<adera::AppContexts&>(mainApp.di.appContexts).scene = sceneCtx;
+        ContextId const sceneCtx = args.rFW.m_contextIds.create();
+        args.rFW.data_get<adera::AppContexts&>(mainApp.di.appContexts).scene = sceneCtx;
 
-        ContextBuilder  sceneCB { sceneCtx, {rTestApp.m_mainContext}, rFW };
+        ContextBuilder  sceneCB { sceneCtx, {args.mainContext}, args.rFW };
         sceneCB.add_feature(ftrScene);
-        sceneCB.add_feature(ftrCommonScene, rTestApp.m_defaultPkg);
-        sceneCB.add_feature(ftrPhysics);
-        sceneCB.add_feature(ftrPhysicsShapes, osp::draw::MaterialId{0});
-        sceneCB.add_feature(ftrDroppers);
-        sceneCB.add_feature(ftrBounds);
+        sceneCB.add_feature(ftrCleanupCtx);
+        sceneCB.add_feature(ftrCommonScene, args.defaultPkg);
 
-        sceneCB.add_feature(ftrJolt);
-        sceneCB.add_feature(ftrJoltConstAccel);
-        sceneCB.add_feature(ftrPhysicsShapesJolt);
+        auto const scene = args.rFW.get_interface<FIScene>(sceneCtx);
 
-        auto const scene = rFW.get_interface<FIScene>(sceneCtx);
-
-        //sceneCB.add_feature(ftrUniverseCore, PipelineId{mainApp.pl.mainLoop});
-        sceneCB.add_feature(ftrUniverseSceneFrame);
-        sceneCB.add_feature(ftrUniverseTestPlanets);
+        sceneCB.add_feature(ftrUniverseCore);
+        sceneCB.add_feature(ftrSceneInUniverse);
+        sceneCB.add_feature(ftrUniverseSimpleSimulators);
+        sceneCB.add_feature(ftrUniverseCospaceTest);
         ContextBuilder::finalize(std::move(sceneCB));
-
-        ospjolt::ForceFactors_t const gravity = add_constant_acceleration(sc_gravityForce, rFW, sceneCtx);
-        set_phys_shape_factors(gravity, rFW, sceneCtx);
-        add_floor(rFW, sceneCtx, rTestApp.m_defaultPkg, 0);
     }});
-
 
 
     add_scenario({
-        .name        = "solar-system",
-        .brief       = "Scenario that simulates a basic solar system.",
+        .name        = "universe-nbody",
+        .brief       = "Scenario that simulates a basic n-body solar system",
         .description = "Controls:\n"
                        "* [WASD]            - Move camera\n"
                        "* [QE]              - Move camera up/down\n"
-                       "* [Drag MouseRight] - Orbit camera\n",
-        .loadFunc = [] (TestApp& rTestApp)
+                       "* [Drag MouseRight] - Orbit camera\n"
+                       "* [Space]           - Throw spheres\n",
+        .loadFunc = [] (ScenarioArgs args)
     {
-        auto        &rFW      = rTestApp.m_framework;
-        auto  const mainApp   = rFW.get_interface<FIMainApp>  (rTestApp.m_mainContext);
+        auto  const mainApp   = args.rFW.get_interface<FIMainApp>(args.mainContext);
 
-        ContextId const sceneCtx = rFW.m_contextIds.create();
-        rFW.data_get<adera::AppContexts&>(mainApp.di.appContexts).scene = sceneCtx;
+        ContextId const sceneCtx = args.rFW.m_contextIds.create();
+        args.rFW.data_get<adera::AppContexts&>(mainApp.di.appContexts).scene = sceneCtx;
 
-        ContextBuilder  sceneCB { sceneCtx, {rTestApp.m_mainContext}, rFW };
+        ContextBuilder  sceneCB { sceneCtx, {args.mainContext}, args.rFW };
         sceneCB.add_feature(ftrScene);
-        sceneCB.add_feature(ftrCommonScene, rTestApp.m_defaultPkg);
+        sceneCB.add_feature(ftrCleanupCtx);
+        sceneCB.add_feature(ftrCommonScene, args.defaultPkg);
 
-        auto const scene = rFW.get_interface<FIScene>(sceneCtx);
+        auto const scene = args.rFW.get_interface<FIScene>(sceneCtx);
 
-        sceneCB.add_feature(ftrUniverseCore, PipelineId{scene.pl.update});
-        sceneCB.add_feature(ftrUniverseSceneFrame);
+        sceneCB.add_feature(ftrUniverseCore);
+        sceneCB.add_feature(ftrSceneInUniverse);
+        sceneCB.add_feature(ftrUniverseSimpleSimulators);
         sceneCB.add_feature(ftrSolarSystem);
         ContextBuilder::finalize(std::move(sceneCB));
     }});
-*/
+
+
     return scenarioMap;
 }
 

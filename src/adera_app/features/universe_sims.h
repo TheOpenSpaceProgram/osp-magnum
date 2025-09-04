@@ -1,6 +1,6 @@
 /**
  * Open Space Program
- * Copyright © 2019-2024 Open Space Program Project
+ * Copyright © 2019-2025 Open Space Program Project
  *
  * MIT License
  *
@@ -31,43 +31,45 @@
 #include <osp/universe/universe.h>
 #include <osp/drawing/drawing.h>
 
-
 namespace ftr_inter
 {
 
+struct FIUniPlanets {
+    struct DataIds {
+        DataId planetMainSpace;
+        DataId satSurfaceSpaces;
+    };
+
+    struct Pipelines { };
+};
+
+
+struct FIUniSimpleSims
+{
+    struct DataIds {
+        DataId circlePath;
+        DataId constantSpin;
+        DataId simpleGravity;
+    };
+
+    struct Pipelines { };
+};
 
 };
 
 namespace adera
 {
 
-
-// Universe Scenario
-
-/**
- * @brief Core Universe struct with addressable Coordinate Spaces
- */
-extern osp::fw::FeatureDef const ftrUniverseCore;
+extern osp::fw::FeatureDef const ftrUniverseSimpleSimulators;
 
 
 /**
- * @brief Represents the physics scene's presence in a Universe
+ * @brief Initializes planet information, position, mass etc...
  */
-extern osp::fw::FeatureDef const ftrSceneInUniverse;
+extern osp::fw::FeatureDef const ftrSolarSystem;
 
 
-/**
- * @brief Draw universe, specifically designed for setup_uni_test_planets
- */
-extern osp::fw::FeatureDef const ftrUniverseTestPlanetsDraw;
-
-
-struct PlanetDrawParams
-{
-    osp::draw::MaterialId planetMat;
-    osp::draw::MaterialId axisMat;
-};
-
+extern osp::fw::FeatureDef const ftrUniverseCospaceTest;
 
 } // namespace adera
 

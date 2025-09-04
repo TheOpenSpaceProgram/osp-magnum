@@ -24,7 +24,7 @@
  */
 #pragma once
 
-#include "universe.h"
+#include "universetypes.h"
 
 #include "../core/math_2pow.h"
 
@@ -43,12 +43,23 @@ constexpr bool quat_non_zero(Quaterniond const in) noexcept
     return in.scalar() != 1.0;
 }
 
+/**
+ * @brief Relevant variables to for a parent-child relationship between two coordinate spaces
+ */
+struct CospaceRelationship
+{
+    int                 parentPrecision;
+    int                 childPrecision;
+    Vector3g            childPos;
+    osp::Quaterniond    childRot;
+};
+
 
 /**
  * @brief Describes a mathematical function used to transform positions between
  *        coordinate spaces
  *
- * 2D example:
+ * 1D example:
  *
  * Parent: ... -O-----|-----|-----|-----|-----|-----|-----|-----|-----|-----|
  *              0     1     2     3     4     5     6     7     8     9    10
@@ -77,7 +88,7 @@ constexpr bool quat_non_zero(Quaterniond const in) noexcept
  *
  * C->P(x) = 2^(-precDiff) * x + childPos
  *           substitute:    n = -precDiff;       c = childPos;     m = 0;
- * C->P(x) = x * 2^n * + c * 2^m
+ * C->P(x) = x * 2^n + c * 2^m
  *
  * This form generalizes both operations, as well as make them easier to
  * combine.
@@ -101,27 +112,27 @@ constexpr bool quat_non_zero(Quaterniond const in) noexcept
  */
 struct CoordTransformer
 {
-    Quaterniond     m_rotOut;
-    Quaterniond     m_rotIn;
-    Vector3g        m_c;
-    int             m_n{0};
-    int             m_m{0};
+    Quaterniond     rotOut;
+    Quaterniond     rotIn;
+    Vector3g        c;
+    int             n{0};
+    int             m{0};
 
     Vector3g transform_position(Vector3g in) const noexcept
     {
         using osp::math::mul_2pow;
 
-        if (quat_non_zero(m_rotIn))
+        if (quat_non_zero(rotIn))
         {
-            in = rotate_vector3g(in, m_rotIn);
+            in = rotate_vector3g(in, rotIn);
         }
 
-        Vector3g out = mul_2pow<Vector3g, spaceint_t>(in, m_n)
-                     + mul_2pow<Vector3g, spaceint_t>(Vector3g(m_c), m_m);
+        Vector3g out = mul_2pow<Vector3g, spaceint_t>(in, n)
+                     + mul_2pow<Vector3g, spaceint_t>(Vector3g(c), m);
 
-        if (quat_non_zero(m_rotOut))
+        if (quat_non_zero(rotOut))
         {
-            out = rotate_vector3g(out, m_rotOut);
+            out = rotate_vector3g(out, rotOut);
         }
 
         return out;
@@ -129,182 +140,175 @@ struct CoordTransformer
 
     Quaterniond rotation() const noexcept
     {
-        return m_rotOut * m_rotIn;
+        return rotOut * rotIn;
     }
 
     constexpr bool is_identity() const noexcept
     {
-        return (m_n == 0) && m_c.isZero();
-    }
-};
-
-/**
- * @brief Composite together two CoordTransformers
- *
- * Manually chaining transforms between spaces of different precisions can lead
- * to loss of information due to rounding.
- * ie. High precision -> Low precision (rounded!) -> High precision (oof!)
- *
- * Compositing the CoordTransformers prevents these errors, and only needs to
- * be calculated once when transforming multiple positions.
- *
- * For coordinate spaces A, B, and C, there exists transform functions
- * A->B(x) and B->C(x).
- *
- * A->C(x) can be formed by substituting functions into each other:
- *
- * A->C(x) = B->C(A->B(x))
- *
- * Algebra goes like this:
- *
- * given:    f1(x)  =  x * 2^n1  +  c1 * 2^m1
- * given:    f2(x)  =  x * 2^n2  +  c2 * 2^m2
- * unknown:  f3(x)  =  x * 2^n3  +  c3 * 2^m3  =  f1( f2(x) )
- *
- * f3(x)   =   f1( f2(x) )
- * f3(x)   =   f2(x)                    * 2^n1          +   c1 * 2^m1
- * f3(x)   =   ( x * 2^n2 + c2 * 2^m2 ) * 2^n1          +   c1 * 2^m1
- * f3(x)   =   x * 2^n2 * 2^n1   +   c2 * 2^m2 * 2^n1   +   c1 * 2^m1
- * f3(x)   =   x * 2^(n1+n2)     +   c2 * 2^(m2+n1)     +   c1 * 2^m1
- *               n3 = n1+n2
- * f3(x)   =   x * 2^n3          +   c2 * 2^(m2+n1)     +   c1 * 2^m1
- *
- * To combine the c2 and c1 terms, their exponents need to be the same. Either
- * term needs to be modified to match the other term. To avoid rounding losses,
- * we avoid splitting off a negative exponent.
- *
- * Exponent change:     2^u + 2^v  ->  2^(u-v+v) + 2^v  ->  2^(u-v)*2^(v) + b^v
- *                   -> (2^(u-v) + b)^v
- *
- * let d = (m2+n1) - m1
- *
- * if (d == 0):  both exponents are safe to combine
- *     c3 = (c2+c1)             m3 = m1 or (m2 + n1)
- *
- * if (d > 0):   c2*2^(m2+n1) + c1*2^m1  ->  c2*(2^d)*(2^m1) + c1*2^m1
- *     c3 = c2*(2^d) + c1;      m3 = m1
- *
- * if (d < 0):   c2*2^(m2+n1) + c1*2^m1  ->  c2*2^(m2+n1) + c1*2^(-d)*(m2+n1)
- *     c3 = c2 + c1*2^(-d);     m3 = m2+n1
- *
- * All variables are now known: h(x)  =  x * 2^n3  +  c3 * 2^m3
- *
- *
- * Accounting for rotations is a bit messier:
- *
- * f3(x)  =  R1[ r1( R2[ r2(x) * 2^n2 + c2 * 2^m2] ) * 2^n1 + c1 * 2^m1  ]
- *
- * Rotate functions are linear maps, with additivity and homogeneity:
- *  * f(U + V) = f(U) + f(V)
- *  * f(aU) = af(U)
- * Steps are similar to without rotations, so skipping over...
- *
- * f3(x)  =  R1[ r1(R2[r2(x)]) * 2^n3  +  r1(R2[c2]) * 2^(m2+n1)  +  c1 * 2^m1 ]
- *
- * To combine c1 and c2 terms, 2^ terms are dealt with previously (m3), but now
- * rotations must also match.
- *
- * Either rotate c2 by r1(R2[x]):
- * f3(x)  =  R1[   r1(R2[r2(x)]) * 2^n3   +   (r1(R2[c2]) + c1) * 2^m3   ]
- *           R3(x) = R1(x);      r3(x) = r1(R2[x])   c3 = (r1(R2[c2]) + c1)
- *
- * Or rotate all terms by inverse of r1(R2[x]):
- * f3(x)  =  R1[r1(R2[     r2(x) * 2^n3   +  (c2 + R2(r1-1[c2])) * 2^m3     ])]
- *           R3 = R1[r1(R2[x])]  r3(x) = r2(x)       c3 = (c2 + R2-1(r1-1[c1]))
- *
- * If r1(R2[x]) is an identity function, just ignore it.
- *
- * @param f1 [in] Outer function to composite
- * @param f2 [in] Inner function to composite
- *
- * @return Composite CoordTransformer f1( f2(x) )
- */
-inline CoordTransformer coord_composite(
-        CoordTransformer const& f1, CoordTransformer const& f2) noexcept
-{
-    Vector3g c1;
-    Vector3g c2;
-    int m3;
-
-    int const d = f2.m_m + f1.m_n - f1.m_m;
-
-    if (d == 0)
-    {
-        c1 = f1.m_c;
-        c2 = f2.m_c;
-        m3 = f1.m_m;
-    }
-    else if (d > 0)
-    {
-        c1 = f1.m_c;
-        c2 = f2.m_c * math::int_2pow<spaceint_t>(d);
-        m3 = f1.m_m;
-    }
-    else // if (d < 0)
-    {
-        c1 = f1.m_c * math::int_2pow<spaceint_t>(-d);
-        c2 = f2.m_c;
-        m3 = f2.m_m + f1.m_n;
+        return (n == 0) && c.isZero();
     }
 
-    Quaterniond const in1Out2 = f1.m_rotIn * f2.m_rotOut;
-    Quaterniond out3;
-    Quaterniond in3;
-
-    if (quat_non_zero(in1Out2))
+    static CoordTransformer from_parent_to_child(CospaceRelationship const rel) noexcept
     {
-        if (c1 > c2)
+        return {
+            .rotOut   = rel.childRot.inverted(),
+            .c        = -rel.childPos,
+            .n        = rel.childPrecision - rel.parentPrecision,
+            .m        = rel.childPrecision - rel.parentPrecision
+        };
+    }
+
+    static CoordTransformer from_child_to_parent(CospaceRelationship const rel) noexcept
+    {
+        return {
+            .rotIn    = rel.childRot,
+            .c        = rel.childPos,
+            .n        = rel.parentPrecision - rel.childPrecision,
+            .m        = 0
+        };
+    }
+
+    /**
+     * @brief Calculate algebraic function composition of two CoordTransformers: f1( f2(x) )
+     *
+     * Manually chaining transforms between spaces of different precisions can lead
+     * to loss of information due to rounding.
+     * ie. High precision -> Low precision (rounded!) -> High precision (oof!)
+     *
+     * Compositing the CoordTransformers prevents these errors, and only needs to
+     * be calculated once when transforming multiple positions.
+     *
+     * For coordinate spaces A, B, and C, there exists transform functions
+     * A->B(x) and B->C(x).
+     *
+     * A->C(x) can be formed by substituting functions into each other:
+     *
+     * A->C(x) = B->C(A->B(x))
+     *
+     * Algebra goes like this:
+     *
+     * given:    f1(x)  =  x * 2^n1  +  c1 * 2^m1
+     * given:    f2(x)  =  x * 2^n2  +  c2 * 2^m2
+     * unknown:  f3(x)  =  x * 2^n3  +  c3 * 2^m3  =  f1( f2(x) )
+     *
+     * f3(x)   =   f1( f2(x) )
+     * f3(x)   =   f2(x)                    * 2^n1          +   c1 * 2^m1
+     * f3(x)   =   ( x * 2^n2 + c2 * 2^m2 ) * 2^n1          +   c1 * 2^m1
+     * f3(x)   =   x * 2^n2 * 2^n1   +   c2 * 2^m2 * 2^n1   +   c1 * 2^m1
+     * f3(x)   =   x * 2^(n1+n2)     +   c2 * 2^(m2+n1)     +   c1 * 2^m1
+     *               n3 = n1+n2
+     * f3(x)   =   x * 2^n3          +   c2 * 2^(m2+n1)     +   c1 * 2^m1
+     *
+     * To combine the c2 and c1 terms, their exponents need to be the same. Either
+     * term needs to be modified to match the other term. To avoid rounding losses,
+     * we avoid splitting off a negative exponent.
+     *
+     * Exponent change:     2^u + 2^v  ->  2^(u-v+v) + 2^v  ->  2^(u-v)*2^(v) + b^v
+     *                   -> (2^(u-v) + b)^v
+     *
+     * let d = (m2+n1) - m1
+     *
+     * if (d == 0):  both exponents are safe to combine
+     *     c3 = (c2+c1)             m3 = m1 or (m2 + n1)
+     *
+     * if (d > 0):   c2*2^(m2+n1) + c1*2^m1  ->  c2*(2^d)*(2^m1) + c1*2^m1
+     *     c3 = c2*(2^d) + c1;      m3 = m1
+     *
+     * if (d < 0):   c2*2^(m2+n1) + c1*2^m1  ->  c2*2^(m2+n1) + c1*2^(-d)*(m2+n1)
+     *     c3 = c2 + c1*2^(-d);     m3 = m2+n1
+     *
+     * All variables are now known: h(x)  =  x * 2^n3  +  c3 * 2^m3
+     *
+     *
+     * Accounting for rotations is a bit messier:
+     *
+     * f3(x)  =  R1[ r1( R2[ r2(x) * 2^n2 + c2 * 2^m2] ) * 2^n1 + c1 * 2^m1  ]
+     *
+     * Rotate functions are linear maps, with additivity and homogeneity:
+     *  * f(U + V) = f(U) + f(V)
+     *  * f(aU) = af(U)
+     * Steps are similar to without rotations, so skipping over...
+     *
+     * f3(x)  =  R1[ r1(R2[r2(x)]) * 2^n3  +  r1(R2[c2]) * 2^(m2+n1)  +  c1 * 2^m1 ]
+     *
+     * To combine c1 and c2 terms, 2^ terms are dealt with previously (m3), but now
+     * rotations must also match.
+     *
+     * Either rotate c2 by r1(R2[x]):
+     * f3(x)  =  R1[   r1(R2[r2(x)]) * 2^n3   +   (r1(R2[c2]) + c1) * 2^m3   ]
+     *           R3(x) = R1(x);      r3(x) = r1(R2[x])   c3 = (r1(R2[c2]) + c1)
+     *
+     * Or rotate all terms by inverse of r1(R2[x]):
+     * f3(x)  =  R1[r1(R2[     r2(x) * 2^n3   +  (c2 + R2(r1-1[c2])) * 2^m3     ])]
+     *           R3 = R1[r1(R2[x])]  r3(x) = r2(x)       c3 = (c2 + R2-1(r1-1[c1]))
+     *
+     * If r1(R2[x]) is an identity function, just ignore it.
+     *
+     * @param f1 [in] Outer function to composite
+     * @param f2 [in] Inner function to composite
+     *
+     * @return Composite CoordTransformer f1( f2(x) )
+     */
+    inline static CoordTransformer from_composite(CoordTransformer const& f1, CoordTransformer const& f2) noexcept
+    {
+        Vector3g c1;
+        Vector3g c2;
+        int m3;
+
+        int const d = f2.m + f1.n - f1.m;
+
+        if (d == 0)
         {
-            c2 = rotate_vector3g(c2, in1Out2);
-            out3 = f1.m_rotOut;
-            in3 = in1Out2 * f2.m_rotIn;
+            c1 = f1.c;
+            c2 = f2.c;
+            m3 = f1.m;
+        }
+        else if (d > 0)
+        {
+            c1 = f1.c;
+            c2 = f2.c * math::int_2pow<spaceint_t>(d);
+            m3 = f1.m;
+        }
+        else // if (d < 0)
+        {
+            c1 = f1.c * math::int_2pow<spaceint_t>(-d);
+            c2 = f2.c;
+            m3 = f2.m + f1.n;
+        }
+
+        Quaterniond const in1Out2 = f1.rotIn * f2.rotOut;
+        Quaterniond out3;
+        Quaterniond in3;
+
+        if (quat_non_zero(in1Out2))
+        {
+            if (c1 > c2)
+            {
+                c2 = rotate_vector3g(c2, in1Out2);
+                out3 = f1.rotOut;
+                in3 = in1Out2 * f2.rotIn;
+            }
+            else
+            {
+                c1 = rotate_vector3g(c1, in1Out2.inverted());
+                out3 = f1.rotOut * in1Out2;
+                in3 = f2.rotIn;
+            }
         }
         else
         {
-            c1 = rotate_vector3g(c1, in1Out2.inverted());
-            out3 = f1.m_rotOut * in1Out2;
-            in3 = f2.m_rotIn;
+            out3 = f1.rotOut;
+            in3 = f2.rotIn;
         }
+
+        return {
+            .rotOut   = out3,
+            .rotIn    = in3,
+            .c        = c1 + c2,
+            .n        = f1.n + f2.n,
+            .m        = m3
+        };
     }
-    else
-    {
-        out3 = f1.m_rotOut;
-        in3 = f2.m_rotIn;
-    }
-
-    return {
-        .m_rotOut   = out3,
-        .m_rotIn    = in3,
-        .m_c        = c1 + c2,
-        .m_n        = f1.m_n + f2.m_n,
-        .m_m        = m3
-    };
-}
-
-inline CoordTransformer coord_parent_to_child(
-        CoSpaceTransform const& parent, CoSpaceTransform const& child) noexcept
-{
-    int const precisionDiff = child.m_precision - parent.m_precision;
-
-    return {
-        .m_rotOut   = child.m_rotation.inverted(),
-        .m_c        = -child.m_position,
-        .m_n        = precisionDiff,
-        .m_m        = precisionDiff
-    };
-}
-
-inline CoordTransformer coord_child_to_parent(
-        CoSpaceTransform const& parent, CoSpaceTransform const& child) noexcept
-{
-    int const precisionDiff = child.m_precision - parent.m_precision;
-
-    return {
-        .m_rotIn    = child.m_rotation,
-        .m_c        = child.m_position,
-        .m_n        = -precisionDiff,
-        .m_m        = 0
-    };
-}
+};
 
 }

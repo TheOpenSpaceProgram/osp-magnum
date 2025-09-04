@@ -24,7 +24,10 @@
  */
 #pragma once
 
-#include <entt/entity/storage.hpp>
+#include "../core/strong_id.h"
+#include "../core/math_types.h"
+
+#include <longeron/id_management/refcount.hpp>
 
 #include <Magnum/Math/Vector3.h>
 
@@ -33,32 +36,35 @@
 namespace osp::universe
 {
 
-using SatId     = uint32_t;
-using CoSpaceId = uint32_t;
+// Universe consists of several types of 'global' instances:
+// * Simulations
+// * CoordinateSpaces
+// * DataAccessors
+// * Components
+// * DataSources
+// * SatelliteSets
 
-}
+using SimulationId      = osp::StrongId<std::uint32_t, struct DummyForSimulationId>;
 
-// Specialize entt::storage_traits to disable signals for storage that uses
-// Satellites as entities
-template<typename Type>
-struct entt::storage_type<Type, osp::universe::SatId>
-{
-    using type = basic_storage<Type, osp::universe::SatId>;
-};
+using CoSpaceId         = osp::StrongId<std::uint32_t, struct DummyForCoSpaceId>;
+using CoSpaceOwner      = lgrn::IdRefCount<CoSpaceId>::Owner_t;
 
-namespace osp::universe
-{
+using ComponentTypeId   = osp::StrongId<std::uint32_t, struct DummyForComponentTypeId>;
+using DataAccessorId    = osp::StrongId<std::uint32_t, struct DummyForDataAccessorId>;
+using DataAccessorOwner = lgrn::IdRefCount<DataAccessorId>::Owner_t;
 
-using spaceint_t = int64_t;
+using DataSourceId      = osp::StrongId<std::uint32_t, struct DummyForDataSourceId>;
+using DataSourceOwner   = lgrn::IdRefCount<DataSourceId>::Owner_t;
 
-// 1024 space units = 1 meter
-// TODO: this should vary by trajectory, but for now it's global
-constexpr float gc_units_per_meter = 1024.0f;
+using SatelliteId       = osp::StrongId<std::uint32_t, struct DummyForSatId>;
+
+using IntakeId          = osp::StrongId<std::uint32_t, struct DummyForIntakeId>;
+
+
+using spaceint_t = std::int64_t;
 
 // A Vector3 for space
 using Vector3g = Magnum::Math::Vector3<spaceint_t>;
 
-template<typename COMP_T>
-using ucomp_storage_t = typename entt::storage_type<COMP_T, SatId>::type;
 
 }
