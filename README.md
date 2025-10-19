@@ -7,7 +7,7 @@
 
 OpenSpaceProgram is an open source initiative with the goal of creating a realistic spacecraft building game inspired by Kerbal Space Program.
 
-[[Website](https://openspaceprogram.org/)]  [[Discord Server](https://discord.gg/7xFsKRg)]
+[[Website](https://openspaceprogram.org/)]  [[Discord Server](https://discord.gg/7xFsKRg)] [[IRC](ircs://irc.libera.chat:6697/#openspaceprogram)]
 
 Putting gameplay details aside (art, story, progression, etc...), a game of this nature requires a massive and complicated universe simulation with intricate vehicles, rigid-body physics, orbits, and literally rocket science. To avoid inevitably creating an unmaintainable buggy mess, we need a strong foundation built with considerable amounts of engineering and passion.
 
@@ -34,23 +34,38 @@ After heavy iteration, it became apparent that it's impractical to build over an
 * Vehicles
   * Part model format uses Standard glTF
   * 'Link System' - Parts communicate like components in a logic circuit simulator. (PID control anything, differential thrust, auto-landing... Too many possibilities!)
-* Planet terrain, Icosahedron-based tessellation
-* Tasks and Framework utilities
+* Planet terrain
+  * Icosahedron-based tessellation. Manifold (Hole-free) mesh; allows vertex shaders to cleanly displace vertices.
+* Universe
+  * Stitches together many simpler simulations into a common interface
+    * Currently supports fixed circular paths and simple n-body. More sophisticated orbit simulators can be added easily.
+    * Handles transferring objects and splitting data between simulations
+  * Nested coordinate spaces with 64-bit int/fixed-point coordinates with variable precision
+    * Use '65536 units = 1 meter' for a planet, and '1 unit = 1 meter' for a galaxy, for example
+* Powerful Framework
+  * Designed to elegantly handle tough cases like floating origin translations; generally making sure all code runs in the correct order
+  * Immune to 'NullReferenceException-like' logic bugs common in conventional game engines. Frequent null-checking not required
+  * Extremely composable. Easy to swap out major components, such as the renderer or physics engine
 * Runnable Test application demo
   * OpenGL renderer using Magnum
   
-
-Upcoming major features
-
-* See https://github.com/TheOpenSpaceProgram/osp-magnum/issues?q=is%3Aissue+is%3Aopen+label%3Aplanned
-
-
 Notes:
 
 * No multi-threading is implemented yet
   * Code is structured in a way that is easy to *efficiently* multithread in the future 
   * Don't underestimate how fast a single thread can be. This won't be a problem for a while
 
+## Roadmap
+
+1. [Minimum-Viable-Product: Lunar Lander](https://github.com/TheOpenSpaceProgram/osp-magnum/issues/308)
+2. Sandbox demo. Edit vehicles directly, with ways to save/load vehicles; no separate 'vehicle assembly' UI yet. Can walk characters around on EVA.
+3. ???
+
+Making this into an actual 'game' will practically be a separate project.
+
+### Planned major features and changes:
+
+* See https://github.com/TheOpenSpaceProgram/osp-magnum/issues?q=is%3Aissue+is%3Aopen+label%3Aplanned
 
 ## Building
 
@@ -90,7 +105,13 @@ If you just want to try the demo without building, then see the [Actions](https:
 
 Our development team is very small right now. We need more crew to help to launch this project to its first release.
 
-You *don't* need to be a professional C++ developer to be involved or help! Graphics, sounds, game design, and scientific accuracy are important to this project too.
+This project has many different aspects. It's best if you're interested in working on a specific feature. Aerodynamics? An orbit simulator? UI? Graphics? Sounds? Rocket engines? Wheels? Trains??? Maybe just weird C++?
+
+We are at a point where many different features can be worked on simultaneously; but of course many issues block others. The sad reality is: we need to write code to do fun things (but make it good!!!).
+
+You *don't* need to be a professional C++ developer to be involved or help! Art style, music, game design, scientific accuracy, and having lots of space nerds around are important to this project too!
+
+Feel free to ask questions (even, and especially, the stupid ones) on Github, Discord, or IRC.
 
 ### Resources
 
@@ -98,8 +119,6 @@ You *don't* need to be a professional C++ developer to be involved or help! Grap
 * [Framework Unit test / Tutorial](test/framework/main.cpp)
 * [1 hour 30 minute long technical introduction video](https://www.youtube.com/watch?v=vdUllp9-E6k)
 * [Informal project history from BDFL's perspective](https://gist.github.com/Capital-Asterisk/a22c81ffff1bf20d5023bdd40909d31d)
-
-Feel free to ask questions on Github or Discord (even, and especially, the stupid ones); this will greatly help with documentation.
 
 ## Random Notes
 * This project might be codenamed 'adera'. the name of the street the 49 UBC bus was at while the project files were first created.
