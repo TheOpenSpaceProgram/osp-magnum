@@ -57,7 +57,7 @@ Notes:
 
 ## Roadmap
 
-1. Lunar Lander Minimum-Viable-Product demo. Orbits, terrain, solar system, and fairly complex prebuilt lander / service module.
+1. [Minimum-Viable-Product: Lunar Lander](https://github.com/TheOpenSpaceProgram/osp-magnum/issues/308)
 2. Sandbox demo. Edit vehicles directly, with ways to save/load vehicles; no separate 'vehicle assembly' UI yet. Can walk characters around on EVA.
 3. ???
 
