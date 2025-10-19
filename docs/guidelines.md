@@ -78,7 +78,7 @@ constexpr std::array<float, 9> sc_table = {{
 
 ```
 
-Balance spacing around parentheses. Spaces on after the opening brace should match its closing brace:
+Balance spacing around parentheses. Spaces after an opening brace should match spaces before its corresponding closing brace. Spaces are not always required around braces; just do whatever seems most readable:
 
 ```cpp
 (  a + b * (c(d) + e) + f(g)  )
@@ -112,7 +112,7 @@ IntConstPtr_t const *pConstPointerToConstPointer;
 
 * Variables are `camelCase` (with prefixes, read section below)
 * Functions are `snake_case`
-  * Functions that check a condition and return a bool usually start with `is_`
+  * Functions that check a condition and return a bool usually start with `is_` or `has_`
 * Type names are `PascalCase`
   * Prefix with `E` for enums
   * Prefix with `I` for interface classes
@@ -121,7 +121,7 @@ IntConstPtr_t const *pConstPointerToConstPointer;
 Names should be descriptive, though single-letter names are permitted for loop counters and math-heavy expressions.
 
 
-#### Variables prefixes
+#### Variables
 
 Hungarian notation is used to some extent. This makes it easier to tell the type when it's important. In many cases, these are things the IDE may not highlight:
 
@@ -146,6 +146,13 @@ Examples:
 * `rVariableName` - Reference
 * `m_pVariableName` - Member variable that's a pointer
 * `gc_variableName` - Global constant
+
+Associative containers may be easier to read when postfixed with `Of`
+
+```cpp
+nameOf[personId] = ...
+ageOf[personId] = ...
+```
 
 #### Type Aliases
 
@@ -173,27 +180,21 @@ Some Id types are simply aliases to an integer type (eg: `using ObjId = std::uin
 
 #### Special types - Context
 
-`ACtx` "Active Context" prefix for structs/classes that intend to add context to an ActiveScene.
+Framework Contexts are major sections in the application (main, scene, window, sceneRenderer, universe). TODO: More documentation is needed about Framework.
 
-The definition of "context variable" varies across computing. Here, it refers to arbitrary data assigned to something that is currently running, and has a lifetime bound to it. For `ACtx`, this is data assigned to an ActiveScene.
+Prefix for structs/classes that intend to add additional data to a Framework Context:
 
-`ACtx` types are usually stored as Top Data.
+* `ACtx` - Active Context
+* `UCtx`- Universe context
 
-eg: `ACtxSceneGraph` adds scene graph support to an ActiveScene. It stores a parent-child hierarchy for ActiveEnts.
+These types are usually stored as Framework data (with `data_emplace<T>`, `data_get<T>`, has a DataId).
 
-#### Special types - Systems
+eg: `ACtxSceneGraph` adds scene graph support to a context. It stores a parent-child hierarchy for ActiveEnts.
 
-`Sys` "System" prefix for static System classes.
+#### Special types - others / archaic
 
-System refers to an Entity-Component-System (ECS) System. These are intended to operate on an ActiveScene (or potentially any kind of 'world') to help update or step it through time. Systems cannot be initialized, and only provide a set of related static functions. It's practically a namespace.
-
-The existence of system classes is questionable.
-
-#### Special types - archaic
-
-`AComp` prefix.
-
-An Entity-Component-System (ECS) Component. Data assigned to an Entity. No longer used.
+* `Sys` prefix - An ECS (Entity-Component-System) 'System class'. Previously had a purpose but are now just classes with static functions (practically namespaces).
+* `AComp` prefix - ECS Component. Data associated with an Entity ID through some associative container (eg: `Storage_t<ActiveEnt, ACompTransform>`). No longer used in new code.
 
 ### Function Argument order
 
@@ -223,7 +224,6 @@ Allowed for `auto`:
 * Template types while metaprogramming
 * Painfully long type names
 * You have a good reason to
-
 
 ### Do not use a variable after `std::move`
 
@@ -324,6 +324,9 @@ Comments should...
 * NOT be a C++ tutorial (except for obscure features, eg: `std::popcount`)
 * NOT document overall functionality of components in function docs or within code. Document this separately or as part of the class/struct. (eg: Invariants)
 
+Additionally...
+* Prefer larger blocks of comments over smaller scattered ones
+
 
 ```cpp
 // ❌ - C++ tutorial
@@ -419,3 +422,4 @@ private:
 };
 
 ```
+
