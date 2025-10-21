@@ -195,8 +195,12 @@ ContextId make_scene_renderer(Framework &rFW, PkgId defaultPkg, ContextId mainCo
         auto &rCamCtrl      = rFW.data_get<ACtxCameraController>    (scnRender.di.camCtrl);
         rCamCtrl.m_orbitDistance += 75000;
     }
-
 */
+
+    auto &rScnRenderGl = rFW.data_get<draw::ACtxSceneRenderGL>(magnumScn.di.scnRenderGl);
+
+    rScnRenderGl.m_diffuseTexId .resize(rScnRender.m_drawIds.capacity());
+    rScnRenderGl.m_meshId       .resize(rScnRender.m_drawIds.capacity());
 
     ContextBuilder::finalize(std::move(scnRdrCB));
     return scnRdrCtx;

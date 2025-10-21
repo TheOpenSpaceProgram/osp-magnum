@@ -76,8 +76,6 @@ void SinglethreadFWExecutor::load(osp::fw::Framework& rFW)
         LGRN_ASSERTM(report.failedNotAdded.empty() && report.failedLocked.empty(), "deadlock");
     }
 
-    RoxSync sad;
-
     // IdRegistryStl doesn't have a clear() yet. just leak implmentation details and set all bits to 1.
 
     m_graph.sgtypeIds   .bitview().set();
@@ -192,7 +190,7 @@ void SinglethreadFWExecutor::load(osp::fw::Framework& rFW)
                 scheduleStage = stageId;
             }
         }
-        LGRN_ASSERTMV(schedulePoint.has_value(), "Missing Schedule stage", rPltypeInfo.debugName);
+        //LGRN_ASSERTMV(schedulePoint.has_value(), "Missing Schedule stage", rPltypeInfo.debugName);
         rSgtype.points[finish].debugName = "Finish";
 
         rSgtype.cycles = {{
@@ -306,22 +304,37 @@ void SinglethreadFWExecutor::load(osp::fw::Framework& rFW)
 
     // # Add pipelines
 
+    // Count number syncs to each pipeline
+    for (TaskSyncToPipeline const& taskSync : tasks.syncs)
+    {
+        ++ m_roxPipelineOf[taskSync.pipeline].syncCount;
+    }
+
     // reserve new pipeline subgraph IDs
     for (PipelineId const pipelineId : tasks.pipelineIds)
     {
         Pipeline  const &pipeline       = tasks.pipelineInst[pipelineId];
         RoxPltype const &roxPltype      = roxPltypeOf[pipeline.type];
+        RoxPipeline     &rRoxPl         = m_roxPipelineOf[pipelineId];
 
-        bool     const hasDefaultSchedule = ! pipeline.scheduleCondition.has_value();
+        bool      const hasSchedulePoint   = roxPltype.schedulePoint.has_value();
+        bool      const hasDefaultSchedule = hasSchedulePoint && ! pipeline.scheduleCondition.has_value();
 
         LGRN_ASSERTM(pipeline.initialStage.has_value(), "pipeline has no initial stage set");
 
-        m_roxPipelineOf[pipelineId] = {
-            .main           = m_graph.subgraphIds.create(),
-            .scheduleStatus = m_graph.subgraphIds.create(),
-            .schedule       = hasDefaultSchedule ? m_graph.syncIds.create() : SynchronizerId{},
-            .initialStage   = pipeline.initialStage
-        };
+        if (pipeline.scheduleCondition.has_value())
+        {
+            rRoxPl.syncCount += 1;
+        }
+
+        if (rRoxPl.syncCount != 0)
+        {
+            rRoxPl.main             = m_graph.subgraphIds.create();
+            rRoxPl.scheduleStatus   = hasSchedulePoint ? m_graph.subgraphIds.create() : SubgraphId{};
+            rRoxPl.schedule         = hasDefaultSchedule ? m_graph.syncIds.create() : SynchronizerId{};
+            rRoxPl.initialStage     = pipeline.initialStage;
+        }
+        // else, this pipeline has no tasks. Don't create it as it will just infinite loop and hang
     }
 
     resize_fit_subgraphs();
@@ -330,41 +343,50 @@ void SinglethreadFWExecutor::load(osp::fw::Framework& rFW)
     for (PipelineId const pipelineId : tasks.pipelineIds)
     {
         RoxPipeline   const &roxPl          = m_roxPipelineOf[pipelineId];
+
+        if ( ! roxPl.main.has_value() ) { continue; }
+
         Pipeline      const &pipeline       = tasks.pipelineInst[pipelineId];
         RoxPltype     const &roxPltype      = roxPltypeOf[pipeline.type];
         SubgraphType  const &sgtype         = m_graph.sgtypes[roxPltype.sgtype];
-        bool          const hasDefaultSchedule = ! pipeline.scheduleCondition.has_value();
+        bool          const hasDefaultSchedule = roxPltype.schedulePoint.has_value() && ! pipeline.scheduleCondition.has_value();
         RoxLoopblk          &rRoxLoopblk    = m_roxLoopblkOf[pipeline.block];
 
         rRoxLoopblk.pipelineChildren.push_back(pipelineId);
 
-        Subgraph            &rSgMain         = m_graph.subgraphs[roxPl.main];
-        Subgraph            &rSgScheduleStat = m_graph.subgraphs[roxPl.scheduleStatus];
+        Subgraph            &rSgMain        = m_graph.subgraphs[roxPl.main];
         auto          const pointCount      = sgtype.points.size();
         auto          const stageCount      = pointCount-2u;
         LocalPointId  const start           = point(0);
         LocalPointId  const finish          = point(stageCount+1u);
 
-        rSgMain        .debugName       = fmt::format("PL{} {}", pipelineId.value, pipeline.name);
-        rSgScheduleStat.debugName       = fmt::format("for PL{}", pipelineId.value);
-        rSgMain        .instanceOf      = roxPltype.sgtype;
-        rSgScheduleStat.instanceOf      = sgtSingleStatId;
+        rSgMain        .debugName           = fmt::format("PL{} {}", pipelineId.value, pipeline.name);
+        rSgMain        .instanceOf          = roxPltype.sgtype;
         rSgMain        .points.resize(pointCount);
-        rSgScheduleStat.points.resize(2);
 
         // Connect pipeline main subgraph to its parent BlockCtrl's subgraph
         m_graph.connect({.sync = rRoxLoopblk.left,      .subgraphPoint = {roxPl.main, start}});
         m_graph.connect({.sync = rRoxLoopblk.right,     .subgraphPoint = {roxPl.main, finish}});
-        m_graph.connect({.sync = rRoxLoopblk.checkstop, .subgraphPoint = {roxPl.scheduleStatus, point(1)}});
 
         m_wtxSubgraphOf[roxPl.main] = {
             .tag        = WtxSubgraph::ETag::Pipeline,
             .pipelineId = pipelineId.value
         };
 
-        m_wtxSubgraphOf[roxPl.scheduleStatus] = {
-            .tag        = WtxSubgraph::ETag::ScheduleStatus
-        };
+        if (roxPltype.schedulePoint.has_value())
+        {
+            Subgraph &rSgScheduleStat       = m_graph.subgraphs[roxPl.scheduleStatus];
+            rSgScheduleStat.debugName       = fmt::format("for PL{}", pipelineId.value);
+            rSgScheduleStat.instanceOf      = sgtSingleStatId;
+            rSgScheduleStat.points.resize(2);
+
+            m_graph.connect({.sync = rRoxLoopblk.checkstop, .subgraphPoint = {roxPl.scheduleStatus, point(1)}});
+
+            m_wtxSubgraphOf[roxPl.scheduleStatus] = {
+                .tag        = WtxSubgraph::ETag::ScheduleStatus
+            };
+        }
+        // else, no schedule point. No scheduleStatus graph was created either.
 
         if (hasDefaultSchedule)
         {
@@ -409,11 +431,11 @@ void SinglethreadFWExecutor::load(osp::fw::Framework& rFW)
     for (LoopBlockId const loopblkId : tasks.loopblkIds)
     {
         LoopBlock     const &loopBlk        = tasks.loopblkInst[loopblkId];
-        bool          const hasScheduleTask = loopBlk.scheduleCondition.has_value();
+        bool          const hasCustomScheduleTask = loopBlk.scheduleCondition.has_value();
         RoxLoopblk          &rRoxLoopblk    = m_roxLoopblkOf[loopblkId];
         Subgraph            &rSubgraph      = m_graph.subgraphs[rRoxLoopblk.subgraph];
 
-        if (hasScheduleTask)
+        if (hasCustomScheduleTask)
         {
             LGRN_ASSERT( ! rRoxLoopblk.schedule.has_value() );
 
@@ -453,36 +475,40 @@ void SinglethreadFWExecutor::load(osp::fw::Framework& rFW)
         Pipeline      const &pipeline       = tasks.pipelineInst[pipelineId];
         RoxPltype     const &roxPltype      = roxPltypeOf[pipeline.type];
         RoxPipeline         &rRoxPipeline   = m_roxPipelineOf[pipelineId];
-        RoxLoopblk          &rRoxLoopblk    = m_roxLoopblkOf[pipeline.block];
-        bool          const hasScheduleTask = pipeline.scheduleCondition.has_value();
 
-        if (hasScheduleTask)
+        if (rRoxPipeline.scheduleStatus.has_value())
         {
-            LGRN_ASSERT( ! rRoxPipeline.schedule.has_value() );
+            RoxLoopblk          &rRoxLoopblk            = m_roxLoopblkOf[pipeline.block];
+            bool          const hasCustomScheduleTask   = pipeline.scheduleCondition.has_value();
 
-            RoxTask         &rRoxTask           = m_roxTaskOf[pipeline.scheduleCondition];
-            RoxSync         &rTaskMainRoxSync   = m_roxSyncOf[rRoxTask.main];
-            Synchronizer    &rTaskMainSync      = m_graph.syncs[rRoxTask.main];
+            if (hasCustomScheduleTask)
+            {
+                LGRN_ASSERT( ! rRoxPipeline.schedule.has_value() );
 
-            // Convert existing task to a Schedule
-            rRoxTask        .parent     = pipeline.block;
-            rRoxPipeline    .schedule   = rRoxTask.main;
-            rTaskMainRoxSync.tag        = ESyncType::PlSchedule;
-            rTaskMainRoxSync.pipelineId = pipelineId;
-            rTaskMainSync   .debugName  = fmt::format("PL{} Schedule{}", pipelineId.value, rTaskMainSync.debugName);
+                RoxTask         &rRoxTask           = m_roxTaskOf[pipeline.scheduleCondition];
+                RoxSync         &rTaskMainRoxSync   = m_roxSyncOf[rRoxTask.main];
+                Synchronizer    &rTaskMainSync      = m_graph.syncs[rRoxTask.main];
+
+                // Convert existing task to a Schedule
+                rRoxTask        .parent     = pipeline.block;
+                rRoxPipeline    .schedule   = rRoxTask.main;
+                rTaskMainRoxSync.tag        = ESyncType::PlSchedule;
+                rTaskMainRoxSync.pipelineId = pipelineId;
+                rTaskMainSync   .debugName  = fmt::format("PL{} Schedule{}", pipelineId.value, rTaskMainSync.debugName);
+            }
+            else
+            {
+                LGRN_ASSERT(rRoxPipeline.schedule.has_value() );
+            }
+
+            Subgraph            &rSgMain        = m_graph.subgraphs[rRoxPipeline.main];
+            Synchronizer        &rScheduleSync  = m_graph.syncs[rRoxPipeline.schedule];
+
+            m_graph.connect({.sync = rRoxPipeline.schedule, .subgraphPoint = {rRoxPipeline.main, roxPltype.schedulePoint}});
+            m_graph.connect({.sync = rRoxPipeline.schedule, .subgraphPoint = {rRoxPipeline.scheduleStatus, point(0)}});
+
+            rRoxLoopblk.associatedTasks.push_back(rRoxPipeline.schedule);
         }
-        else
-        {
-            LGRN_ASSERT(rRoxPipeline.schedule.has_value() );
-        }
-
-        Subgraph            &rSgMain        = m_graph.subgraphs[rRoxPipeline.main];
-        Synchronizer        &rScheduleSync  = m_graph.syncs[rRoxPipeline.schedule];
-
-        m_graph.connect({.sync = rRoxPipeline.schedule, .subgraphPoint = {rRoxPipeline.main, roxPltype.schedulePoint}});
-        m_graph.connect({.sync = rRoxPipeline.schedule, .subgraphPoint = {rRoxPipeline.scheduleStatus, point(0)}});
-
-        rRoxLoopblk.associatedTasks.push_back(rRoxPipeline.schedule);
     }
 
     // assign rRoxTask.parent loopblocks, and detect tasks that span across multiple loopblocks
@@ -544,6 +570,7 @@ void SinglethreadFWExecutor::load(osp::fw::Framework& rFW)
         if (rRoxTask.is_spanning_nested_loopblocks())
         {
             RoxLoopblk const &rRoxLoopblk = m_roxLoopblkOf[rRoxTask.parent];
+            bool const isSchedule = m_roxSyncOf[rRoxTask.main].tag == ESyncType::PlSchedule;
 
             Synchronizer    &rSustainer       = m_graph.syncs[rRoxTask.sustainer];
             rSustainer.debugName = fmt::format("Task{} Sustainer", taskId.value);
@@ -557,7 +584,7 @@ void SinglethreadFWExecutor::load(osp::fw::Framework& rFW)
             rExternal.debugName = fmt::format("Task{} External", taskId.value);
             rExternal.debugGraphLongAndUgly = true;
             m_roxSyncOf[rRoxTask.external] = {
-                .tag        = ESyncType::TaskExt,
+                .tag        = isSchedule ? ESyncType::PlScheduleExt : ESyncType::TaskExt,
                 .taskId     = taskId,
             };
         }
@@ -825,9 +852,9 @@ void SinglethreadFWExecutor::process_aligned_sync(SynchronizerId const alignedSy
     RoxSync const &alignedRoxSync = m_roxSyncOf[alignedSyncId];
     WtxSync       &alignedWtxSync = m_wtxSyncOf[alignedSyncId];
 
-    bool const isPlSchedule  = alignedRoxSync.tag == ESyncType::PlSchedule;
-    bool const isBlkSchedule = alignedRoxSync.tag == ESyncType::BlkSchedule;
-    bool const isTask        = (alignedRoxSync.tag == ESyncType::Task) || isPlSchedule || isBlkSchedule;
+    bool const isPlSchedule     = alignedRoxSync.tag == ESyncType::PlSchedule;
+    bool const isBlkSchedule    = alignedRoxSync.tag == ESyncType::BlkSchedule;
+    bool const isTask           = (alignedRoxSync.tag == ESyncType::Task) || isPlSchedule || isBlkSchedule;
 
     SynchronizerId runTaskSync;
 
@@ -859,7 +886,7 @@ void SinglethreadFWExecutor::process_aligned_sync(SynchronizerId const alignedSy
             runTaskSync = alignedSyncId;
         }
     }
-    else if (alignedRoxSync.tag == ESyncType::TaskExt)
+    else if (alignedRoxSync.tag == ESyncType::TaskExt || alignedRoxSync.tag == ESyncType::PlScheduleExt)
     {
         auto const taskId = TaskId{alignedRoxSync.taskId};
         WtxTask &rWtxTask = m_wtxTaskOf[taskId];
@@ -926,7 +953,7 @@ void SinglethreadFWExecutor::process_aligned_sync(SynchronizerId const alignedSy
         }
         else
         {
-            if (isPlSchedule)
+            if (isPlSchedule || alignedRoxSync.tag == ESyncType::PlScheduleExt)
             {
                 finish_schedule_pipeline(PipelineId{runTaskRoxSync.pipelineId}, taskId,  status, false, rFW);
             }
@@ -1055,7 +1082,10 @@ void SinglethreadFWExecutor::process_aligned_sync(SynchronizerId const alignedSy
             for (PipelineId const pipeline : roxLoopblk.pipelineChildren)
             {
                 RoxPipeline const &roxPipeline = m_roxPipelineOf[pipeline];
-                m_reset.push_back(roxPipeline.scheduleStatus);
+                if (roxPipeline.scheduleStatus.has_value())
+                {
+                    m_reset.push_back(roxPipeline.scheduleStatus);
+                }
             }
 
             for (LoopBlockId const childLoopblkId : roxLoopblk.loopblkChildren)

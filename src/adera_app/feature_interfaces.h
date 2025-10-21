@@ -76,56 +76,63 @@ inline osp::PipelineTypeInfo const gc_infoForEStgIntr
 /**
  * @brief Continuous Containers, data that persists and is modified over time
  *
+ * This pipeline is intended to organize access to variables associated with entities that can be
+ * added and removed.
+ *
+ * Things that were considered (about game engines and simulations in general):
+ * * When a new entity is created, it should NOT be moved (physics updated) right away before it is
+ *   first rendered. It should not appear offset from where it was requested to be initialized.
+ * * It shouldn't be possible to create and immediately delete an entity on the same frame before
+ *   it is rendered. The entity should live at least one frame for other systems to be able to
+ *   process and respond to entities being added or removed.
+ * * Creating an entity and simultaneously requesting a floating origin translation is tough case.
+ *   Make sure all positions are translated before requesting to spawn new entites.
+ *
+ * More explainations on the current order:
+ * * Modify comes before Delete and New, because it's janky to modify elements directly after
+ *   they're added. It only cares about 'what currently exists'.
+ * * ReadyB4New is there to read results of Modify, without considering new or deleted elements.
+ *   Elements can be requested to be deleted here. This also handles the case for requesting a
+ *   floating origin translation like mentioned above.
+ * * Delete runs before New, because Delete makes empty spaces in buffers for new elements to fill
+ * * Resize comes before New, to resize/reallocate containers to a known new maximum size before
+ *   adding new elements.
  */
 enum class EStgCont : uint8_t
 {
-    Delete      = 0,
-    ///< Remove elements from a container or mark them for deletion. This often involves reading
-    ///< a set of elements to delete. This is run first since it leaves empty spaces for new
-    ///< elements to fill directly after
-
-    Resize_     = 1,
-    ///< Resize the container to fit more elements
-
-    New         = 2,
-    ///< Add new elements
-
-    Modify      = 3,
-    ///< Modify existing elements
-
-    ScheduleC   = 4,
-
-    Ready       = 5,
-    ///< Container is ready to use
-
-    ReadyWorkaround = 6,
+    Modify      = 0,    ///< Modify existing elements
+    ReadyB4New  = 1,    ///< Container is ready to use after modify, but before adding new elements
+    Delete      = 2,    ///< Remove elements from a container
+    Resize_     = 3,    ///< Resize the container to fit more elements
+    New         = 4,    ///< Add new elements
+    Ready       = 5,    ///< Container is ready to use
 };
 inline osp::PipelineTypeInfo const gc_infoForEStgCont
 {
     .debugName = "Continuous container",
     .stages = {{
+        { .name = "Modify",                         },
+        { .name = "ReadyB4New",                     },
         { .name = "Delete",                         },
         { .name = "Resize_",                        },
         { .name = "New",                            },
-        { .name = "Modify",                         },
-        { .name = "Schedule",   .isSchedule = true  },
-        { .name = "Ready",                          },
-        { .name = "ReadyWorkaround",                }
+        { .name = "Ready",                          }
     }},
-    .initialStage = osp::StageId{6}
+    .initialStage = osp::StageId{0 /* Modify */}
 };
-
 
 enum class EStgEvnt : uint8_t
 {
-    Schedule__  = 0,
-    Run_        = 1,
-    Done_       = 2
+    Before      = 0,
+    Schedule__  = 1,
+    Run_        = 2,
+    Done_       = 3
 };
 inline osp::PipelineTypeInfo const gc_infoForEStgEvnt
 {
     .debugName = "Event",
     .stages = {{
+        { .name = "Before",                         },
         { .name = "Schedule",   .isSchedule = true  },
         { .name = "Run",        .useCancel = true   },
         { .name = "Done",                           }
@@ -170,6 +177,22 @@ inline osp::PipelineTypeInfo const gc_infoForEStgLink
     .initialStage = osp::StageId{0}
 };
 
+enum class EStgLinkValue : uint8_t
+{
+    ExternalIn      = 0,
+    LoopRunning     = 1,
+    LoopDone        = 2
+};
+inline osp::PipelineTypeInfo const gc_infoForEStgLinkValue
+{
+    .debugName = "EStgLinkValue",
+    .stages = {{
+        { .name = "ExternalIn",                     },
+        { .name = "LoopRunning",                    },
+        { .name = "LoopDone",                       }
+    }},
+    .initialStage = osp::StageId{0 /* ExternalIn */}
+};
 
 namespace stages
 {
@@ -179,6 +202,7 @@ namespace stages
     using enum EStgEvnt;
     using enum EStgFBO;
     using enum EStgLink;
+    using enum EStgLinkValue;
 } // namespace stages
 
 inline void register_stage_enums()
@@ -190,6 +214,7 @@ inline void register_stage_enums()
     rPltypeReg.assign_pltype_info<EStgCont>(gc_infoForEStgCont);
     rPltypeReg.assign_pltype_info<EStgFBO> (gc_infoForEStgFBO);
     rPltypeReg.assign_pltype_info<EStgLink>(gc_infoForEStgLink);
+    rPltypeReg.assign_pltype_info<EStgLinkValue>(gc_infoForEStgLinkValue);
 }
 
 
@@ -285,23 +310,20 @@ struct FICommonScene {
     };
 
     struct Pipelines {
-        /// ACtxBasic::m_activeIds
-        PipelineDef<EStgCont> activeEnt         {"activeEnt"};
+
+        PipelineDef<EStgCont> activeEnt         {"activeEnt"};          ///< ACtxBasic::m_activeIds
         PipelineDef<EStgIntr> activeEntDelete   {"activeEntDelete"};
         PipelineDef<EStgIntr> subtreeRootDel    {"subtreeRootDel"};
 
-        PipelineDef<EStgCont> transform         {"transform         - ACtxBasic::m_transform"};
-        PipelineDef<EStgCont> hierarchy         {"hierarchy         - ACtxBasic::m_scnGraph"};
+        PipelineDef<EStgCont> transform         {"transform"};          ///< ACtxBasic::m_activeIds
+        PipelineDef<EStgIntr> translateOrigin   {"translateOrigin"};    ///< ACtxBasic::m_translateOrigin
+        PipelineDef<EStgCont> hierarchy         {"hierarchy"};          ///< ACtxBasic::m_scnGraph
 
-        /// drawing.m_meshIds
-        PipelineDef<EStgCont> meshIds           {"meshIds"};
-        /// drawing.m_texIds
-        PipelineDef<EStgCont> texIds            {"texIds"};
+        PipelineDef<EStgCont> meshIds           {"meshIds"};            ///< ACtxDrawing::m_meshIds
+        PipelineDef<EStgCont> texIds            {"texIds"};             ///< ACtxDrawing::m_texIds
 
-        /// drawingRes.{m_resToTex, m_texToRes}
-        PipelineDef<EStgCont> texToRes          {"texToRes"};
-        /// drawingRes.{m_meshToRes, m_resToMesh}
-        PipelineDef<EStgCont> meshToRes         {"meshToRes"};
+        PipelineDef<EStgCont> texToRes          {"texToRes"};           ///< ACtxDrawingRes::{m_resToTex, m_texToRes}
+        PipelineDef<EStgCont> meshToRes         {"meshToRes"};          ///< ACtxDrawingRes::{m_meshToRes, m_resToMesh}
 
     };
 };
@@ -315,7 +337,7 @@ struct FIPhysics {
     };
 
     struct Pipelines {
-        PipelineDef<EStgCont> physBody          {"physBody"};
+        PipelineDef<EStgCont> mass              {"mass"};
         PipelineDef<EStgOptn> physUpdate        {"physUpdate"};
     };
 };
@@ -395,7 +417,6 @@ struct FIBounds {
 
     struct Pipelines {
         PipelineDef<EStgCont> boundsSet         {"boundsSet"};
-        PipelineDef<EStgIntr> outOfBounds       {"outOfBounds"};
     };
 };
 
@@ -412,12 +433,14 @@ struct FILinks {
     };
 
     struct Pipelines {
+        PipelineDef<EStgIntr> requestMachUpdExt {"requestMachUpdExt"};
+        PipelineDef<EStgIntr> requestMachUpdLoop{"requestMachUpdLoop"};
+        PipelineDef<EStgEvnt> linkLoopExt       {"linkLoopExt"};
         PipelineDef<EStgLink> linkLoop          {"linkLoop"};
 
         PipelineDef<EStgCont> machIds           {"machIds"};
         PipelineDef<EStgCont> nodeIds           {"nodeIds"};
         PipelineDef<EStgCont> connect           {"connect"};
-        PipelineDef<EStgCont> machUpdExtIn      {"machUpdExtIn"};
     };
 };
 
@@ -494,27 +517,10 @@ struct FISignalsFloat {
     };
 
     struct Pipelines {
-        PipelineDef<EStgCont> sigFloatValues    {"sigFloatValues    -"};
-        PipelineDef<EStgCont> sigFloatUpdExtIn  {"sigFloatUpdExtIn  -"};
-        PipelineDef<EStgCont> sigFloatUpdLoop   {"sigFloatUpdLoop   -"};
+        PipelineDef<EStgLinkValue>  sigValFloatExt    {"sigValFloatExt"}; ///< sigValFloat outside link loop
+        PipelineDef<EStgCont>       sigValFloatLoop   {"sigValFloatLoop"}; ///< sigValFloat internal to link loop
     };
 };
-
-
-//#define TESTAPP_DATA_NEWTON 1, \
-//    idNwt
-//struct PlNewton
-//{
-//    PipelineDef<EStgCont> nwtBody           {"nwtBody"};
-//};
-
-//#define TESTAPP_DATA_NEWTON_FORCES 1, \
-//    idNwtFactors
-
-
-
-//#define TESTAPP_DATA_NEWTON_ACCEL 1, \
-//    idAcceleration
 
 struct FIJolt {
     struct DataIds {
@@ -540,7 +546,6 @@ struct FIVhclSpawnJolt {
     };
 
     struct Pipelines {
-        PipelineDef<EStgCont> addedToHierarchy {"addedToHierarchy"};
     };
 };
 
@@ -551,15 +556,6 @@ struct FIJoltConstAccel {
 
     struct Pipelines { };
 };
-
-//struct FIRocketsNwt {
-//    struct DataIds {
-//        DataId rocketsNwt;
-//    };
-
-//    struct Pipelines { };
-//};
-
 
 struct FIRocketsJolt {
     struct DataIds {

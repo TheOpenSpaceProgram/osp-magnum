@@ -50,7 +50,6 @@ struct ACtxPhysics
     KeyedVec<ActiveEnt, EShape>     m_shape;
     ActiveEntSet_t                  m_hasColliders;
     Storage_t<ActiveEnt, ACompMass> m_mass;
-    Vector3                         m_originTranslate;
     ActiveEntVec_t                  m_colliderDirty;
 
     std::vector< std::pair<ActiveEnt, Vector3> > m_setVelocity;

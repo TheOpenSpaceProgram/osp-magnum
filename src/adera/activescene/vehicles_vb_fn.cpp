@@ -92,7 +92,6 @@ void SysVehicleSpawnVB::create_parts_and_welds(ACtxVehicleSpawn& rVehicleSpawn, 
 
     std::size_t const maxParts = rScnParts.partIds.capacity();
     std::size_t const maxWelds = rScnParts.weldIds.capacity();
-    rScnParts.partPrefabs           .resize(maxParts);
     rScnParts.partTransformWeld     .resize(maxParts);
     rScnParts.partToWeld            .resize(maxParts);
     rScnParts.weldToParts           .data_reserve(maxParts);
@@ -187,11 +186,6 @@ void SysVehicleSpawnVB::request_prefabs(ACtxVehicleSpawn& rVehicleSpawn, ACtxVeh
             ++itDstPartIds;
 
             PrefabPair const& prefabPairSrc = pVData->m_partPrefabs[srcPart];
-            PrefabPair prefabPairDst{
-                rResources.owner_create(osp::restypes::gc_importer, prefabPairSrc.m_importer),
-                prefabPairSrc.m_prefabId
-            };
-            rScnParts.partPrefabs[dstPart]        = std::move(prefabPairDst);
             rScnParts.partTransformWeld[dstPart]  = pVData->m_partTransformWeld[srcPart];
 
             // Add Prefab and Part init events

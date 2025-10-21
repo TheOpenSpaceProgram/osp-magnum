@@ -158,16 +158,16 @@ FeatureDef const ftrUniverseCore = feature_def("UniverseCore", [] (
     rFB.pipeline(uniCore.pl.accessors)              .parent(mainApp.loopblks.mainLoop);
     rFB.pipeline(uniCore.pl.accessorsOfCospace)     .parent(mainApp.loopblks.mainLoop);
     rFB.pipeline(uniCore.pl.stolenSats)             .parent(mainApp.loopblks.mainLoop);
-    rFB.pipeline(uniCore.pl.accessorDelete)         .parent(mainApp.loopblks.mainLoop).initial_stage(UseOrRun);
+    rFB.pipeline(uniCore.pl.accessorDelete)         .parent(mainApp.loopblks.mainLoop);
     rFB.pipeline(uniCore.pl.datasrcIds)             .parent(mainApp.loopblks.mainLoop);
     rFB.pipeline(uniCore.pl.datasrcs)               .parent(mainApp.loopblks.mainLoop);
     rFB.pipeline(uniCore.pl.datasrcOf)              .parent(mainApp.loopblks.mainLoop);
     rFB.pipeline(uniCore.pl.datasrcChanges)         .parent(mainApp.loopblks.mainLoop);
     rFB.pipeline(uniCore.pl.simTimeBehindBy)        .parent(mainApp.loopblks.mainLoop);
-    rFB.pipeline(uniTransfers.pl.requests)          .parent(mainApp.loopblks.mainLoop).initial_stage(UseOrRun);
+    rFB.pipeline(uniTransfers.pl.requests)          .parent(mainApp.loopblks.mainLoop);
     rFB.pipeline(uniTransfers.pl.requestAccessorIds).parent(mainApp.loopblks.mainLoop);
     rFB.pipeline(uniTransfers.pl.midTransfer)       .parent(mainApp.loopblks.mainLoop);
-    rFB.pipeline(uniTransfers.pl.midTransferDelete) .parent(mainApp.loopblks.mainLoop).initial_stage(UseOrRun);
+    rFB.pipeline(uniTransfers.pl.midTransferDelete) .parent(mainApp.loopblks.mainLoop);
 
     // DataAccessors ----------------------------------------------------------
 
@@ -279,7 +279,7 @@ FeatureDef const ftrUniverseCore = feature_def("UniverseCore", [] (
 
     rFB.task()
         .name       ("create datasources")
-        .sync_with  ({ uniCore.pl.datasrcChanges(UseOrRun), uniCore.pl.datasrcOf(Modify), uniCore.pl.datasrcs(New) })
+        .sync_with  ({ uniCore.pl.datasrcChanges(UseOrRun), uniCore.pl.datasrcOf(New), uniCore.pl.datasrcs(New) })
         .args       ({          uniCore.di.dataSrcs })
         .func       ([] (UCtxDataSources &rDataSrcs) noexcept
     {
@@ -770,9 +770,9 @@ FeatureDef const ftrUniverseTestPlanetsDraw = feature_def("UniverseTestPlanetsDr
 
     rPlanetDraw.planetMat = params.planetMat;
 
-     rFB.task()
+    rFB.task()
         .name       ("Read universe datasource changes")
-        .sync_with  ({uniPlanetsDraw.pl.trackedSats(Modify), uniPlanetsDraw.pl.resync(ModifyOrSignal), uniCore.pl.accessorIds(Ready), uniCore.pl.satIds(Ready)})
+        .sync_with  ({uniPlanetsDraw.pl.trackedSats(Modify), uniPlanetsDraw.pl.resync(ModifyOrSignal), uniCore.pl.accessorIds(ReadyB4New), uniCore.pl.satIds(ReadyB4New)})
         .args       ({uniPlanetsDraw.di.planetDraw,          uniCore.di.dataAccessors,               uniCore.di.satInst,        uniCore.di.dataSrcs, uniCore.di.coordSpaces, scnInUni.di.scnCospace})
         .func       ([] (  PlanetDraw &rPlanetDraw, UCtxDataAccessors &rDataAccessors, UCtxSatellites &rSatInst, UCtxDataSources &rDataSrcs, UCtxCoordSpaces const& rCoordSpaces, CoSpaceId scnCospace) noexcept
     {
@@ -860,7 +860,7 @@ FeatureDef const ftrUniverseTestPlanetsDraw = feature_def("UniverseTestPlanetsDr
 
     rFB.task()
         .name       ("write draw transforms")
-        .sync_with  ({windowApp.pl.sync(Run), uniPlanetsDraw.pl.resync(Run), scnRender.pl.drawEnt(Ready), scnRender.pl.mesh(New), scnRender.pl.material(New), uniCore.pl.accessors(Ready), uniCore.pl.accessorIds(Ready), uniCore.pl.cospaceTransform(Ready), uniPlanetsDraw.pl.trackedSats(Ready)})
+        .sync_with  ({windowApp.pl.sync(Run), uniPlanetsDraw.pl.resync(Run), scnRender.pl.drawEnt(Ready), scnRender.pl.drawTransforms(Ready), uniCore.pl.accessors(Ready), uniCore.pl.accessorIds(Ready), uniCore.pl.cospaceTransform(Ready), uniPlanetsDraw.pl.trackedSats(Ready)})
         .args       ({    uniPlanetsDraw.di.planetDraw,          uniCore.di.dataAccessors,              uniCore.di.coordSpaces,        uniCore.di.simulations,             uniCore.di.stolenSats,               uniCore.di.satInst,        uniCore.di.dataSrcs,                uniCore.di.compTypes,      scnRender.di.scnRender, scnInUni.di.scnCospace})
         .func       ([] (      PlanetDraw &rPlanetDraw, UCtxDataAccessors &rDataAccessors, UCtxCoordSpaces const& rCoordSpaces, UCtxSimulations &rSimulations, UCtxStolenSatellites &rStolenSats, UCtxSatellites &rSatInst, UCtxDataSources &rDataSrcs, UCtxComponentTypes const& compTypes, ACtxSceneRender &rScnRender,   CoSpaceId scnCospace) noexcept
     {

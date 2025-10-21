@@ -120,6 +120,26 @@ struct ACtxSceneRender
     ACtxSceneRender() = default;
     OSP_MOVE_ONLY_CTOR_ASSIGN(ACtxSceneRender);
 
+    /**
+     * @brief Resize containers to fit current number of DrawEnts
+     */
+    void resize_to_fit_drawids()
+    {
+        auto const capacity = m_drawIds.capacity();
+        m_opaque        .resize(capacity);
+        m_transparent   .resize(capacity);
+        m_visible       .resize(capacity);
+        m_color         .resize(capacity, {1.0f, 1.0f, 1.0f, 1.0f});
+        m_drawTransform .resize(capacity);
+        m_diffuseTex    .resize(capacity);
+        m_mesh          .resize(capacity);
+
+        for (Material &rMat : m_materials)
+        {
+            rMat.m_ents.resize(capacity);
+        }
+    }
+
     lgrn::IdRegistryStl<DrawEnt>            m_drawIds;
 
     DrawEntSet_t                            m_opaque;

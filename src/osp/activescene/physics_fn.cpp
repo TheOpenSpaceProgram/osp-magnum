@@ -29,13 +29,13 @@ using namespace osp;
 using namespace osp::active;
 
 void SysPhysics::calculate_subtree_mass_center(
-        ACompTransformStorage_t const&          rTf,
-        ACtxPhysics&                            rCtxPhys,
-        ACtxSceneGraph&                         rScnGraph,
+        ACompTransformStorage_t           const &rTf,
+        ACtxPhysics                             &rCtxPhys,
+        ACtxSceneGraph                    const &rScnGraph,
         ActiveEnt                               root,
-        Vector3&                                rMassPos,
-        float&                                  rTotalMass,
-        Matrix4 const&                          currentTf)
+        Vector3                                 &rMassPos,
+        float                                   &rTotalMass,
+        Matrix4                           const &currentTf)
 {
     for (ActiveEnt const child : SysSceneGraph::children(rScnGraph, root))
     {
@@ -63,12 +63,12 @@ void SysPhysics::calculate_subtree_mass_center(
 
 
 void SysPhysics::calculate_subtree_mass_inertia(
-        ACompTransformStorage_t const&          rTf,
-        ACtxPhysics&                            rCtxPhys,
-        ACtxSceneGraph&                         rScnGraph,
+        ACompTransformStorage_t           const &rTf,
+        ACtxPhysics                             &rCtxPhys,
+        ACtxSceneGraph                    const &rScnGraph,
         ActiveEnt                               root,
-        Matrix3&                                rInertiaTensor,
-        Matrix4 const&                          currentTf)
+        Matrix3                                 &rInertiaTensor,
+        Matrix4                           const &currentTf)
 {
     for (ActiveEnt const child : SysSceneGraph::children(rScnGraph, root))
     {

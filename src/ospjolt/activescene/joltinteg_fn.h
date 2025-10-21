@@ -41,6 +41,7 @@ namespace ospjolt
 class SysJolt
 {
     using ActiveEnt                 = osp::active::ActiveEnt;
+    using ACtxBasic                 = osp::active::ACtxBasic;
     using ACtxPhysics               = osp::active::ACtxPhysics;
     using ACtxSceneGraph            = osp::active::ACtxSceneGraph;
     using ACompTransform            = osp::active::ACompTransform;
@@ -48,36 +49,24 @@ class SysJolt
 public:
 
 
-    static void resize_body_data(ACtxJoltWorld& rCtxWorld);
-
-    /**
-     * @brief Respond to scene origin shifts by translating all rigid bodies
-     *
-     * @param rCtxPhys      [ref] Generic physics context with m_originTranslate
-     * @param rCtxWorld     [ref] Jolt World
-     */
-    static void update_translate(
-            ACtxPhysics& rCtxPhys,
-            ACtxJoltWorld& rCtxWorld) noexcept;
-
     /**
      * @brief Step the entire Jolt World forward in time
      *
-     * @param rCtxPhys      [ref] Generic Physics context. Updates linear and angular velocity.
-     * @param rCtxWorld     [ref] Jolt world to update
-     * @param timestep      [in] Time to step world, passed to Jolt update
-     * @param rTf           [ref] Relative transforms used by rigid bodies
+     * @param rCtxBasic       [ref]
+     * @param rCtxPhys        [ref] Generic Physics context. Updates linear and angular velocity.
+     * @param rCtxWorld       [ref] Jolt world to update
+     * @param timestep        [in] Time to step world, passed to Jolt update
      */
     static void update_world(
-            ACtxPhysics&                            rCtxPhys,
-            ACtxJoltWorld&                          rCtxWorld,
-            float                                   timestep,
-            osp::active::ACompTransformStorage_t&   rTf) noexcept;
+            ACtxBasic                   &rCtxBasic,
+            ACtxPhysics                 &rCtxPhys,
+            ACtxJoltWorld               &rCtxWorld,
+            float                       timestep) noexcept;
 
     static void remove_components(
             ACtxJoltWorld& rCtxWorld, ActiveEnt ent) noexcept;
 
-    static Ref<Shape> create_primitive(ACtxJoltWorld &rCtxWorld, osp::EShape shape, Vec3Arg scale);
+    static JPH::Ref<JPH::Shape> create_primitive(ACtxJoltWorld &rCtxWorld, osp::EShape shape, JPH::Vec3Arg scale);
 
     template<typename IT_T>
     static void update_delete(
@@ -90,10 +79,10 @@ public:
         }
     }
     //Apply a scale to a shape.
-    static void scale_shape(Ref<Shape> rShape, Vec3Arg scale);
+    static void scale_shape(JPH::Ref<JPH::Shape> rShape, JPH::Vec3Arg scale);
 
     //Get the inverse mass of a jolt body
-    static float get_inverse_mass_no_lock(PhysicsSystem& physicsSystem, BodyId bodyId);
+    static float get_inverse_mass_no_lock(JPH::PhysicsSystem const& physicsSystem, BodyId bodyId);
     
 private:
 
@@ -116,7 +105,7 @@ private:
             ACompTransformStorage_t const&          rTf,
             ActiveEnt                               ent,
             osp::Matrix4 const&                     transform,
-            CompoundShapeSettings&                  rCompound) noexcept;
+            JPH::CompoundShapeSettings&             rCompound) noexcept;
 
 };
 

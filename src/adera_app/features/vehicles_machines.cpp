@@ -61,7 +61,7 @@ FeatureDef const ftrMachMagicRockets = feature_def("MachMagicRockets", [] (
 {
     rFB.task()
         .name       ("Allocate Machine update bitset for MagicRocket")
-        .sync_with  ({links.pl.machIds(Ready), links.pl.machUpdExtIn(New)})
+        .sync_with  ({links.pl.machIds(Ready), links.pl.linkLoopExt(Before)})
         .args       ({      links.di.links,         links.di.updMach})
         .func       ([] (ACtxLinks& rLinks, MachineUpdater& rUpdMach)
     {
@@ -248,7 +248,7 @@ FeatureDef const ftrMachRCSDriver = feature_def("RCSDriver", [] (
 {
     rFB.task()
         .name       ("Allocate Machine update bitset for RcsDriver")
-        .sync_with  ({scn.pl.update(Run), links.pl.machIds(Ready), links.pl.machUpdExtIn(New)})
+        .sync_with  ({scn.pl.update(Run), links.pl.machIds(Ready), links.pl.linkLoopExt(Before)})
         .args       ({      links.di.links,         links.di.updMach})
         .func       ([] (ACtxLinks& rLinks, MachineUpdater& rUpdMach)
     {
@@ -257,7 +257,7 @@ FeatureDef const ftrMachRCSDriver = feature_def("RCSDriver", [] (
 
     rFB.task()
         .name       ("RCS Drivers calculate new values")
-        .sync_with  ({links.pl.linkLoop(MachUpd), links.pl.machUpdExtIn(Ready)})
+        .sync_with  ({links.pl.linkLoop(MachUpd), sigFloat.pl.sigValFloatExt(LoopRunning), sigFloat.pl.sigValFloatLoop(Modify)})
         .args       ({      links.di.links,         links.di.updMach,             sigFloat.di.sigValFloat,          sigFloat.di.sigUpdFloat})
         .func       ([] (ACtxLinks& rLinks, MachineUpdater& rUpdMach, SignalValues_t<float>& rSigValFloat, UpdateNodes<float>& rSigUpdFloat) noexcept
     {
@@ -404,7 +404,7 @@ FeatureDef const ftrVehicleControl = feature_def("VehicleControl", [] (
 
     rFB.task()
         .name       ("Write inputs to UserControl Machines")
-        .sync_with  ({windowApp.pl.inputs(Run), sigFloat.pl.sigFloatUpdExtIn(Modify)})
+        .sync_with  ({windowApp.pl.inputs(Run), sigFloat.pl.sigValFloatExt(ExternalIn)})
         .args       ({      parts.di.scnParts,    links.di.links,         links.di.updMach,             sigFloat.di.sigValFloat,          sigFloat.di.sigUpdFloat,                    windowApp.di.userInput,       vhclCtrl.di.vhControls,      scn.di.deltaTimeIn})
         .func       ([] (ACtxParts& rScnParts, ACtxLinks& rLinks, MachineUpdater& rUpdMach, SignalValues_t<float>& rSigValFloat, UpdateNodes<float>& rSigUpdFloat, input::UserInputHandler const& rUserInput, VehicleControls& rVhControls, float const deltaTimeIn) noexcept
     {

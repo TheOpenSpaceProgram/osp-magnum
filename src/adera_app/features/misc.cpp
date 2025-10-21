@@ -82,11 +82,7 @@ FeatureDef const ftrCursor = feature_def("Cursor", [] (
 
     auto const cursorEnt = rFB.data_emplace<DrawEnt>(cursor.di.drawEnt, rScnRender.m_drawIds.create());
 
-    auto const capacity = rScnRender.m_drawIds.capacity();
-    rScnRender.m_mesh   .resize(capacity);
-    rScnRender.m_color  .resize(capacity, {1.0f, 1.0f, 1.0f, 1.0f});
-    rScnRender.m_visible.resize(capacity);
-    rScnRender.m_opaque .resize(capacity);
+    rScnRender.resize_to_fit_drawids();
 
     rScnRender.m_mesh[cursorEnt] = SysRender::add_drawable_mesh(rDrawing, rDrawingRes, rResources, pkg, "cubewire");
     rScnRender.m_color[cursorEnt] = { 0.0f, 1.0f, 0.0f, 1.0f };
@@ -94,12 +90,11 @@ FeatureDef const ftrCursor = feature_def("Cursor", [] (
     rScnRender.m_opaque.insert(cursorEnt);
 
     Material &rMat = rScnRender.m_materials[material];
-    rMat.m_ents.resize(capacity);
     rMat.m_ents.insert(cursorEnt);
 
     rFB.task()
         .name       ("Move cursor")
-        .sync_with  ({scnRender.pl.render(Run), camCtrl.pl.camCtrl(Ready), scnRender.pl.drawTransforms(Modify)})
+        .sync_with  ({scnRender.pl.render(Run), camCtrl.pl.camCtrl(Ready), scnRender.pl.drawTransforms(New)})
         .args       ({        cursor.di.drawEnt,                            camCtrl.di.camCtrl,                 scnRender.di.scnRender })
         .func([] (DrawEnt const cursorEnt, ACtxCameraController const& rCamCtrl, ACtxSceneRender& rScnRender) noexcept
     {

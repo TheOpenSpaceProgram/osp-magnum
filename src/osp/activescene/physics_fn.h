@@ -37,21 +37,21 @@ class SysPhysics
 public:
 
     static void calculate_subtree_mass_center(
-            ACompTransformStorage_t const&          rTf,
-            ACtxPhysics&                            rCtxPhys,
-            ACtxSceneGraph&                         rScnGraph,
+            ACompTransformStorage_t           const &rTf,
+            ACtxPhysics                             &rCtxPhys,
+            ACtxSceneGraph                    const &rScnGraph,
             ActiveEnt                               root,
-            Vector3&                                rMassPos,
-            float&                                  rTotalMass,
-            Matrix4 const&                          currentTf = {});
+            Vector3                                 &rMassPos,
+            float                                   &rTotalMass,
+            Matrix4                           const &currentTf = {});
 
     static void calculate_subtree_mass_inertia(
-            ACompTransformStorage_t const&          rTf,
-            ACtxPhysics&                            rCtxPhys,
-            ACtxSceneGraph&                         rScnGraph,
+            ACompTransformStorage_t           const &rTf,
+            ACtxPhysics                             &rCtxPhys,
+            ACtxSceneGraph                    const &rScnGraph,
             ActiveEnt                               root,
-            Matrix3&                                rInertiaTensor,
-            Matrix4 const&                          currentTf = {});
+            Matrix3                                 &rInertiaTensor,
+            Matrix4                           const &currentTf = {});
 
     template<typename IT_T, typename ITB_T>
     static void update_delete_phys(ACtxPhysics& rCtxPhys, IT_T const& first, ITB_T const& last);

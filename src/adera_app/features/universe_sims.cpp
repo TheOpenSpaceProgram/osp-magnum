@@ -250,7 +250,7 @@ FeatureDef const ftrUniverseSimpleSimulators = feature_def("UniverseSimpleSimula
 
     rFB.task()
         .name       ("update simple simulations")
-        .sync_with  ({uniCore.pl.accessors(Modify), uniCore.pl.accessorDelete(Modify_), uniCore.pl.simTimeBehindBy(Ready), uniCore.pl.datasrcChanges(Modify_), uniCore.pl.stolenSats(Modify), uniTransfers.pl.midTransfer(Ready), uniTransfers.pl.midTransferDelete(Modify_)})
+        .sync_with  ({uniCore.pl.accessors(Modify), uniCore.pl.accessorDelete(Modify_), uniCore.pl.simTimeBehindBy(ReadyB4New), uniCore.pl.datasrcChanges(Modify_), uniCore.pl.stolenSats(Modify), uniTransfers.pl.midTransfer(ReadyB4New), uniTransfers.pl.midTransferDelete(Modify_)})
         .args       ({
             uniCore.di          .simulations,
             uniCore.di          .dataSrcs,
@@ -524,6 +524,8 @@ FeatureDef const ftrSolarSystem = feature_def("SolarSystem", [] (
     rSimulations.simulationOf.resize(rSimulations.ids.capacity());
     rStolenSats.of.resize(rDataAccessors.ids.capacity());
 
+    rTransferBufs.midTransfersOf.resize(rSimulations.ids.capacity());
+
     rFB.task()
         .name       ("Tell all simulations to advance forward in time")
         .sync_with  ({uniCore.pl.simTimeBehindBy(Modify)})
@@ -633,6 +635,8 @@ FeatureDef const ftrUniverseCospaceTest = feature_def("UniverseCospaceTest", [] 
 
     rSimulations.simulationOf.resize(rSimulations.ids.capacity());
     rStolenSats.of.resize(rDataAccessors.ids.capacity());
+
+    rTransferBufs.midTransfersOf.resize(rSimulations.ids.capacity());
 
     rFB.task()
         .name       ("Tell all simulations to advance forward in time")
