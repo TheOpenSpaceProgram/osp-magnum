@@ -719,5 +719,148 @@ FeatureDef const ftrRocketThrustJolt = feature_def("RocketThrustJolt", [] (
     rRocketsJolt.factorIndex = static_cast<std::uint8_t>(index);
 }); // ftrRocketThrustJolt
 
+struct ACtxTerrainJolt
+{
+    BodyId bodyId;
+    JPH::Ref<JPH::MutableCompoundShape> shape;
+
+
+    // useful for when translating everything for MutableCompountShape::ModifyShapes
+    std::vector<JPH::Vec3> asd;
+};
+
+FeatureDef const ftrTerrainJolt = feature_def("ftrTerrainJolt", [] (
+        FeatureBuilder              &rFB,
+        Implement<FITerrainJolt>    terrainJolt,
+        DependOn<FITerrain>         terrain,
+        DependOn<FICommonScene>     comScn,
+        DependOn<FIPhysics>         phys,
+        DependOn<FIJolt>            jolt)
+{
+    using namespace planeta;
+
+    auto &rTerrainJolt  = rFB.data_emplace<ACtxTerrainJolt>(terrainJolt.di.terrainJolt);
+    auto &rJolt         = rFB.data_get<ACtxJoltWorld>(jolt.di.jolt);
+
+
+
+    //JPH::Ref<JPH::Shape> pShape = SysJolt::create_primitive(rJolt, EShape::Sphere, JPH::Vec3(1.0, 1.0, 1.0));
+
+    JPH::MutableCompoundShapeSettings asdf;
+
+    //asdf.AddShape(JPH::Vec3(0, 0, 0), JPH::Quat::sIdentity(), pShape, 0);
+
+    rTerrainJolt.shape = static_cast<JPH::MutableCompoundShape*>(asdf.Create().Get().GetPtr());
+
+    JPH::BodyInterface      &bodyInterface  = rJolt.m_physicsSystem.GetBodyInterface();
+
+    rTerrainJolt.bodyId = rJolt.m_bodyIds.create();
+
+    JPH::BodyID joltBodyId = BToJolt(rTerrainJolt.bodyId);
+
+    JPH::BodyCreationSettings bodyCreation(rTerrainJolt.shape, JPH::Vec3(0.0f, 0.0f, 0.0f), JPH::Quat::sIdentity(), JPH::EMotionType::Static, Layers::NON_MOVING);
+    bodyInterface.CreateBodyWithID(joltBodyId, bodyCreation);
+    bodyCreation.mEnhancedInternalEdgeRemoval = true;
+
+    JPH::BodyInterface::AddState addState = bodyInterface.AddBodiesPrepare(&joltBodyId, 1);
+    bodyInterface.AddBodiesFinalize(&joltBodyId, 1, addState, JPH::EActivation::Activate);
+
+    // terrain.pl.surfaceChanges(UseOrRun)
+    //                        MutableCompoundShapeSettings compound;
+    //                rPhys.m_hasColliders.insert(weldEnt);
+    //                // Collect all colliders from hierarchy.
+    //                compound_collect_recurse( rPhys, rJolt, rBasic, weldEnt, Matrix4{}, compound );
+    //                Ref<Shape> compoundShape = compound.Create().Get();
+
+
+
+    rFB.task()
+        .name       ("Add Jolt physics shapes to chunks")
+        .sync_with  ({terrain.pl.surfaceChanges(UseOrRun), terrain.pl.chunkMesh(Ready), terrain.pl.terrainFrame(Ready),  terrain.pl.skeleton(Ready),  jolt.pl.joltBody(New), phys.pl.physUpdate(Done)})
+        .args       ({           comScn.di.basic,         terrain.di.terrain,                 terrain.di.terrainFrame, phys.di.phys,     terrainJolt.di.terrainJolt,         jolt.di.jolt   })
+        .func       ([] (ACtxBasic const &rBasic, ACtxTerrain const& terrain, ACtxTerrainFrame const& terrainFrame, ACtxPhysics& rPhys, ACtxTerrainJolt &rTerrainJolt, ACtxJoltWorld& rJolt) noexcept
+    {
+        //return;
+        //if (terrain.scratchpad.surfaceAdded.empty()) { return; }
+
+        JPH::BodyInterface &bodyInterface = rJolt.m_physicsSystem.GetBodyInterface();
+
+        auto *pShape = static_cast<JPH::MutableCompoundShape*>(rTerrainJolt.shape.GetPtr());
+
+
+        JPH::Vec3 prevCOM = pShape->GetCenterOfMass();
+
+        JPH::BodyID joltBodyId = BToJolt(rTerrainJolt.bodyId);
+
+        float const scale = std::exp2(float(-terrain.skData.precision));
+
+        {
+            JPH::BodyLockWrite lock(rJolt.m_physicsSystem.GetBodyLockInterface(), joltBodyId);
+
+            // possible hack/optimization: reduce number of times CalculateSubShapeBounds is called
+            // auto &rSubShapes = const_cast<JPH::CompoundShape::SubShapes&>(pShape->GetSubShapes());
+
+            auto const &rSubShapes = const_cast<JPH::CompoundShape::SubShapes&>(pShape->GetSubShapes());
+
+            for (std::size_t i = rSubShapes.size() - 1; i != ~std::size_t(0); --i)
+            {
+                auto const sktri = SkTriId::from_index(rSubShapes[i].mUserData);
+                if (terrain.scratchpad.surfaceRemoved.contains(sktri))
+                {
+                    pShape->RemoveShape(i);
+                }
+            }
+
+            for (SkTriId sktriId : terrain.scratchpad.surfaceAdded)
+            {
+                SkeletonTriangle const& sktri = terrain.skeleton.tri_at(sktriId);
+
+                if (terrain.skeleton.tri_group_at(tri_group_id(sktriId)).depth != terrain.skeleton.levelMax)
+                {
+                    continue;
+                }
+
+                auto const sharedVrtxs = std::array<SharedVrtxId, 3>{{
+                        terrain.skChunks.m_skVrtxToShared[sktri.vertices[0]],
+                        terrain.skChunks.m_skVrtxToShared[sktri.vertices[1]],
+                        terrain.skChunks.m_skVrtxToShared[sktri.vertices[2]]}};
+
+                auto posView = terrain.chunkGeom.vbufPositions.view_const(terrain.chunkGeom.vrtxBuffer, terrain.chunkInfo.vrtxTotal);
+
+                JPH::Vec3 const vrtx0    = Vec3MagnumToJolt(posView[terrain.chunkInfo.vbufSharedOffset + sharedVrtxs[0].value]);
+                JPH::Vec3 const vrtx1Rel = Vec3MagnumToJolt(posView[terrain.chunkInfo.vbufSharedOffset + sharedVrtxs[1].value]) - vrtx0;
+                JPH::Vec3 const vrtx2Rel = Vec3MagnumToJolt(posView[terrain.chunkInfo.vbufSharedOffset + sharedVrtxs[2].value]) - vrtx0;
+
+
+
+                float const scaleInv = std::exp2(-float(terrain.skData.precision));
+
+                constexpr float thickness = 24.0f;
+
+                // 0 + vrtx1Rel-vrtx0 + vrtx2Rel-vrtx0 = -vrtx0
+                //
+                JPH::Vec3 const center = Vec3MagnumToJolt(Vector3(terrainFrame.position) * scaleInv)
+                                       + (vrtx1Rel + vrtx2Rel) / 3.0f;
+
+                JPH::Vec3 down = -center.Normalized() * thickness;
+
+                std::array<JPH::Vec3, 6> const points{{
+                    JPH::Vec3(0.0f, 0.0f, 0.0f), vrtx1Rel, vrtx2Rel,
+                    down, vrtx1Rel + down, vrtx2Rel + down
+                }};
+
+                JPH::ConvexHullShapeSettings 开门的是发难(points.data(), points.size());
+
+                pShape->AddShape(vrtx0, JPH::Quat::sIdentity(), 开门的是发难.Create().Get(), sktriId.value);
+            }
+        }
+
+        bodyInterface.NotifyShapeChanged(joltBodyId, prevCOM, false, JPH::EActivation::Activate);
+
+
+    });
+
+}); // ftrPhysicsShapesJolt
+
 } // namespace adera
 

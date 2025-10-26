@@ -522,6 +522,40 @@ struct FISignalsFloat {
     };
 };
 
+struct FITerrain {
+    struct DataIds {
+        DataId terrainFrame;
+        DataId terrain;
+    };
+
+    struct Pipelines {
+        PipelineDef<EStgCont> skeleton          {"skeleton"};
+        PipelineDef<EStgIntr> surfaceChanges    {"surfaceChanges"};
+        PipelineDef<EStgCont> chunkMesh         {"chunkMesh"};
+        PipelineDef<EStgCont> terrainFrame      {"terrainFrame"};
+    };
+};
+
+struct FITerrainIco {
+    struct DataIds {
+        DataId terrainIco;
+    };
+
+    struct Pipelines { };
+};
+
+struct FITerrainDbgDraw {
+    struct DataIds {
+        DataId draw;
+    };
+
+    struct Pipelines { };
+};
+
+//-----------------------------------------------------------------------------
+
+// Jolt feature interfaces
+
 struct FIJolt {
     struct DataIds {
         DataId jolt;
@@ -557,6 +591,7 @@ struct FIJoltConstAccel {
     struct Pipelines { };
 };
 
+
 struct FIRocketsJolt {
     struct DataIds {
         DataId rocketsJolt;
@@ -567,42 +602,17 @@ struct FIRocketsJolt {
 };
 
 
-struct FITerrain {
+struct FITerrainJolt {
     struct DataIds {
-        DataId terrainFrame;
-        DataId terrain;
-    };
-
-    struct Pipelines {
-        PipelineDef<EStgCont> skeleton          {"skeleton"};
-        PipelineDef<EStgIntr> surfaceChanges    {"surfaceChanges"};
-        PipelineDef<EStgCont> chunkMesh         {"chunkMesh"};
-        PipelineDef<EStgCont> terrainFrame      {"terrainFrame"};
-    };
-};
-
-struct FITerrainIco {
-    struct DataIds {
-        DataId terrainIco;
+        DataId terrainJolt;
     };
 
     struct Pipelines { };
 };
-
-struct FITerrainDbgDraw {
-    struct DataIds {
-        DataId draw;
-    };
-
-    struct Pipelines { };
-};
-
-
-
 
 //-----------------------------------------------------------------------------
 
-// Universe sessions
+// Universe feature interfaces
 
 struct FIUniCore {
     struct DataIds {
@@ -663,7 +673,7 @@ struct FISceneInUniverse {
 
 //-----------------------------------------------------------------------------
 
-// Solar System sessions
+// Solar System feature interfaces
 
 struct FISolarSys {
     struct DataIds {
@@ -685,7 +695,7 @@ struct FISolarSysDraw {
 
 //-----------------------------------------------------------------------------
 
-// Renderer sessions, tend to exist only when the window is open
+// Renderer feature interfaces, tend to exist only when the window is open
 
 struct FIWindowApp {
     struct DataIds {
