@@ -37,19 +37,22 @@ JPH_SUPPRESS_WARNING_PUSH
 JPH_SUPPRESS_WARNINGS
 
 #include <Jolt/RegisterTypes.h>
+
+#include <Jolt/Physics/Body/BodyCreationSettings.h>
+#include <Jolt/Physics/Collision/BroadPhase/BroadPhaseLayer.h>
+#include <Jolt/Physics/Collision/Shape/BoxShape.h>
+#include <Jolt/Physics/Collision/Shape/CompoundShape.h>
+#include <Jolt/Physics/Collision/Shape/CylinderShape.h>
+#include <Jolt/Physics/Collision/Shape/MutableCompoundShape.h>
+#include <Jolt/Physics/Collision/Shape/RotatedTranslatedShape.h>
+#include <Jolt/Physics/Collision/Shape/ScaledShape.h>
+#include <Jolt/Physics/Collision/Shape/SphereShape.h>
+#include <Jolt/Physics/PhysicsStepListener.h>
+#include <Jolt/Physics/PhysicsSystem.h>
+
 #include <Jolt/Core/Factory.h>
 #include <Jolt/Core/JobSystemThreadPool.h>
-#include <Jolt/Physics/PhysicsSystem.h>
-#include <Jolt/Physics/Collision/Shape/BoxShape.h>
-#include <Jolt/Physics/Collision/Shape/SphereShape.h>
-#include <Jolt/Physics/Collision/Shape/CylinderShape.h>
-#include <Jolt/Physics/Collision/Shape/RotatedTranslatedShape.h>
-#include <Jolt/Physics/Body/BodyCreationSettings.h>
 #include <Jolt/Core/TempAllocator.h>
-#include <Jolt/Physics/Collision/Shape/CompoundShape.h>
-#include <Jolt/Physics/Collision/Shape/ScaledShape.h>
-#include <Jolt/Physics/Collision/Shape/MutableCompoundShape.h>
-#include <Jolt/Physics/PhysicsStepListener.h>
 
 JPH_SUPPRESS_WARNING_POP
 
@@ -102,7 +105,7 @@ inline osp::Quaternion QuatJoltToMagnum(JPH::Quat in)
 #ifdef JPH_ENABLE_ASSERTS
 
 // Callback for asserts, connect this to your own assert handler if you have one
-static bool AssertFailedImpl(const char *inExpression, const char *inMessage, const char *inFile, uint inLine)
+static bool AssertFailedImpl(const char *inExpression, const char *inMessage, const char *inFile, JPH::uint inLine)
 {
     // Print to the TTY
     std::cout << inFile << ":" << inLine << ": (" << inExpression << ") " << (inMessage != nullptr? inMessage : "") << std::endl;
@@ -206,7 +209,7 @@ public:
         mObjectToBroadPhase[Layers::MOVING] = BroadPhaseLayers::MOVING;
     }
 
-    uint GetNumBroadPhaseLayers() const override
+    JPH::uint GetNumBroadPhaseLayers() const override
     {
         return BroadPhaseLayers::NUM_LAYERS;
     }
