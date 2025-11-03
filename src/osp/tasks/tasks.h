@@ -240,10 +240,12 @@ struct TaskOrderReport
         int         time;
     };
 
-    lgrn::IdSetStl<LoopBlockId> loopblks;
-    std::vector<Step>           steps;
-    std::vector<TaskId>         failedLocked;
-    std::vector<TaskId>         failedNotAdded;
+    lgrn::IdSetStl<LoopBlockId>             loopblks;
+    osp::KeyedVec<PipelineId, unsigned int> taskCountOf;
+    osp::KeyedVec<TaskId, unsigned int>     syncCountOf;
+    std::vector<Step>                       steps;
+    std::vector<TaskId>                     failedLocked;
+    std::vector<TaskId>                     failedNotAdded;
 };
 
 void check_task_order(Tasks const& tasks, TaskOrderReport& rOut, lgrn::IdSetStl<LoopBlockId> loopblks);

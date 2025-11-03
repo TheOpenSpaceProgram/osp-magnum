@@ -27,6 +27,7 @@
 #include "forcefactors.h"
 
 #include <osp/activescene/basic.h>
+#include <osp/activescene/physics.h>
 #include <osp/core/id_map.h>
 
 
@@ -36,19 +37,22 @@ JPH_SUPPRESS_WARNING_PUSH
 JPH_SUPPRESS_WARNINGS
 
 #include <Jolt/RegisterTypes.h>
+
+#include <Jolt/Physics/Body/BodyCreationSettings.h>
+#include <Jolt/Physics/Collision/BroadPhase/BroadPhaseLayer.h>
+#include <Jolt/Physics/Collision/Shape/BoxShape.h>
+#include <Jolt/Physics/Collision/Shape/CompoundShape.h>
+#include <Jolt/Physics/Collision/Shape/CylinderShape.h>
+#include <Jolt/Physics/Collision/Shape/MutableCompoundShape.h>
+#include <Jolt/Physics/Collision/Shape/RotatedTranslatedShape.h>
+#include <Jolt/Physics/Collision/Shape/ScaledShape.h>
+#include <Jolt/Physics/Collision/Shape/SphereShape.h>
+#include <Jolt/Physics/PhysicsStepListener.h>
+#include <Jolt/Physics/PhysicsSystem.h>
+
 #include <Jolt/Core/Factory.h>
 #include <Jolt/Core/JobSystemThreadPool.h>
-#include <Jolt/Physics/PhysicsSystem.h>
-#include <Jolt/Physics/Collision/Shape/BoxShape.h>
-#include <Jolt/Physics/Collision/Shape/SphereShape.h>
-#include <Jolt/Physics/Collision/Shape/CylinderShape.h>
-#include <Jolt/Physics/Collision/Shape/RotatedTranslatedShape.h>
-#include <Jolt/Physics/Body/BodyCreationSettings.h>
 #include <Jolt/Core/TempAllocator.h>
-#include <Jolt/Physics/Collision/Shape/CompoundShape.h>
-#include <Jolt/Physics/Collision/Shape/ScaledShape.h>
-#include <Jolt/Physics/Collision/Shape/MutableCompoundShape.h>
-#include <Jolt/Physics/PhysicsStepListener.h>
 
 JPH_SUPPRESS_WARNING_POP
 
@@ -67,41 +71,41 @@ JPH_SUPPRESS_WARNING_POP
 
 namespace ospjolt
 {
-using namespace JPH;
 
-using JoltBodyPtr_t = std::unique_ptr< Body >;
+using JoltBodyPtr_t = std::unique_ptr< JPH::Body >;
 
-using BodyId = osp::StrongId<uint32, struct DummyForBodyId>;
+using BodyId = osp::StrongId< std::uint32_t, struct DummyForBodyId>;
 
 inline JPH::BodyID BToJolt(const BodyId& bodyId)
 {
     return JPH::BodyID(bodyId.value, 0);
 }
 
-inline osp::Vector3 Vec3JoltToMagnum(Vec3 in)
+inline osp::Vector3 Vec3JoltToMagnum(JPH::Vec3 in)
 {
     return osp::Vector3(in.GetX(), in.GetY(), in.GetZ());
 }
 
-inline Vec3 Vec3MagnumToJolt(osp::Vector3 in)
+inline JPH::Vec3 Vec3MagnumToJolt(osp::Vector3 in)
 {
-    return Vec3(in.x(), in.y(), in.z());
+    return JPH::Vec3(in.x(), in.y(), in.z());
 }
 
-inline Quat QuatMagnumToJolt(osp::Quaternion in)
+inline JPH::Quat QuatMagnumToJolt(osp::Quaternion in)
 {
-    return Quat(in.vector().x(), in.vector().y(), in.vector().z(), in.scalar());
+    return JPH::Quat(in.vector().x(), in.vector().y(), in.vector().z(), in.scalar());
 }
 
-inline osp::Quaternion QuatJoltToMagnum(Quat in)
+inline osp::Quaternion QuatJoltToMagnum(JPH::Quat in)
 {
     return osp::Quaternion(osp::Vector3(in.GetX(), in.GetY(), in.GetZ()), in.GetW());
 }
 
+
 #ifdef JPH_ENABLE_ASSERTS
 
 // Callback for asserts, connect this to your own assert handler if you have one
-static bool AssertFailedImpl(const char *inExpression, const char *inMessage, const char *inFile, uint inLine)
+static bool AssertFailedImpl(const char *inExpression, const char *inMessage, const char *inFile, JPH::uint inLine)
 {
     // Print to the TTY
     std::cout << inFile << ":" << inLine << ": (" << inExpression << ") " << (inMessage != nullptr? inMessage : "") << std::endl;
@@ -125,23 +129,50 @@ static void TraceImpl(const char *inFMT, ...)
     OSP_LOG_TRACE(buffer);
 }
 
+class JoltGlobalInit
+{
+public:
+    static void init_if_required()
+    {
+        std::call_once(sm_flag, JoltGlobalInit::init);
+    }
+private:
+
+    static void init()
+    {
+        JPH::RegisterDefaultAllocator();
+        JPH::Trace = &TraceImpl;
+        JPH_IF_ENABLE_ASSERTS(JPH::AssertFailed = &AssertFailedImpl;)
+        JPH::Factory::sInstance = new JPH::Factory();
+        JPH::RegisterTypes();
+    }
+
+    static inline std::once_flag sm_flag;
+};
+
+
+;
+
+
+//
+
 
 /**
  * @brief The different physics layers for the simulation
  */
 namespace Layers
 {
-    static constexpr ObjectLayer NON_MOVING = 0;
-    static constexpr ObjectLayer MOVING = 1;
-    static constexpr ObjectLayer NUM_LAYERS = 2;
+    static constexpr JPH::ObjectLayer NON_MOVING = 0;
+    static constexpr JPH::ObjectLayer MOVING = 1;
+    static constexpr JPH::ObjectLayer NUM_LAYERS = 2;
 };
 /**
  * @brief Class that determines if two object layers can collide
  */
-class ObjectLayerPairFilterImpl : public ObjectLayerPairFilter
+class ObjectLayerPairFilterImpl : public JPH::ObjectLayerPairFilter
 {
 public:
-    bool ShouldCollide(ObjectLayer inObject1, ObjectLayer inObject2) const override
+    bool ShouldCollide(JPH::ObjectLayer inObject1, JPH::ObjectLayer inObject2) const override
     {
         switch (inObject1)
         {
@@ -160,15 +191,15 @@ public:
  */
 namespace BroadPhaseLayers
 {
-    static constexpr BroadPhaseLayer NON_MOVING(0);
-    static constexpr BroadPhaseLayer MOVING(1);
-    static constexpr uint NUM_LAYERS(2);
+    static constexpr JPH::BroadPhaseLayer NON_MOVING(0);
+    static constexpr JPH::BroadPhaseLayer MOVING(1);
+    static constexpr JPH::uint NUM_LAYERS(2);
 };
 
 /**
  * @brief Class that defines a mapping between object and broadphase layers.
  */
-class BPLayerInterfaceImpl final : public BroadPhaseLayerInterface
+class BPLayerInterfaceImpl final : public JPH::BroadPhaseLayerInterface
 {
 public:
     BPLayerInterfaceImpl()
@@ -178,12 +209,12 @@ public:
         mObjectToBroadPhase[Layers::MOVING] = BroadPhaseLayers::MOVING;
     }
 
-    uint GetNumBroadPhaseLayers() const override
+    JPH::uint GetNumBroadPhaseLayers() const override
     {
         return BroadPhaseLayers::NUM_LAYERS;
     }
 
-    BroadPhaseLayer GetBroadPhaseLayer(ObjectLayer inLayer) const override
+    JPH::BroadPhaseLayer GetBroadPhaseLayer(JPH::ObjectLayer inLayer) const override
     {
         JPH_ASSERT(inLayer < Layers::NUM_LAYERS);
         return mObjectToBroadPhase[inLayer];
@@ -191,7 +222,7 @@ public:
 
 #if defined(JPH_EXTERNAL_PROFILE) || defined(JPH_PROFILE_ENABLED)
     /// Get the user readable name of a broadphase layer (debugging purposes)
-    const char * GetBroadPhaseLayerName(BroadPhaseLayer inLayer) const override
+    const char * GetBroadPhaseLayerName(JPH::BroadPhaseLayer inLayer) const override
     {
         if (inLayer == BroadPhaseLayers::NON_MOVING) {
             return "NON_MOVING";
@@ -203,15 +234,15 @@ public:
 #endif // JPH_EXTERNAL_PROFILE || JPH_PROFILE_ENABLED
 
 private:
-    BroadPhaseLayer					mObjectToBroadPhase[Layers::NUM_LAYERS];
+    JPH::BroadPhaseLayer mObjectToBroadPhase[Layers::NUM_LAYERS];
 };
 /**
  * @brief Class that determines if an object layer can collide with a broadphase layer
  */
-class ObjectVsBroadPhaseLayerFilterImpl : public ObjectVsBroadPhaseLayerFilter
+class ObjectVsBroadPhaseLayerFilterImpl : public JPH::ObjectVsBroadPhaseLayerFilter
 {
 public:
-    bool ShouldCollide(ObjectLayer inLayer1, BroadPhaseLayer inLayer2) const override
+    bool ShouldCollide(JPH::ObjectLayer inLayer1, JPH::BroadPhaseLayer inLayer2) const override
     {
         switch (inLayer1)
         {
@@ -229,17 +260,20 @@ public:
 struct ACtxJoltWorld;
 
 //The physics callback to sync bodies between osp and jolt
-class PhysicsStepListenerImpl : public PhysicsStepListener
+class PhysicsStepListenerImpl : public JPH::PhysicsStepListener
 {
+    using ACtxBasic     = osp::active::ACtxBasic;
+    using ACtxPhysics   = osp::active::ACtxPhysics;
 public:
-    PhysicsStepListenerImpl(ACtxJoltWorld* pContext) : m_context(pContext) {};
-    void OnStep(float inDeltaTime, PhysicsSystem& rPhysicsSystem) override;
 
-private:
-    ACtxJoltWorld* m_context;
+    void OnStep(float inDeltaTime, JPH::PhysicsSystem& rPhysicsSystem) override;
+
+    ACtxBasic     *m_pCtxBasic      {nullptr};
+    ACtxPhysics   *m_pCtxPhysics    {nullptr};
+    ACtxJoltWorld *m_pCtxJoltWorld  {nullptr};
 };
 
-using ShapeStorage_t = osp::Storage_t<osp::active::ActiveEnt, Ref<Shape>>;
+using ShapeStorage_t = osp::Storage_t<osp::active::ActiveEnt, JPH::Ref<JPH::Shape>>;
 
 /**
  * @brief Represents an instance of a Jolt physics world in the scene
@@ -254,48 +288,16 @@ public:
         Func_t      m_func{nullptr};
         entt::any   m_userData;
     };
-    // The default values are the one suggested in the Jolt hello world exemple for a "real" project.
-    // It might be overkill here.
-    ACtxJoltWorld(  int threadCount = 2,
-                    uint maxBodies = 65536, 
-                    uint numBodyMutexes = 0, 
-                    uint maxBodyPairs = 65536, 
-                    uint maxContactConstraints = 10240
-                ) : m_pPhysicsSystem(std::make_unique<PhysicsSystem>()), 
-                    m_temp_allocator(10 * 1024 * 1024),
-                    m_joltJobSystem(std::make_unique<JobSystemThreadPool>(cMaxPhysicsJobs, cMaxPhysicsBarriers, threadCount))
-    {
-        m_pPhysicsSystem->Init(maxBodies, 
-                    numBodyMutexes, 
-                    maxBodyPairs, 
-                    maxContactConstraints, 
-                    m_bPLInterface, 	
-                    m_objectVsBPLFilter, 
-                    m_objectLayerFilter);
-        //gravity is handled on the OSP side
-        m_pPhysicsSystem->SetGravity(Vec3Arg::sZero());
-        m_listener = std::make_unique<PhysicsStepListenerImpl>(this);
-        m_pPhysicsSystem->AddStepListener(m_listener.get());
-    }
 
-    //mandatory jolt initialization steps
-    //Should this be called on world creation ? not ideal in case of multiple worlds.
-    static void initJoltGlobal()
-    {
-        std::call_once(ACtxJoltWorld::initFlag, ACtxJoltWorld::initJoltGlobalInternal);
-    }
+    JPH::PhysicsSystem                                  m_physicsSystem;
 
-    
-
-    TempAllocatorImpl                                   m_temp_allocator;
+    std::optional<JPH::TempAllocatorImpl>               m_oAllocator;
     ObjectLayerPairFilterImpl                           m_objectLayerFilter;
-    BPLayerInterfaceImpl                                m_bPLInterface;
+    BPLayerInterfaceImpl                                m_bplInterface;
     ObjectVsBroadPhaseLayerFilterImpl                   m_objectVsBPLFilter;
-    std::unique_ptr<JobSystem>                          m_joltJobSystem;
+    JPH::JobSystemThreadPool                            m_jobSystem;
 
-    std::unique_ptr<PhysicsSystem>                      m_pPhysicsSystem;
-
-    std::unique_ptr<PhysicsStepListenerImpl>		    m_listener;
+    PhysicsStepListenerImpl                             m_listener;
 
     lgrn::IdRegistryStl<BodyId>                         m_bodyIds;
     osp::IdMap_t<BodyId, ForceFactors_t>                m_bodyFactors;
@@ -307,34 +309,41 @@ public:
     std::vector<ForceFactorFunc>                        m_factors;
     ShapeStorage_t                                      m_shapes;
 
-    osp::active::ACompTransformStorage_t                *m_pTransform{nullptr};
+    //osp::active::ACompTransformStorage_t                *m_pTransform{nullptr};
+
+    bool m_allDirty{}; ///< if true, update all positions
 
 private:
 
-    static void initJoltGlobalInternal() 
-    {
-        
-        RegisterDefaultAllocator();
-
-        // Install trace and assert callbacks
-        JPH::Trace = &TraceImpl;
-        JPH_IF_ENABLE_ASSERTS(AssertFailed = &AssertFailedImpl;)
-
-        // Create a factory, this class is responsible for creating instances of classes based on their name or hash and is mainly used for deserialization of saved data.
-        // It is not directly used in this example but still required.
-        Factory::sInstance = new Factory();
-
-        // Register all physics types with the factory and install their collision handlers with the CollisionDispatch class.
-        // If you have your own custom shape types you probably need to register their handlers with the CollisionDispatch before calling this function.
-        // If you implement your own default material (PhysicsMaterial::sDefault) make sure to initialize it before this function or else this function will create one for you.
-        RegisterTypes();
-
-    }
-
-
-    inline static std::once_flag initFlag;
-    
 };
+
+// The default values are the one suggested in the Jolt hello world exemple for a "real" project.
+// It might be overkill here.
+inline void setup_jolt_world(
+    ACtxJoltWorld   &rCtxJoltWorld,
+    int             threadCount             = 2,
+    JPH::uint       maxBodies               = 65536,
+    JPH::uint       numBodyMutexes          = 0,
+    JPH::uint       maxBodyPairs            = 65536,
+    JPH::uint       maxContactConstraints   = 10240)
+{
+    rCtxJoltWorld.m_oAllocator.emplace(10 * 1024 * 1024);
+
+    rCtxJoltWorld.m_physicsSystem.Init(
+        maxBodies,
+        numBodyMutexes,
+        maxBodyPairs,
+        maxContactConstraints,
+        rCtxJoltWorld.m_bplInterface,
+        rCtxJoltWorld.m_objectVsBPLFilter,
+        rCtxJoltWorld.m_objectLayerFilter);
+
+    rCtxJoltWorld.m_jobSystem.Init(JPH::cMaxPhysicsJobs, JPH::cMaxPhysicsBarriers, threadCount);
+
+    // gravity is handled on the OSP side
+    rCtxJoltWorld.m_physicsSystem.SetGravity(JPH::Vec3Arg::sZero());
+    rCtxJoltWorld.m_physicsSystem.AddStepListener(&rCtxJoltWorld.m_listener);
+}
 
 
 } //namespace ospjolt

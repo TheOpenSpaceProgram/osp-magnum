@@ -86,7 +86,7 @@ struct ACtxSceneGraph
 using ACompTransformStorage_t = Storage_t<ActiveEnt, ACompTransform>;
 
 /**
- * @brief Storage for basic components
+ * @brief ActiveEnt Ids, scene graph, and transform
  */
 struct ACtxBasic
 {
@@ -94,6 +94,8 @@ struct ACtxBasic
 
     ACtxSceneGraph                      m_scnGraph;
     ACompTransformStorage_t             m_transform;
+
+    Vector3                             m_translateOrigin;
 };
 
 } // namespace osp::active

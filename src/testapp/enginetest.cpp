@@ -139,19 +139,7 @@ entt::any make_scene(osp::Resources& rResources, osp::PkgId const pkg)
     rScene.m_scnRdr.m_activeToDraw  .resize(maxActiveEnts);
     rScene.m_scnRdr.drawTfObserverEnable.resize(maxActiveEnts);
 
-    auto const maxDrawEnts = rScene.m_scnRdr.m_drawIds.capacity();
-    rScene.m_scnRdr.m_opaque        .resize(maxDrawEnts);
-    rScene.m_scnRdr.m_transparent   .resize(maxDrawEnts);
-    rScene.m_scnRdr.m_visible       .resize(maxDrawEnts);
-    rScene.m_scnRdr.m_color         .resize(maxDrawEnts);
-    rScene.m_scnRdr.m_drawTransform .resize(maxDrawEnts);
-    rScene.m_scnRdr.m_diffuseTex    .resize(maxDrawEnts);
-    rScene.m_scnRdr.m_mesh          .resize(maxDrawEnts);
-    for (MaterialId const materialId : rScene.m_scnRdr.m_materialIds)
-    {
-        Material &mat = rScene.m_scnRdr.m_materials[materialId];
-        mat.m_ents.resize(maxDrawEnts);
-    }
+    rScene.m_scnRdr.resize_to_fit_drawids();
 
     // Take ownership of the cube mesh Resource. This will create a scene-space
     // MeshId that we can assign to ActiveEnts

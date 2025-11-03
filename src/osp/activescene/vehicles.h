@@ -56,7 +56,7 @@ struct ACtxParts
     using MapPartToMachines_t = lgrn::IntArrayMultiMap<PartId, link::MachinePair>;
 
     lgrn::IdRegistryStl<PartId>                     partIds;
-    KeyedVec<PartId, PrefabPair>                    partPrefabs;
+    //KeyedVec<PartId, PrefabPair>                    partPrefabs;
     KeyedVec<PartId, Matrix4>                       partTransformWeld;    ///< Part's transform relative to the weld it's part of
     std::vector<PartId>                             partDirty;
 

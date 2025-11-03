@@ -47,67 +47,28 @@ using osp::Matrix3;
 using osp::Matrix4;
 using osp::Vector3;
 
-void SysJolt::resize_body_data(ACtxJoltWorld& rCtxWorld)
-{
-    std::size_t const capacity = rCtxWorld.m_bodyIds.capacity();
-}
-
-
-void SysJolt::update_translate(ACtxPhysics& rCtxPhys, ACtxJoltWorld& rCtxWorld) noexcept
-{
-
-    // Origin translation
-    if (Vector3 const translate = std::exchange(rCtxPhys.m_originTranslate, {});
-        ! translate.isZero())
-    {
-        PhysicsSystem* pJoltWorld = rCtxWorld.m_pPhysicsSystem.get();
-        BodyIDVector allBodiesIds;
-        pJoltWorld->GetBodies(allBodiesIds);
-
-        BodyInterface &bodyInterface = pJoltWorld->GetBodyInterface();
-
-        // Translate every jolt body
-        for (BodyID bodyId : allBodiesIds)
-        {
-            RVec3 position = bodyInterface.GetPosition(bodyId);
-            Matrix4 matrix;
-            position += Vec3MagnumToJolt(translate);
-            //As we are translating the whole world, we don't need to wake up asleep bodies. 
-            bodyInterface.SetPosition(bodyId, position, EActivation::DontActivate);
-        }
-    }
-}
-
 using Corrade::Containers::ArrayView;
 
 void SysJolt::update_world(
-        ACtxPhysics&                rCtxPhys,
-        ACtxJoltWorld&              rCtxWorld,
-        float                       timestep,
-        ACompTransformStorage_t&    rTf) noexcept
+        ACtxBasic                   &rBasic,
+        ACtxPhysics                 &rPhys,
+        ACtxJoltWorld               &rJoltWorld,
+        float                       timestep) noexcept
 {
-    PhysicsSystem *pJoltWorld = rCtxWorld.m_pPhysicsSystem.get();
-    BodyInterface &bodyInterface = pJoltWorld->GetBodyInterface();
+    constexpr int collisionSteps = 1;
 
-    // Apply changed velocities
-    for (auto const& [ent, vel] : rCtxPhys.m_setVelocity)
-    {
-        JPH::BodyID const bodyId     = BToJolt(rCtxWorld.m_entToBody.at(ent));
+    rJoltWorld.m_listener.m_pCtxBasic        = &rBasic;
+    rJoltWorld.m_listener.m_pCtxPhysics      = &rPhys;
+    rJoltWorld.m_listener.m_pCtxJoltWorld    = &rJoltWorld;
 
-        bodyInterface.SetLinearVelocity(bodyId, Vec3MagnumToJolt(vel));
-    }
-    rCtxPhys.m_setVelocity.clear();
-
-    rCtxWorld.m_pTransform = std::addressof(rTf);
-
-    int collisionSteps = 1;
-    pJoltWorld->Update(timestep, collisionSteps, &rCtxWorld.m_temp_allocator, rCtxWorld.m_joltJobSystem.get());
+    // calls PhysicsStepListenerImpl::OnStep
+    rJoltWorld.m_physicsSystem.Update(timestep, collisionSteps, &rJoltWorld.m_oAllocator.value(), &rJoltWorld.m_jobSystem);
 }
 
 void SysJolt::remove_components(ACtxJoltWorld& rCtxWorld, ActiveEnt ent) noexcept
 {
     auto itBodyId = rCtxWorld.m_entToBody.find(ent);
-    BodyInterface &bodyInterface = rCtxWorld.m_pPhysicsSystem->GetBodyInterface();
+    JPH::BodyInterface &bodyInterface = rCtxWorld.m_physicsSystem.GetBodyInterface();
 
     if (itBodyId != rCtxWorld.m_entToBody.end())
     {
@@ -119,59 +80,56 @@ void SysJolt::remove_components(ACtxJoltWorld& rCtxWorld, ActiveEnt ent) noexcep
         rCtxWorld.m_bodyToEnt[bodyId] = lgrn::id_null<ActiveEnt>();
         rCtxWorld.m_entToBody.erase(itBodyId);
     }
-
 }
 
-Ref<Shape> SysJolt::create_primitive(ACtxJoltWorld &rCtxWorld, osp::EShape shape, Vec3Arg scale)
+JPH::Ref<JPH::Shape> SysJolt::create_primitive(ACtxJoltWorld &rCtxWorld, osp::EShape shape, JPH::Vec3Arg scale)
 {
     switch (shape)
     {
     case EShape::Sphere:
     //Sphere only support uniform shape
-        return SphereShapeSettings(1.0f * scale.GetX()).Create().Get();
+        return JPH::SphereShapeSettings(1.0f * scale.GetX()).Create().Get();
     case EShape::Box:
-        return BoxShapeSettings(scale).Create().Get();
+        return JPH::BoxShapeSettings(scale).Create().Get();
     case EShape::Cylinder:
         //cylinder needs to be internally rotated 90° to match with graphics
-        return  RotatedTranslatedShapeSettings(
-                    Vec3Arg::sZero(), 
-                    Quat::sRotation(Vec3::sAxisX(), JPH_PI/2), 
-                    new CylinderShapeSettings(scale.GetZ(), 2.0f * scale.GetX())
+        return JPH::RotatedTranslatedShapeSettings(
+                    JPH::Vec3Arg::sZero(),
+                    JPH::Quat::sRotation(JPH::Vec3::sAxisX(), JPH::JPH_PI/2),
+                    new JPH::CylinderShapeSettings(scale.GetZ(), scale.GetX())
                 ).Create().Get();
         
     default:
-        return SphereShapeSettings(1.0f * scale.GetX()).Create().Get();
+        return JPH::SphereShapeSettings(1.0f * scale.GetX()).Create().Get();
     }
 }
 
-void SysJolt::scale_shape(Ref<Shape> rShape, Vec3Arg scale) {
-    if (rShape->GetSubType() == EShapeSubType::Scaled) {
-        ScaledShape* rScaledShape = dynamic_cast<ScaledShape*>(rShape.GetPtr());
+void SysJolt::scale_shape(JPH::Ref<JPH::Shape> rShape, JPH::Vec3Arg scale) {
+    if (rShape->GetSubType() == JPH::EShapeSubType::Scaled) {
+        JPH::ScaledShape* rScaledShape = dynamic_cast<JPH::ScaledShape*>(rShape.GetPtr());
         if (rScaledShape != nullptr) 
         {
-            rShape = new ScaledShape(rScaledShape->GetInnerShape(), scale * rScaledShape->GetScale());
+            rShape = new JPH::ScaledShape(rScaledShape->GetInnerShape(), scale * rScaledShape->GetScale());
         }
     }
     else 
     {
-        rShape = new ScaledShape(rShape, scale);
+        rShape = new JPH::ScaledShape(rShape, scale);
     }
 }
 
-float SysJolt::get_inverse_mass_no_lock(PhysicsSystem &physicsSystem,
-                                        BodyId bodyId) {
-  const BodyLockInterfaceNoLock &lockInterface =
-      physicsSystem.GetBodyLockInterfaceNoLock();
-  {
-    JPH::BodyLockRead lock(lockInterface, BToJolt(bodyId));
-    if (lock.Succeeded()) // body_id may no longer be valid
+float SysJolt::get_inverse_mass_no_lock(JPH::PhysicsSystem const &physicsSystem, BodyId bodyId)
+{
+    const JPH::BodyLockInterfaceNoLock &lockInterface = physicsSystem.GetBodyLockInterfaceNoLock();
     {
-      const JPH::Body &body = lock.GetBody();
-
-      return body.GetMotionProperties()->GetInverseMass();
+        JPH::BodyLockRead lock(lockInterface, BToJolt(bodyId));
+        if (lock.Succeeded()) // body_id may no longer be valid
+        {
+            const JPH::Body &body = lock.GetBody();
+            return body.GetMotionProperties()->GetInverseMass();
+        }
     }
-  }
-  return 0.0f;
+    return 0.0f;
 }
 
 void SysJolt::find_shapes_recurse(
@@ -181,12 +139,12 @@ void SysJolt::find_shapes_recurse(
         ACompTransformStorage_t const&          rTf,
         ActiveEnt                               ent,
         Matrix4 const&                          transform,
-        CompoundShapeSettings&                  rCompound) noexcept
+        JPH::CompoundShapeSettings&             rCompound) noexcept
 {
     // Add jolt shape if exists
     if (rCtxWorld.m_shapes.contains(ent))
     {
-        Ref<Shape> rShape = rCtxWorld.m_shapes.get(ent);
+        JPH::Ref<JPH::Shape> rShape = rCtxWorld.m_shapes.get(ent);
 
         // Set transform relative to root body
         SysJolt::scale_shape(rShape, Vec3MagnumToJolt(transform.scaling()));
@@ -221,40 +179,109 @@ void SysJolt::find_shapes_recurse(
 //TODO this is locking on all bodies. Is it bad ?
 //The easy fix is to provide multiple step listeners for disjoint sets of bodies, which can then run in parallel.
 //It might not be worth it considering this function should be quite fast.
-void PhysicsStepListenerImpl::OnStep(float inDeltaTime, PhysicsSystem &rPhysicsSystem)
+void PhysicsStepListenerImpl::OnStep(float inDeltaTime, JPH::PhysicsSystem &rPhysicsSystem)
 {
-    //no lock as all bodies are already locked
-    BodyInterface &bodyInterface = rPhysicsSystem.GetBodyInterfaceNoLock();
-    for (BodyId bodyId : m_context->m_bodyIds)
+    JPH::BodyInterface &bodyInterface = rPhysicsSystem.GetBodyInterfaceNoLock();
+    JPH::BodyLockInterfaceNoLock const &bodyLockInterface = rPhysicsSystem.GetBodyLockInterfaceNoLock();
+
+    bool const doOriginTranslation = !m_pCtxBasic->m_translateOrigin.isZero();
+    JPH::Vec3 const translateOrigin = Vec3MagnumToJolt(m_pCtxBasic->m_translateOrigin);
+
+
+//    if (!translateOrigin.isZero())
+//    {
+//        JPH::BodyIDVector allBodiesIds;
+//        pJoltWorld->GetBodies(allBodiesIds);
+
+//        JPH::BodyInterface &bodyInterface = pJoltWorld->GetBodyInterface();
+
+//        // Translate every jolt body
+//        for (JPH::BodyID bodyId : allBodiesIds)
+//        {
+//            JPH::RVec3 position = bodyInterface.GetPosition(bodyId);S
+//            Matrix4 matrix;
+//            position -= Vec3MagnumToJolt(translateOrigin);
+//            //As we are translating the whole world, we don't need to wake up asleep bodies.
+//            bodyInterface.SetPosition(bodyId, position, JPH::EActivation::DontActivate);
+//        }
+//    }
+
+    // Apply changed velocities
+    for (auto const& [ent, vel] : m_pCtxPhysics->m_setVelocity)
+    {
+        JPH::BodyID const joltBodyId     = BToJolt(m_pCtxJoltWorld->m_entToBody.at(ent));
+
+        bodyInterface.SetLinearVelocity(joltBodyId, Vec3MagnumToJolt(vel));
+    }
+    m_pCtxPhysics->m_setVelocity.clear();
+
+
+    for (BodyId bodyId : m_pCtxJoltWorld->m_bodyIds)
     {
         JPH::BodyID joltBodyId = BToJolt(bodyId);
-        if (bodyInterface.GetMotionType(joltBodyId) != EMotionType::Dynamic) 
+
+        bool        updateOspTf     = false;
+        bool        forcesDirty     = false;
+
+        JPH::Vec3 newPos;
+        JPH::Quat newRot;
+
+        ActiveEnt const ent = m_pCtxJoltWorld->m_bodyToEnt[bodyId];
+
+        JPH::BodyLockWrite lock(bodyLockInterface, joltBodyId);
+
+        JPH::Body &rBody = lock.GetBody();
+
+        if (rBody.IsDynamic())
         {
-            continue;
+            updateOspTf = true;
+
+            //Force and torque osp -> jolt
+            Vector3 force{0.0f};
+            Vector3 torque{0.0f};
+
+            LGRN_ASSERT(ForceFactors_t{}.size() == 64u);
+            auto const factorsInts = std::initializer_list<std::uint64_t>{m_pCtxJoltWorld->m_bodyFactors[bodyId].to_ullong()};
+            auto const factorsBits = lgrn::bit_view(factorsInts);
+
+            for (std::size_t const factorIdx : factorsBits.ones())
+            {
+                ACtxJoltWorld::ForceFactorFunc const& factor = m_pCtxJoltWorld->m_factors[factorIdx];
+                factor.m_func(bodyId, *m_pCtxJoltWorld, factor.m_userData, force, torque);
+            }
+
+            forcesDirty = true;
+
+            rBody.AddForce(Vec3MagnumToJolt(force));
+            rBody.AddTorque(Vec3MagnumToJolt(torque));
         }
 
-        //Transform jolt -> osp
+//        if (doOriginTranslation && JPH::BodyManager::sIsValidBodyPointer(&rBody))
+//        {
+//            // TODO: SetPositionAndRotationInternal is the only way to set position?
+//            //       Some unneeded center-of-mass calculations are involved, can this be fixed?
+//            newPos = rBody.GetPosition() - translateOrigin;
+//            newRot = rBody.GetRotation();
+//            bodyInterface.SetPositionAndRotation(joltBodyId, newPos, newRot, JPH::EActivation::DontActivate);
+//            //rBody.SetPositionAndRotationInternal(newPos, newRot, false);
+//            updateOspTf = true;
+//        }
 
-
-        ActiveEnt const ent = m_context->m_bodyToEnt[bodyId];
-        Mat44 worldTranform = bodyInterface.GetWorldTransform(joltBodyId);
-
-        worldTranform.StoreFloat4x4((Float4*)m_context->m_pTransform->get(ent).m_transform.data());
-
-        //Force and torque osp -> jolt
-        Vector3 force{0.0f};
-        Vector3 torque{0.0f};
-
-        LGRN_ASSERT(ForceFactors_t{}.size() == 64u);
-        auto const factorsInts = std::initializer_list<std::uint64_t>{m_context->m_bodyFactors[bodyId].to_ullong()};
-        auto const factorsBits = lgrn::bit_view(factorsInts);
-
-        for (std::size_t const factorIdx : factorsBits.ones())
-        {   
-            ACtxJoltWorld::ForceFactorFunc const& factor = m_context->m_factors[factorIdx];
-            factor.m_func(bodyId, *m_context, factor.m_userData, force, torque);
+        if (forcesDirty)
+        {
+            bodyInterface.ActivateBody(joltBodyId);
         }
 
-        bodyInterface.AddForceAndTorque(joltBodyId, Vec3MagnumToJolt(force), Vec3MagnumToJolt(torque));
+        if (updateOspTf)
+        {
+            JPH::Quat a;
+            JPH::Vec3 b;
+
+            JPH::Vec3 comOffset = rBody.GetRotation() * rBody.GetShape()->GetCenterOfMass();
+
+            m_pCtxBasic->m_transform.get(ent).m_transform = Matrix4::from(
+                    QuatJoltToMagnum(rBody.GetRotation()).toMatrix(),
+                    Vec3JoltToMagnum(rBody.GetCenterOfMassPosition()) - Vec3JoltToMagnum(comOffset));
+        }
     }
 }

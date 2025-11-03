@@ -55,14 +55,14 @@ FeatureDef const ftrPhysics = feature_def("Physics", [] (
         DependOn<FIScene>       scn,
         DependOn<FICommonScene> comScn)
 {
-    rFB.pipeline(phys.pl.physBody)  .parent(mainApp.loopblks.mainLoop);
-    rFB.pipeline(phys.pl.physUpdate).parent(mainApp.loopblks.mainLoop).initial_stage(Done);
+    rFB.pipeline(phys.pl.mass)      .parent(mainApp.loopblks.mainLoop);
+    rFB.pipeline(phys.pl.physUpdate).parent(mainApp.loopblks.mainLoop);
 
     rFB.data_emplace< ACtxPhysics > (phys.di.phys);
 
     rFB.task()
         .name       ("Delete Physics components")
-        .sync_with  ({comScn.pl.activeEntDelete(UseOrRun), phys.pl.physBody(Delete)})
+        .sync_with  ({comScn.pl.activeEntDelete(UseOrRun), phys.pl.mass(Delete)})
         .args       ({         phys.di.phys,              comScn.di.activeEntDel })
         .func       ([] (ACtxPhysics &rPhys, ActiveEntVec_t const &rActiveEntDel) noexcept
     {
@@ -139,7 +139,7 @@ FeatureDef const ftrPrefabs = feature_def("Prefabs", [] (
 
     rFB.task()
         .name       ("Init Prefab physics")
-        .sync_with  ({prefabs.pl.spawnRequest(UseOrRun), prefabs.pl.spawnedEnts(UseOrRun), phys.pl.physBody(Modify), phys.pl.physUpdate(Done)})
+        .sync_with  ({prefabs.pl.spawnRequest(UseOrRun), prefabs.pl.spawnedEnts(UseOrRun), phys.pl.mass(New), phys.pl.physUpdate(Done)})
         .args       ({     comScn.di.basic,  mainApp.di.resources,       phys.di.phys,    prefabs.di.prefabs})
         .func       ([] (ACtxBasic &rBasic, Resources &rResources, ACtxPhysics &rPhys, ACtxPrefabs &rPrefabs) noexcept
     {
@@ -204,8 +204,8 @@ FeatureDef const ftrPrefabDraw = feature_def("PrefabDraw", [] (
     rFB.task()
         .name       ("Add mesh and material to prefabs")
         .sync_with  ({prefabs.pl.spawnRequest(UseOrRun), prefabs.pl.spawnedEnts(UseOrRun),
-                      comScn.pl.texToRes(New), comScn.pl.meshToRes(New),
-                      scnRender.pl.drawEnt(Ready),  scnRender.pl.activeDrawTfs(Ready), scnRender.pl.misc(Modify),
+                      comScn.pl.texToRes(New), comScn.pl.meshToRes(New), comScn.pl.meshIds(New), comScn.pl.texIds(New),
+                      scnRender.pl.drawEnt(Ready),  scnRender.pl.activeDrawTfs(Ready), scnRender.pl.misc(New),
                       scnRender.pl.mesh      (New), scnRender.pl.meshDirty      (Modify_),
                       scnRender.pl.diffuseTex(New), scnRender.pl.diffuseTexDirty(Modify_),
                       scnRender.pl.material  (New), scnRender.pl.materialDirty  (Modify_)})
@@ -217,8 +217,8 @@ FeatureDef const ftrPrefabDraw = feature_def("PrefabDraw", [] (
     rFB.task()
         .name       ("Resync prefab mesh and material")
         .sync_with  ({windowApp.pl.resync(Run),
-                      comScn.pl.texToRes(New), comScn.pl.meshToRes(New),
-                      scnRender.pl.drawEnt(Ready),  scnRender.pl.activeDrawTfs(Modify), scnRender.pl.misc(Modify),
+                      comScn.pl.texToRes(New), comScn.pl.meshToRes(New), comScn.pl.meshIds(New), comScn.pl.texIds(New),
+                      scnRender.pl.drawEnt(Ready),  scnRender.pl.activeDrawTfs(New), scnRender.pl.misc(New),
                       scnRender.pl.mesh      (New), scnRender.pl.meshDirty      (Modify_),
                       scnRender.pl.diffuseTex(New), scnRender.pl.diffuseTexDirty(Modify_),
                       scnRender.pl.material  (New), scnRender.pl.materialDirty  (Modify_)})

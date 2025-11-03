@@ -717,7 +717,7 @@ FeatureDef const ftrTerrainDebugDraw = feature_def("TerrainDebugDraw", [] (
 
     rFB.task()
         .name       ("Reposition terrain surface mesh")
-        .sync_with  ({scnRender.pl.render(Run), terrain.pl.terrainFrame(Ready), terrain.pl.chunkMesh(Ready), scnRender.pl.drawEnt(Ready), scnRender.pl.drawTransforms(Modify)})
+        .sync_with  ({scnRender.pl.render(Run), terrain.pl.terrainFrame(Ready), terrain.pl.chunkMesh(Ready), scnRender.pl.drawEnt(Ready), scnRender.pl.drawTransforms(New)})
         .args       ({    terrainDbgDraw.di.draw,         terrain.di.terrainFrame,    terrain.di.terrain,     scnRender.di.scnRender })
         .func       ([] (TerrainDebugDraw& rDraw, ACtxTerrainFrame &rTerrainFrame, ACtxTerrain &rTerrain, ACtxSceneRender &rScnRender) noexcept
     {

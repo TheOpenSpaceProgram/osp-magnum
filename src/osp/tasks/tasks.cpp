@@ -41,20 +41,29 @@ struct StageLock
 {
     TaskId      taskId;
     PipelineId  pipelineId;
-    StageId     stageId;
 };
 
 void check_task_order(Tasks const& tasks, TaskOrderReport& rOut, lgrn::IdSetStl<LoopBlockId> loopblks)
 {
+    auto const &rPltypeinfo = PipelineTypeIdReg::instance();
+
     std::vector<StageLock> locks;
 
-    osp::KeyedVec<PipelineId, StageId> currentStages;
-    currentStages.resize(tasks.pipelineIds.capacity());
-    lgrn::IdSetStl<PipelineId> stageJustChanged;
-    stageJustChanged.resize(tasks.pipelineIds.capacity());
+    osp::KeyedVec<PipelineId, std::uint8_t> lockCountOf;
+    osp::KeyedVec<PipelineId, StageId>      prevStageOf;
+    osp::KeyedVec<PipelineId, StageId>      currentStageOf;
+    lgrn::IdSetStl<PipelineId>              stageJustChanged;
+    osp::KeyedVec<TaskId, std::uint8_t>     remainingSyncPointsOf;
+    lgrn::IdSetStl<TaskId>                  tasksRemaining;
 
-    osp::KeyedVec<TaskId, std::uint8_t> alignsRemaining;
-    alignsRemaining.resize(tasks.taskIds.capacity());
+    rOut.taskCountOf        .resize(tasks.pipelineIds.capacity(), 0);
+    lockCountOf             .resize(tasks.pipelineIds.capacity(), 0);
+    prevStageOf             .resize(tasks.pipelineIds.capacity(), {});
+    currentStageOf          .resize(tasks.pipelineIds.capacity(), {});
+    stageJustChanged        .resize(tasks.pipelineIds.capacity());
+    rOut.syncCountOf        .resize(tasks.taskIds.capacity(), 0);
+    remainingSyncPointsOf   .resize(tasks.taskIds.capacity(), 0);
+    tasksRemaining          .resize(tasks.taskIds.capacity());
 
     int pipelinesNotFinished = 0;
     for (PipelineId const pipelineId : tasks.pipelineIds)
@@ -64,130 +73,133 @@ void check_task_order(Tasks const& tasks, TaskOrderReport& rOut, lgrn::IdSetStl<
         {
             ++pipelinesNotFinished;
 
-            currentStages[pipelineId] = pipeline.initialStage;
+            currentStageOf[pipelineId] = pipeline.initialStage;
             stageJustChanged.insert(pipelineId);
-            rOut.steps.push_back({.pipelineId = pipelineId, .stageId = pipeline.initialStage, .time = 0});
             if (pipeline.scheduleCondition.has_value())
             {
-                ++ alignsRemaining[pipeline.scheduleCondition];
+                // Schedule sync is not listed in tasks.syncs
+                ++ remainingSyncPointsOf[pipeline.scheduleCondition];
+                ++ rOut.taskCountOf[pipelineId];
+                ++ rOut.syncCountOf[pipeline.scheduleCondition];
+                tasksRemaining.insert(pipeline.scheduleCondition);
             }
         }
     }
-
 
     for (TaskSyncToPipeline const& syncTo : tasks.syncs)
     {
         if (loopblks.contains(tasks.pipelineInst[syncTo.pipeline].block))
         {
-            ++ alignsRemaining[syncTo.task];
+            ++ remainingSyncPointsOf[syncTo.task];
+            ++ rOut.taskCountOf[syncTo.pipeline];
+            ++ rOut.syncCountOf[syncTo.task];
+            tasksRemaining.insert(syncTo.task);
         }
     }
 
     int time = 0;
-
-    auto &rPltypeinfo = PipelineTypeIdReg::instance();
-
-    auto const task_aligned = [&] (TaskId const taskId, PipelineId const pipelineId, StageId stageId)
+    bool somethingHappened = true;
+    while (somethingHappened)
     {
-        LGRN_ASSERT(alignsRemaining[taskId] != 0);
-        -- alignsRemaining[taskId];
-        if (alignsRemaining[taskId] == 0)
-        {
-            rOut.steps.push_back({.taskId = taskId, .time = time});
+        somethingHappened = false;
 
-            // remove all locks assiciated with this task
-            for (StageLock &rLock : locks)
+        // Keep trying to advance each pipeline's stages until everything is locked and stops moving
+        bool anyPipelineAdvanced = true;
+        while (anyPipelineAdvanced)
+        {
+            anyPipelineAdvanced = false;
+
+            // For stages that have just advanced, lock them if they hit any syncs
+            for (TaskSyncToPipeline const& syncTo : tasks.syncs)
             {
-                if (rLock.taskId == taskId)
+                if (stageJustChanged.contains(syncTo.pipeline) && currentStageOf[syncTo.pipeline] == syncTo.stage)
                 {
-                    rLock = {};
+                    ++lockCountOf[syncTo.pipeline];
+                    --remainingSyncPointsOf[syncTo.task];
+                    locks.push_back({syncTo.task, syncTo.pipeline});
+                }
+            }
+
+            // Schedule task is not part of tasks.syncs, handle it separately
+            for (PipelineId const pipelineId : stageJustChanged)
+            {
+                Pipeline const &pipeline = tasks.pipelineInst[pipelineId];
+                if (   pipeline.scheduleCondition.has_value()
+                    && currentStageOf[pipelineId].has_value()
+                    && rPltypeinfo.get(pipeline.type).stages[currentStageOf[pipelineId]].isSchedule)
+                {
+                    ++lockCountOf[pipelineId];
+                    --remainingSyncPointsOf[pipeline.scheduleCondition];
+                    locks.push_back({pipeline.scheduleCondition, pipelineId});
+                }
+            }
+
+            stageJustChanged.clear();
+
+            // Try to advance all pipeline's current stages forward
+            for (PipelineId const pipelineId : tasks.pipelineIds)
+            {
+                Pipeline  const &pipeline       = tasks.pipelineInst[pipelineId];
+                StageId         &rCurrentStage  = currentStageOf[pipelineId];
+
+                if (   rCurrentStage.has_value()          // Is not finished yet?
+                    && lockCountOf[pipelineId] == 0       // Is not locked?
+                    && loopblks.contains(pipeline.block)) // Is part of selected loopblock?
+                {
+                    anyPipelineAdvanced = true;
+                    somethingHappened   = true;
+                    stageJustChanged.insert(pipelineId);
+
+                    rCurrentStage.value++;
+                    if (rCurrentStage.value == rPltypeinfo.get(pipeline.type).stages.size())
+                    {
+                        rCurrentStage.value = 0; // Loop around back to zero
+                    }
+                    if (rCurrentStage == pipeline.initialStage)
+                    {
+                        rCurrentStage = {};     // Finished. (Looped around back to initial stage)
+                        --pipelinesNotFinished;
+                    }
                 }
             }
         }
-        else
-        {
-            locks.push_back({taskId, pipelineId, stageId});
-        }
-    };
 
-    bool nothingMoved = true;
-
-    do
-    {
-        // any points connected to current stages?
-        for (TaskSyncToPipeline const& syncTo : tasks.syncs)
-        {
-            if (stageJustChanged.contains(syncTo.pipeline) && currentStages[syncTo.pipeline] == syncTo.stage)
-            {
-                task_aligned(syncTo.task, syncTo.pipeline, syncTo.stage);
-            }
-        }
+        // Write changed stages to steps
         for (PipelineId const pipelineId : tasks.pipelineIds)
         {
-            if (stageJustChanged.contains(pipelineId))
+            if (prevStageOf[pipelineId] != currentStageOf[pipelineId])
             {
-                Pipeline const &inst = tasks.pipelineInst[pipelineId];
-                if (inst.scheduleCondition.has_value() && rPltypeinfo.get(inst.type).stages[currentStages[pipelineId]].isSchedule)
-                {
-                    task_aligned(inst.scheduleCondition, pipelineId, currentStages[pipelineId]);
-                }
+                prevStageOf[pipelineId] = currentStageOf[pipelineId];
+                rOut.steps.push_back({.pipelineId = pipelineId, .stageId = currentStageOf[pipelineId], .time = time});
             }
         }
 
-        if (pipelinesNotFinished == 0) { break; }
+        // Remove locks on pipelines for completed tasks.
+        // Erase from 'locks' and add to rOut.steps at the same time.
+        locks.erase(std::remove_if(locks.begin(), locks.end(),
+                [&remainingSyncPointsOf, &lockCountOf, &tasksRemaining, &rOut, &somethingHappened, time] (StageLock const& lock) -> bool
+        {
+            if (remainingSyncPointsOf[lock.taskId] == 0) // task sync fully aligned?
+            {
+                somethingHappened = true;
+                --lockCountOf[lock.pipelineId];
+
+                if (tasksRemaining.contains(lock.taskId))
+                {
+                    tasksRemaining.erase(lock.taskId);
+                    rOut.steps.push_back({.taskId = lock.taskId, .time = time});
+                }
+                return true; // remove lock
+            }
+            return false;
+        }), locks.end());
 
         ++ time;
-
-        auto const &locksFirst = locks.begin();
-        auto const &locksLast  = locks.end();
-
-        stageJustChanged.clear();
-
-        nothingMoved = true;
-
-        // move points
-        for (PipelineId const pipelineId : tasks.pipelineIds)
-        {
-            Pipeline const& pipeline = tasks.pipelineInst[pipelineId];
-
-            if ( ! loopblks.contains(pipeline.block) ) { continue; }
-
-            StageId &rCurrentStage = currentStages[pipelineId];
-
-            // stages set to null means it's done
-            if ( ! rCurrentStage.has_value() ) { continue; }
-
-            // don't advance stages when a lock exists on it
-            auto const findLock = [rCurrentStage, pipelineId] (StageLock const& lock)
-            {
-                return (lock.pipelineId == pipelineId) && (lock.stageId == rCurrentStage);
-            };
-            if (std::find_if(locksFirst, locksLast, findLock) != locksLast) { continue; }
-
-            nothingMoved = false;
-            rCurrentStage.value++;
-            if (rCurrentStage.value == rPltypeinfo.get(pipeline.type).stages.size())
-            {
-                rCurrentStage.value = 0; // loop around back to zero
-            }
-            if (rCurrentStage == pipeline.initialStage)
-            {
-                // looped around
-                rCurrentStage = {};
-                --pipelinesNotFinished;
-            }
-            else
-            {
-                rOut.steps.push_back({.pipelineId = pipelineId, .stageId = rCurrentStage, .time = time});
-                stageJustChanged.insert(pipelineId);
-            }
-        }
-
-    } while (!nothingMoved);
+    }
 
     for (TaskId const taskId : tasks.taskIds)
     {
-        if (alignsRemaining[taskId] != 0)
+        if (remainingSyncPointsOf[taskId] != 0)
         {
             if (std::find_if(locks.begin(), locks.end(),
                              [taskId] (StageLock const& lock) { return lock.taskId == taskId; })
@@ -212,6 +224,7 @@ std::string visualize_task_order(TaskOrderReport const& report, Tasks const& tas
     auto const  &last = report.steps.end();
     int         time  = 0;
 
+    // Print pipeline vertical line labels
     int count = 0;
     for(PipelineId const pipelineId : tasks.pipelineIds)
     {
@@ -226,10 +239,20 @@ std::string visualize_task_order(TaskOrderReport const& report, Tasks const& tas
             os << "\U0000250D" << pipeline.name << "\n";
             ++count;
         }
-
     }
 
-    osp::KeyedVec<PipelineId, StageId> stageChanges;
+    osp::KeyedVec<PipelineId, StageId>      stageChanges;
+    osp::KeyedVec<PipelineId, unsigned int> taskIndexOf;
+    osp::KeyedVec<TaskId, unsigned int>     syncIndexOf;
+
+    taskIndexOf .resize (tasks.pipelineIds.capacity(), 0);
+    //syncIndexOf .resize (tasks.taskIds.capacity(), 0);
+    stageChanges.reserve(tasks.pipelineIds.capacity());
+
+    unsigned int syncIndex = 0;
+
+    auto const has_vertical_line = [&taskIndexOf, &report] (PipelineId pl) { return (0 < taskIndexOf[pl]) && (taskIndexOf[pl] < report.taskCountOf[pl]); };
+    auto const has_horizontal_line = [&syncIndex, &report] (TaskId taskId) { return (0 < syncIndex) && (syncIndex < report.syncCountOf[taskId]); };
 
     while(it != last)
     {
@@ -250,25 +273,33 @@ std::string visualize_task_order(TaskOrderReport const& report, Tasks const& tas
                 {
                     os << int(stageChange.value) << " ";
                 }
-                else
+                else if (has_vertical_line(pipelineId))
                 {
                     os << "\U00002502 ";
                 }
+                else
+                {
+                    os << "  ";
+                }
             }
-
         }
 
         os << "\n";
 
         while(it != last && it->taskId.has_value() && it->time == time)
         {
+            // Draw horizontal row with a task name on the right
+
+            syncIndex = 0;
             for(PipelineId const pipelineId : tasks.pipelineIds)
             {
                 if (report.loopblks.contains(tasks.pipelineInst[pipelineId].block))
                 {
                     if (tasks.pipelineInst[pipelineId].scheduleCondition == it->taskId)
                     {
-                        os << "\U000025C9\U00002500";
+                        os << "\U000025C9"; // fisheye for schedule tasks
+                        ++ taskIndexOf[pipelineId];
+                        ++ syncIndex;
                     }
                     else if (std::find_if(
                                     tasks.syncs.begin(), tasks.syncs.end(),
@@ -276,12 +307,21 @@ std::string visualize_task_order(TaskOrderReport const& report, Tasks const& tas
                                     { return sync.task == taskId && sync.pipeline == pipelineId; })
                              != tasks.syncs.end())
                     {
-                        os << "\U000025CF\U00002500";
+                        os << "\U000025CF"; // black circle
+                        ++ taskIndexOf[pipelineId];
+                        ++ syncIndex;
+                    }
+                    else if (has_vertical_line(pipelineId))
+                    {
+                        // vertical line, or crossed horizontal+vertical line
+                        os << (has_horizontal_line(it->taskId) ? "\U0000253C" : "\U00002502");
                     }
                     else
                     {
-                        os << "\U0000253C\U00002500";
+                        os << (has_horizontal_line(it->taskId) ? "\U00002500" : " ");
                     }
+
+                    os << (has_horizontal_line(it->taskId) ? "\U00002500" : " ");
                 }
             }
             os << "" <<  tasks.taskInst[it->taskId].debugName << "\n";
@@ -289,7 +329,6 @@ std::string visualize_task_order(TaskOrderReport const& report, Tasks const& tas
         }
 
         ++time;
-
     }
 
     bool noError = report.failedLocked.empty() && report.failedNotAdded.empty();
@@ -313,7 +352,7 @@ std::string visualize_task_order(TaskOrderReport const& report, Tasks const& tas
                                 std::find_if(pltype.stages.begin(), pltype.stages.end(),
                                              [] (PipelineTypeInfo::StageInfo const &stage) { return stage.isSchedule; } ),
                                 pltype.stages.end());
-                        os << stageIndex << "\U00002500";
+                        os << stageIndex << " ";
                     }
                     else if (auto const syncIt = std::find_if(
                                     tasks.syncs.begin(), tasks.syncs.end(),
@@ -327,16 +366,16 @@ std::string visualize_task_order(TaskOrderReport const& report, Tasks const& tas
                                 { return step.pipelineId == pipelineId; })->stageId;
                         if (lastStage == syncIt->stage)
                         {
-                            os << "\U000025CF\U00002500";
+                            os << "\U000025CF ";
                         }
                         else
                         {
-                            os << int(syncIt->stage.value) << "\U00002500";
+                            os << int(syncIt->stage.value) << " ";
                         }
                     }
                     else
                     {
-                        os << "\U00002534\U00002500";
+                        os << "  ";
                     }
                 }
             }

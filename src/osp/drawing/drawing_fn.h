@@ -185,10 +185,6 @@ public:
             ITB_T const&                last,
             FUNC_T                      func = {});
 
-    template<typename IT_T>
-    static void update_delete_drawing(
-            ACtxSceneRender& rCtxScnRdr, ACtxDrawing& rCtxDrawing, IT_T const& first, IT_T const& last);
-
     static MeshIdOwner_t add_drawable_mesh(ACtxDrawing& rDrawing, ACtxDrawingRes& rDrawingRes, Resources& rResources, PkgId const pkg, std::string_view const name);
 
     static constexpr decltype(auto) gen_drawable_mesh_adder(ACtxDrawing& rDrawing, ACtxDrawingRes& rDrawingRes, Resources& rResources, PkgId const pkg);
@@ -282,19 +278,6 @@ void remove_refcounted(
     if (rOwner.has_value())
     {
         rRefcount.ref_release(std::move(rOwner));
-    }
-}
-
-template<typename IT_T>
-void SysRender::update_delete_drawing(
-        ACtxSceneRender& rCtxScnRdr, ACtxDrawing& rCtxDrawing, IT_T const& first, IT_T const& last)
-{
-    for (auto it = first; it != last; std::advance(it, 1))
-    {
-        DrawEnt const drawEnt = *it;
-
-        remove_refcounted(drawEnt, rCtxScnRdr.m_diffuseTex, rCtxDrawing.m_texRefCounts);
-        remove_refcounted(drawEnt, rCtxScnRdr.m_mesh,       rCtxDrawing.m_meshRefCounts);
     }
 }
 

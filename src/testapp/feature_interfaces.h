@@ -66,7 +66,7 @@ struct FIMagnumScene {
         PipelineDef<EStgCont> entMeshGL         {"entMeshGL"};
 
         /// m_diffuseTexId
-        PipelineDef<EStgCont> entDiffuseGL      {"entTextureGL"};
+        PipelineDef<EStgCont> entDiffuseGL      {"entDiffuseGL"};
 
         PipelineDef<EStgCont> groupFwd          {"groupFwd"};
         PipelineDef<EStgCont> groupFwdEnts      {"groupFwdEnts"};

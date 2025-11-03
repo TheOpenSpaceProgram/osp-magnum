@@ -159,7 +159,7 @@ FeatureDef const ftrMagnumScene = feature_def("MagnumScene", [] (
 
     rFB.task()
         .name       ("Assign GL textures to DrawEnts with diffuse textures")
-        .sync_with  ({scnRender.pl.diffuseTexDirty(UseOrRun), scnRender.pl.diffuseTex(Ready), magnum.pl.textureGL(Ready), magnumScn.pl.entDiffuseGL(Modify)})
+        .sync_with  ({scnRender.pl.diffuseTexDirty(UseOrRun), scnRender.pl.diffuseTex(Ready), magnum.pl.textureGL(Ready), magnumScn.pl.entDiffuseGL(New)})
         .args       ({       comScn.di.drawing,        comScn.di.drawingRes,      scnRender.di.scnRender,        magnumScn.di.scnRenderGl,  magnum.di.renderGl })
         .func       ([] (ACtxDrawing &rDrawing, ACtxDrawingRes &rDrawingRes, ACtxSceneRender &rScnRender, ACtxSceneRenderGL &rScnRenderGl, RenderGL &rRenderGl) noexcept
     {
@@ -175,7 +175,7 @@ FeatureDef const ftrMagnumScene = feature_def("MagnumScene", [] (
 
     rFB.task()
         .name       ("Resync GL textures")
-        .sync_with  ({windowApp.pl.resync(Run), scnRender.pl.diffuseTex(Ready), magnum.pl.textureGL(Ready), magnumScn.pl.entDiffuseGL(Modify)})
+        .sync_with  ({windowApp.pl.resync(Run), scnRender.pl.diffuseTex(Ready), magnum.pl.textureGL(Ready), magnumScn.pl.entDiffuseGL(New)})
         .args       ({          comScn.di.drawingRes,      scnRender.di.scnRender,        magnumScn.di.scnRenderGl,  magnum.di.renderGl })
         .func       ([] (ACtxDrawingRes &rDrawingRes, ACtxSceneRender &rScnRender, ACtxSceneRenderGL &rScnRenderGl, RenderGL &rRenderGl) noexcept
     {
@@ -192,7 +192,7 @@ FeatureDef const ftrMagnumScene = feature_def("MagnumScene", [] (
 
     rFB.task()
         .name       ("Sync GL meshes to entities with scene meshes")
-        .sync_with  ({scnRender.pl.meshDirty(UseOrRun), scnRender.pl.mesh(Ready), scnRender.pl.mesh(Ready), magnum.pl.meshGL(Ready), magnumScn.pl.entMeshGL(Modify)})
+        .sync_with  ({scnRender.pl.meshDirty(UseOrRun), scnRender.pl.mesh(Ready), magnum.pl.meshGL(Ready), magnumScn.pl.entMeshGL(New)})
         .args       ({          comScn.di.drawingRes,      scnRender.di.scnRender,        magnumScn.di.scnRenderGl,  magnum.di.renderGl })
         .func       ([] (ACtxDrawingRes &rDrawingRes, ACtxSceneRender &rScnRender, ACtxSceneRenderGL &rScnRenderGl, RenderGL &rRenderGl) noexcept
     {
@@ -207,7 +207,7 @@ FeatureDef const ftrMagnumScene = feature_def("MagnumScene", [] (
 
     rFB.task()
         .name       ("Resync GL meshes")
-        .sync_with  ({windowApp.pl.resync(Run), scnRender.pl.mesh(Ready), scnRender.pl.mesh(Ready), magnum.pl.meshGL(Ready), magnumScn.pl.entMeshGL(Modify)})
+        .sync_with  ({windowApp.pl.resync(Run), scnRender.pl.mesh(Ready), magnum.pl.meshGL(Ready), magnumScn.pl.entMeshGL(New)})
         .args       ({          comScn.di.drawingRes,      scnRender.di.scnRender,        magnumScn.di.scnRenderGl,  magnum.di.renderGl })
         .func       ([] (ACtxDrawingRes &rDrawingRes, ACtxSceneRender &rScnRender, ACtxSceneRenderGL &rScnRenderGl, RenderGL &rRenderGl) noexcept
     {
@@ -255,7 +255,7 @@ FeatureDef const ftrMagnumScene = feature_def("MagnumScene", [] (
     });
 
     rFB.task()
-        .name       ("Delete entities from render groups")
+        .name       ("Delete DrawEnts from render groups")
         .sync_with  ({scnRender.pl.drawEntDelete(UseOrRun), magnumScn.pl.groupFwdEnts(Delete)})
         .args       ({             comScn.di.drawing,  magnumScn.di.groupFwd,         scnRender.di.drawEntDel })
         .func       ([] (ACtxDrawing const &rDrawing, RenderGroup &rGroupFwd, DrawEntVec_t const &rDrawEntDel) noexcept
@@ -337,7 +337,7 @@ FeatureDef const ftrShaderVisualizer = feature_def("ShaderVisualizer", [] (
 
     rFB.task()
         .name       ("Sync MeshVisualizer shader DrawEnts")
-        .sync_with  ({windowApp.pl.sync(Run), scnRender.pl.materialDirty(UseOrRun), magnum.pl.textureGL(Ready), magnumScn.pl.groupFwdEnts(Modify)})
+        .sync_with  ({windowApp.pl.sync(Run), scnRender.pl.materialDirty(UseOrRun), magnum.pl.textureGL(Ready), magnumScn.pl.groupFwdEnts(New)})
         .args       ({        scnRender.di.scnRender,  magnumScn.di.groupFwd,              shVisual.di.shader})
         .func       ([] (ACtxSceneRender &rScnRender, RenderGroup &rGroupFwd, ACtxDrawMeshVisualizer &rShader) noexcept
     {
@@ -347,7 +347,7 @@ FeatureDef const ftrShaderVisualizer = feature_def("ShaderVisualizer", [] (
 
     rFB.task()
         .name       ("Resync MeshVisualizer shader DrawEnts")
-        .sync_with  ({windowApp.pl.resync(Run), magnumScn.pl.groupFwdEnts(Modify), magnumScn.pl.groupFwd(Modify)})
+        .sync_with  ({windowApp.pl.resync(Run), magnumScn.pl.groupFwdEnts(New), magnumScn.pl.groupFwd(Modify)})
         .args       ({        scnRender.di.scnRender,  magnumScn.di.groupFwd,              shVisual.di.shader})
         .func       ([] (ACtxSceneRender &rScnRender, RenderGroup &rGroupFwd, ACtxDrawMeshVisualizer &rShader) noexcept
     {
@@ -390,7 +390,7 @@ FeatureDef const ftrShaderFlat = feature_def("ShaderFlat", [] (
 
     rFB.task()
         .name       ("Sync Flat shader DrawEnts")
-        .sync_with  ({windowApp.pl.sync(Run), magnumScn.pl.groupFwdEnts(Modify), magnumScn.pl.groupFwd(Modify), scnRender.pl.materialDirty(UseOrRun)})
+        .sync_with  ({windowApp.pl.sync(Run), magnumScn.pl.groupFwdEnts(New), magnumScn.pl.groupFwd(New), scnRender.pl.materialDirty(UseOrRun)})
         .args       ({        scnRender.di.scnRender,  magnumScn.di.groupFwd,              magnumScn.di.scnRenderGl,      shFlat.di.shader})
         .func       ([] (ACtxSceneRender &rScnRender, RenderGroup &rGroupFwd, ACtxSceneRenderGL const &rScnRenderGl, ACtxDrawFlat &rShader) noexcept
     {
@@ -409,7 +409,7 @@ FeatureDef const ftrShaderFlat = feature_def("ShaderFlat", [] (
 
     rFB.task()
         .name       ("Resync Flat shader DrawEnts")
-        .sync_with  ({windowApp.pl.resync(Run), magnum.pl.textureGL(Ready), magnumScn.pl.groupFwdEnts(Modify), magnumScn.pl.groupFwd(Modify)})
+        .sync_with  ({windowApp.pl.resync(Run), magnum.pl.textureGL(Ready), magnumScn.pl.groupFwdEnts(New), magnumScn.pl.groupFwd(Modify)})
         .args       ({        scnRender.di.scnRender,  magnumScn.di.groupFwd,              magnumScn.di.scnRenderGl,      shFlat.di.shader})
         .func       ([] (ACtxSceneRender &rScnRender, RenderGroup &rGroupFwd, ACtxSceneRenderGL const &rScnRenderGl, ACtxDrawFlat &rShader) noexcept
     {
@@ -461,7 +461,7 @@ FeatureDef const ftrShaderPhong = feature_def("ShaderPhong", [] (
 
     rFB.task()
         .name       ("Sync Phong shader DrawEnts")
-        .sync_with  ({windowApp.pl.sync(Run), scnRender.pl.materialDirty(UseOrRun), magnumScn.pl.entDiffuseGL(Ready), magnumScn.pl.groupFwdEnts(Modify), magnumScn.pl.groupFwd(Modify)})
+        .sync_with  ({windowApp.pl.sync(Run), scnRender.pl.materialDirty(UseOrRun), magnumScn.pl.entDiffuseGL(Ready), magnumScn.pl.groupFwdEnts(New), magnumScn.pl.groupFwd(Modify)})
         .args       ({        scnRender.di.scnRender,  magnumScn.di.groupFwd,              magnumScn.di.scnRenderGl,      shPhong.di.shader})
         .func       ([] (ACtxSceneRender &rScnRender, RenderGroup &rGroupFwd, ACtxSceneRenderGL const &rScnRenderGl, ACtxDrawPhong &rShader) noexcept
     {
@@ -480,7 +480,7 @@ FeatureDef const ftrShaderPhong = feature_def("ShaderPhong", [] (
 
     rFB.task()
         .name       ("Resync Phong shader DrawEnts")
-        .sync_with  ({windowApp.pl.resync(Run), magnumScn.pl.entDiffuseGL(Ready), magnumScn.pl.groupFwdEnts(Modify), magnumScn.pl.groupFwd(Modify)})
+        .sync_with  ({windowApp.pl.resync(Run), magnumScn.pl.entDiffuseGL(Ready), magnumScn.pl.groupFwdEnts(New), magnumScn.pl.groupFwd(Modify)})
         .args       ({        scnRender.di.scnRender,  magnumScn.di.groupFwd,              magnumScn.di.scnRenderGl,      shPhong.di.shader})
         .func       ([] (ACtxSceneRender &rScnRender, RenderGroup &rGroupFwd, ACtxSceneRenderGL const &rScnRenderGl, ACtxDrawPhong &rShader) noexcept
     {

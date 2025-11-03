@@ -84,7 +84,7 @@ class SinglethreadFWExecutor final : public osp::fw::IExecutor
         SubgraphId              scheduleStatus;
         SynchronizerId          schedule;
         StageId                 initialStage;
-
+        unsigned int            syncCount{0};
     };
     struct WtxPipeline
     {
@@ -120,7 +120,7 @@ class SinglethreadFWExecutor final : public osp::fw::IExecutor
         };
     };
 
-    enum class ESyncType : std::int8_t { Invalid, BlkSchedule, BlkCheckStop, BlkLeft, BlkRight, Task, TaskExt, TaskSus, PlSchedule, MaybeCancel };
+    enum class ESyncType : std::int8_t { Invalid, BlkSchedule, BlkCheckStop, BlkLeft, BlkRight, Task, TaskExt, TaskSus, PlSchedule, PlScheduleExt, MaybeCancel };
 
     struct RoxSync
     {
