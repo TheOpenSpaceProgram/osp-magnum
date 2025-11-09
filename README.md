@@ -7,7 +7,9 @@
 
 OpenSpaceProgram is an open source initiative with the goal of creating a realistic spacecraft building game inspired by Kerbal Space Program.
 
-[[Website](https://openspaceprogram.org/)]  [[Discord Server](https://discord.gg/7xFsKRg)] [[IRC](ircs://irc.libera.chat:6697/#openspaceprogram)]
+[[Website](https://openspaceprogram.org/)]  [[Discord Server](https://discord.gg/7xFsKRg)]
+
+IRC: `#openspaceprogram` on `irc.libera.chat:6697`
 
 Putting gameplay details aside (art, story, progression, etc...), a game of this nature requires a massive and complicated universe simulation with intricate vehicles, rigid-body physics, orbits, and literally rocket science. To avoid inevitably creating an unmaintainable buggy mess, we need a strong foundation built with considerable amounts of engineering and passion.
 
