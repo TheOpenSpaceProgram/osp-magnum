@@ -607,9 +607,10 @@ struct TerrainDebugDraw
 FeatureDef const ftrTerrainDebugDraw = feature_def("TerrainDebugDraw", [] (
         FeatureBuilder              &rFB,
         Implement<FITerrainDbgDraw> terrainDbgDraw,
+        DependOn<FIWindowApp>       windowApp,
         DependOn<FIScene>           scn,
         DependOn<FISceneRenderer>   scnRender,
-        DependOn<FICameraControl>   camCtrl,
+        DependOn<FICamCtrlBase>     camCtrlBase,
         DependOn<FICommonScene>     comScn,
         DependOn<FITerrain>         terrain,
         DependOn<FITerrainIco>      terrainIco,
@@ -637,9 +638,9 @@ FeatureDef const ftrTerrainDebugDraw = feature_def("TerrainDebugDraw", [] (
     rScnRender.m_mesh[rTrnDbgDraw.surface] = rDrawing.m_meshRefCounts.ref_add(rTerrain.terrainMesh);
 
     rFB.task()
-        .name       ("Handle Scene<-->Terrain positioning and floating origin")
-        .sync_with  ({camCtrl.pl.camCtrl(Modify), terrain.pl.terrainFrame(Modify)})
-        .args       ({               camCtrl.di.camCtrl,      scn.di.deltaTimeIn,         terrain.di.terrainFrame,    terrain.di.terrain,    terrainIco.di.terrainIco })
+        .name       ("Update terrain viewer position")
+        .sync_with  ({camCtrlBase.pl.camTarget(Ready), terrain.pl.terrainFrame(Ready)})
+        .args       ({           camCtrlBase.di.camCtrl,      scn.di.deltaTimeIn,         terrain.di.terrainFrame,    terrain.di.terrain,    terrainIco.di.terrainIco })
         .func       ([] (ACtxCameraController& rCamCtrl, float const deltaTimeIn, ACtxTerrainFrame &rTerrainFrame, ACtxTerrain &rTerrain, ACtxTerrainIco &rTerrainIco) noexcept
     {
         using Magnum::Math::abs;
@@ -654,30 +655,9 @@ FeatureDef const ftrTerrainDebugDraw = feature_def("TerrainDebugDraw", [] (
             return;
         }
 
-        // Camera translation with controls
-        SysCameraController::update_move(rCamCtrl, deltaTimeIn, true);
-
         int const scale = int_2pow<int>(rTerrain.skData.precision);
 
         Vector3 &rCamPos = rCamCtrl.m_target.value();
-
-        constexpr float maxDist = 65565.0f;
-
-        // Do a floating origin translation if required
-
-        // Determine if x, y, or z in rCamPos goes further than maxDist, and by how much.
-        // Round up/down towards zero to the closest multiple of maxDist.
-        // Zero if rCamPos is (maxDist) meters away.
-        Vector3 const translateOrigin = sign(rCamPos) * floor(abs(rCamPos) / maxDist) * maxDist;
-        if ( ! translateOrigin.isZero() )
-        {
-            // Origin translation involves translating everything in the scene, but in this case
-            // it's just the camera. Terrain will respond accordingly to changes in rTerrainFrame.
-            rCamPos -= translateOrigin;
-
-            // Scene has moved relative to terrain
-            rTerrainFrame.position += Vector3l{translateOrigin} * scale;
-        }
 
         // Set position of camera target relative to terrain, used for LOD distance checking
         rTerrain.scratchpad.viewerPosition = rTerrainFrame.position + Vector3l(rCamPos * float(scale));
@@ -693,26 +673,18 @@ FeatureDef const ftrTerrainDebugDraw = feature_def("TerrainDebugDraw", [] (
             rTerrain.scratchpad.viewerPosition *= minDistanceToCenter / distanceToCenter;
         }
 
-        // Set camera controller's 'up' direction to gravity direction
+        // Update camera's reference frame rotation, so 'up' points away from planet center
 
-        Vector3 const upOld = rCamCtrl.m_up;
+        Vector3 const upOld = rCamCtrl.m_refFrameRot.transformVectorNormalized(Vector3{0.0f, 0.0f, 1.0f});
         Vector3 const upNew = Vector3{viewerPosD / distanceToCenter};
-        rCamCtrl.m_up = upNew;
-
-        // A bit hacky: Rotate around the target to account for change in 'up' to prevent weird
-        //              behaviour with fast (zoomed-out) camera movement.
-        // return;   // Hard to explain, uncomment this return to see what I mean :>
 
         // Rotation required to rotate upOld into upNew
+        // note: Don't replace with "Quaternion::rotation(upOld, upNew)".
+        //       It ignores small differences
         float const w        = sqrt(upNew.dot() * upNew.dot()) + dot(upOld, upNew);
         auto  const rotation = Quaternion{cross(upOld, upNew), w}.normalized();
 
-        Vector3 const pivot = rCamCtrl.m_target.value();
-        rCamCtrl.m_transform.translation() -= pivot;
-        rCamCtrl.m_transform = Matrix4{rotation.toMatrix()} * rCamCtrl.m_transform;
-        rCamCtrl.m_transform.translation() += pivot;
-
-        SysCameraController::update_view(rCamCtrl, deltaTimeIn);
+        rCamCtrl.m_refFrameRot = (rotation * rCamCtrl.m_refFrameRot).normalized();
     });
 
     rFB.task()
@@ -816,6 +788,51 @@ FeatureDef const ftrTerrainDebugDraw = feature_def("TerrainDebugDraw", [] (
 #endif
 
 }); // ftrTerrainDebugDraw
+
+
+FeatureDef const ftrTerrainSimpleFloatingOrigin = feature_def("TerrainSimpleFloatingOrigin", [] (
+        FeatureBuilder              &rFB,
+        DependOn<FITerrain>         terrain,
+        DependOn<FISceneRenderer>   scnRender,
+        DependOn<FICamCtrlBase>     camCtrlBase)
+{
+    rFB.task()
+        .name       ("Terrain floating origin")
+        .sync_with  ({camCtrlBase.pl.camTarget(Modify), terrain.pl.terrainFrame(Modify)})
+        .args       ({           camCtrlBase.di.camCtrl,         terrain.di.terrainFrame,    terrain.di.terrain })
+        .func       ([] (ACtxCameraController& rCamCtrl, ACtxTerrainFrame &rTerrainFrame, ACtxTerrain &rTerrain) noexcept
+    {
+        if ( ! rCamCtrl.m_target.has_value() )
+        {
+            return;
+        }
+
+        int const scale = int_2pow<int>(rTerrain.skData.precision);
+
+        Vector3 &rCamPos = rCamCtrl.m_target.value();
+
+        constexpr float maxDist = 4096.0f;
+
+        // Do a floating origin translation if required
+
+        // Determine if x, y, or z in rCamPos goes further than maxDist, and by how much.
+        // Round up/down towards zero to the closest multiple of maxDist.
+        // Zero if rCamPos is (maxDist) meters away.
+        Vector3 const translateOrigin = sign(rCamPos) * floor(abs(rCamPos) / maxDist) * maxDist;
+        if ( ! translateOrigin.isZero() )
+        {
+            // Origin translation involves translating everything in the scene, but in this case
+            // it's just the camera. Terrain will respond accordingly to changes in rTerrainFrame.
+            rCamPos -= translateOrigin;
+
+            // Scene has moved relative to terrain
+            rTerrainFrame.position += Vector3l{translateOrigin} * scale;
+        }
+
+    });
+
+}); // ftrTerrainSimpleFloatingOrigin
+
 
 
 } // namespace adera

@@ -43,8 +43,8 @@
 
 using Magnum::Trade::ImageData2D;
 using Magnum::Trade::MeshData;
+using adera::ACtxCameraButtons;
 using adera::ACtxCameraController;
-using adera::SysCameraController;
 using osp::active::ActiveEnt;
 using osp::draw::DrawEnt;
 using osp::draw::RenderGL;
@@ -206,7 +206,7 @@ void update_test_scene(EngineTestScene& rScene, float const delta)
 struct EngineTestRenderer
 {
     EngineTestRenderer(UserInputHandler &rInputs)
-     : m_camCtrl(rInputs)
+     : m_camButtons(rInputs)
     { }
 
     // Support for assigning render-space GL meshes/textures and transforms
@@ -215,6 +215,7 @@ struct EngineTestRenderer
 
     // Pre-built easy camera controls
     osp::draw::Camera m_cam;
+    ACtxCameraButtons m_camButtons;
     ACtxCameraController m_camCtrl;
 
     // Phong shaders and their required data
@@ -393,8 +394,12 @@ void draw(EngineTestScene &rScene, EngineTestRenderer &rRenderer, RenderGL &rRen
     update_test_scene(rScene, delta);
 
     // Rotate and move the camera based on user inputs
-    SysCameraController::update_view(rRenderer.m_camCtrl, delta);
-    SysCameraController::update_move(rRenderer.m_camCtrl, delta, true);
+    adera::CameraCommands const commands = rRenderer.m_camButtons.read_button_inputs(delta);
+    rRenderer.m_camCtrl.apply(commands);
+    rRenderer.m_camCtrl.update_transform();
+
+    //SysCameraController::update_view(rRenderer.m_camCtrl, delta);
+    //SysCameraController::update_move(rRenderer.m_camCtrl, delta, true);
     rRenderer.m_cam.m_transform = rRenderer.m_camCtrl.m_transform;
 
     sync_test_scene  (rRenderGl, rScene, rRenderer);

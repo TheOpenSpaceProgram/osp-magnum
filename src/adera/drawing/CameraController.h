@@ -33,38 +33,34 @@
 namespace adera
 {
 
-struct ACtxCameraController
+struct CameraCommands
+{
+    float           zoom;
+    osp::Rad        yaw;
+    osp::Rad        pitch;
+    osp::Vector3    moveRelative;
+};
+
+struct ACtxCameraButtons
 {
     using EButtonControlIndex = osp::input::EButtonControlIndex;
 
-    ACtxCameraController() = default;
-    ACtxCameraController(osp::input::UserInputHandler &rInput)
+    ACtxCameraButtons(osp::input::UserInputHandler &rInput)
      : m_controls(&rInput)
-     , m_btnOrbit(      m_controls.button_subscribe("cam_orbit"))
-     , m_btnRotUp(      m_controls.button_subscribe("ui_up"))
-     , m_btnRotDn(      m_controls.button_subscribe("ui_dn"))
-     , m_btnRotLf(      m_controls.button_subscribe("ui_lf"))
-     , m_btnRotRt(      m_controls.button_subscribe("ui_rt"))
-     , m_btnMovFd(      m_controls.button_subscribe("cam_fd"))
-     , m_btnMovBk(      m_controls.button_subscribe("cam_bk"))
-     , m_btnMovLf(      m_controls.button_subscribe("cam_lf"))
-     , m_btnMovRt(      m_controls.button_subscribe("cam_rt"))
-     , m_btnMovUp(      m_controls.button_subscribe("cam_up"))
-     , m_btnMovDn(      m_controls.button_subscribe("cam_dn"))
+     , m_btnOrbit(m_controls.button_subscribe("cam_orbit"))
+     , m_btnRotUp(m_controls.button_subscribe("ui_up"))
+     , m_btnRotDn(m_controls.button_subscribe("ui_dn"))
+     , m_btnRotLf(m_controls.button_subscribe("ui_lf"))
+     , m_btnRotRt(m_controls.button_subscribe("ui_rt"))
+     , m_btnMovFd(m_controls.button_subscribe("cam_fd"))
+     , m_btnMovBk(m_controls.button_subscribe("cam_bk"))
+     , m_btnMovLf(m_controls.button_subscribe("cam_lf"))
+     , m_btnMovRt(m_controls.button_subscribe("cam_rt"))
+     , m_btnMovUp(m_controls.button_subscribe("cam_up"))
+     , m_btnMovDn(m_controls.button_subscribe("cam_dn"))
     { }
-    ACtxCameraController(ACtxCameraController const& copy) = delete;
-    ACtxCameraController(ACtxCameraController&& move) = default;
 
-    osp::Vector3 m_up{0.0f, 0.0f, 1.0f};
-
-    std::optional<osp::Vector3> m_target{osp::Vector3{}};
-    osp::Matrix4 m_transform;
-
-    float m_orbitDistance{20.0f};
-
-    float m_orbitDistanceMin{5.0f};
-
-    float m_moveSpeed{1.0f};
+    [[nodiscard]] CameraCommands read_button_inputs(float deltaTime) const;
 
     osp::input::ControlSubscriber m_controls;
 
@@ -85,32 +81,30 @@ struct ACtxCameraController
     EButtonControlIndex m_btnMovUp;
     EButtonControlIndex m_btnMovDn;
 
-}; // struct ACtxCameraController
+}; // struct ACtxCameraButtons
 
-
-class SysCameraController
+struct ACtxCameraController
 {
-public:
+    void apply(CameraCommands commands);
 
-    /**
-     * @brief Read rotation controls and orientation around its target
-     *
-     * @param rCtrl     [in] Camera Controller state
-     * @param delta     [in] Time used to calculate displacement
-     */
-    static void update_view(ACtxCameraController &rCtrl, float delta);
+    void update_transform();
 
-    /**
-     * @brief Read translation controls and move the camera accordingly
-     *
-     * @param rCtrl         [in] Camera Controller state
-     * @param delta         [in] Time used to calculate displacement
-     * @param moveTarget    [in] Option to move the target position as well.
-     *                           Leave this as always true for now, as different
-     *                           camera modes are not yet finalized.
-     */
-    static void update_move(ACtxCameraController &rCtrl, float delta, bool moveTarget);
-};
+    osp::Matrix4                    m_transform;
+    std::optional<osp::Vector3>     m_target            {osp::Vector3{}};
+
+    osp::Quaternion                 m_rot;  ///< derived from up, yaw, and pitch
+
+    osp::Quaternion                 m_refFrameRot; ///<
+
+    //osp::Vector3                    m_up                {0.0f, 1.0f, 0.0f};
+    osp::Rad                        m_yaw               {0.0f};
+    osp::Rad                        m_pitch             {0.0f}; ///< 0 to pi
+
+    float                           m_orbitDistance     {20.0f};
+    float                           m_orbitDistanceMin  {5.0f};
+    float                           m_moveSpeed         {1.0f};
+
+}; // struct ACtxCameraController
 
 
 }

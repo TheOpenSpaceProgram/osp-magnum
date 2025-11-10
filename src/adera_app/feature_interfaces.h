@@ -86,9 +86,9 @@ inline osp::PipelineTypeInfo const gc_infoForEStgIntr
  *   it is rendered. The entity should live at least one frame for other systems to be able to
  *   process and respond to entities being added or removed.
  * * Creating an entity and simultaneously requesting a floating origin translation is tough case.
- *   Make sure all positions are translated before requesting to spawn new entites.
+ *   Make sure all positions are translated before requesting to spawn new entities.
  *
- * More explainations on the current order:
+ * More explanations on the current order:
  * * Modify comes before Delete and New, because it's janky to modify elements directly after
  *   they're added. It only cares about 'what currently exists'.
  * * ReadyB4New is there to read results of Modify, without considering new or deleted elements.
@@ -658,16 +658,24 @@ struct FIUniTransfers {
     };
 };
 
+struct FIUniScenes {
+    struct DataIds {
+        DataId scenes;
+    };
+    struct Pipelines {
+        PipelineDef<EStgIntr> requestTranslate  {"requestTranslate"};
+    };
+};
+
 struct FISceneInUniverse {
     struct DataIds {
-        DataId scnCospace;
+        DataId sceneId;
     };
 
     struct Pipelines {
         //PipelineDef<EStgCont> sceneFrame        {"sceneFrame"};
     };
 };
-
 
 
 
@@ -759,14 +767,21 @@ struct FISceneRenderer {
 };
 
 
-struct FICameraControl {
+struct FICamCtrlBase {
     struct DataIds {
+        DataId camButtons;
         DataId camCtrl;
     };
 
     struct Pipelines {
-        PipelineDef<EStgCont> camCtrl           {"camCtrl"};
+        PipelineDef<EStgCont> camTarget         {"camTarget"};
+        PipelineDef<EStgCont> camTransform      {"camTransform"};
     };
+};
+
+struct FICamCtrlSpecial {
+    struct DataIds { };
+    struct Pipelines { };
 };
 
 

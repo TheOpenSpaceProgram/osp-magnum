@@ -136,6 +136,7 @@ FeatureDef const ftrUniverseCore = feature_def("UniverseCore", [] (
         FeatureBuilder              &rFB,
         Implement<FIUniCore>        uniCore,
         Implement<FIUniTransfers>   uniTransfers,
+        Implement<FIUniScenes>      uniScenes,
         DependOn<FICleanupContext>  cleanup,
         DependOn<FIMainApp>         mainApp,
         entt::any                   userData)
@@ -145,10 +146,11 @@ FeatureDef const ftrUniverseCore = feature_def("UniverseCore", [] (
     auto &rDataAccessors    = rFB.data_emplace< UCtxDataAccessors >     (uniCore.di.dataAccessors);
     auto &rDeletedSats      = rFB.data_emplace< UCtxStolenSatellites >  (uniCore.di.stolenSats);
     auto &rDataSrcss        = rFB.data_emplace< UCtxDataSources >       (uniCore.di.dataSrcs);
-    auto &rSatInst          = rFB.data_emplace< UCtxSatellites >(uniCore.di.satInst);
+    auto &rSatInst          = rFB.data_emplace< UCtxSatellites >        (uniCore.di.satInst);
     auto &rSimulations      = rFB.data_emplace< UCtxSimulations >       (uniCore.di.simulations);
     auto &rIntakes          = rFB.data_emplace< UCtxIntakes >           (uniTransfers.di.intakes);
     auto &rTransferBufs     = rFB.data_emplace< UCtxTransferBuffers >   (uniTransfers.di.transferBufs, rSimulations.ids.create());
+    auto &rScenes           = rFB.data_emplace< UCtxScenes >            (uniScenes.di.scenes);
 
     rFB.pipeline(uniCore.pl.update)                 .parent(mainApp.loopblks.mainLoop);
     rFB.pipeline(uniCore.pl.satIds)                 .parent(mainApp.loopblks.mainLoop);
@@ -168,6 +170,7 @@ FeatureDef const ftrUniverseCore = feature_def("UniverseCore", [] (
     rFB.pipeline(uniTransfers.pl.requestAccessorIds).parent(mainApp.loopblks.mainLoop);
     rFB.pipeline(uniTransfers.pl.midTransfer)       .parent(mainApp.loopblks.mainLoop);
     rFB.pipeline(uniTransfers.pl.midTransferDelete) .parent(mainApp.loopblks.mainLoop);
+    rFB.pipeline(uniScenes.pl.requestTranslate)     .parent(mainApp.loopblks.mainLoop);
 
     // DataAccessors ----------------------------------------------------------
 
@@ -520,6 +523,31 @@ FeatureDef const ftrUniverseCore = feature_def("UniverseCore", [] (
         rTransferBufs.midTransferDelete.clear();
     });
 
+    // Scenes -----------------------------------------------------------------
+
+    rFB.task()
+        .name       ("Apply requestTranslates")
+        .sync_with  ({ uniScenes.pl.requestTranslate(UseOrRun), uniCore.pl.cospaceTransform(Modify) })
+        .args       ({   uniScenes.di.scenes})
+        .func       ([] (UCtxScenes &rScenes) noexcept
+    {
+        for (ConnectedScene &rConnectedScene : rScenes.connectionOf)
+        {
+            // TODO
+        }
+    });
+
+    rFB.task()
+        .name       ("Clear requestTranslates")
+        .sync_with  ({ uniScenes.pl.requestTranslate(Clear)})
+        .args       ({   uniScenes.di.scenes})
+        .func       ([] (UCtxScenes &rScenes) noexcept
+    {
+        for (ConnectedScene &rConnectedScene : rScenes.connectionOf)
+        {
+            rConnectedScene.requestTranslate = Vector3g{0, 0, 0};
+        }
+    });
 
     // Cleanup ----------------------------------------------------------------
 
@@ -542,11 +570,31 @@ FeatureDef const ftrUniverseCore = feature_def("UniverseCore", [] (
 FeatureDef const ftrSceneInUniverse = feature_def("UniverseSceneFrame", [] (
         FeatureBuilder                  &rFB,
         Implement<FISceneInUniverse>    scnInUni,
+        DependOn<FIUniScenes>           uniScenes,
+        DependOn<FICommonScene>         comScn,
         DependOn<FIMainApp>             mainApp,
         DependOn<FIUniCore>             uniCore)
 {
-    rFB.data_emplace< CoSpaceId > (scnInUni.di.scnCospace);
+    rFB.data_emplace< SceneId > (scnInUni.di.sceneId);
+
+    //floatingOrigin.di.translateScene
+
+    // scene in universe moves -> floating origin translation
+    //                         ->
+
+    rFB.task()
+        .name       ("translate scene according to universe")
+        .sync_with  ({ uniScenes.pl.requestTranslate(UseOrRun), comScn.pl.translateOrigin(Modify_) })
+        .args       ({             comScn.di.basic, uniScenes.di.scenes, scnInUni.di.sceneId})
+        .func       ([] (active::ACtxBasic &rBasic, UCtxScenes &rScenes,     SceneId sceneId) noexcept
+    {
+        ConnectedScene const &connection = rScenes.connectionOf[sceneId];
+
+        rBasic.m_translateOrigin += Vector3(connection.requestTranslate) / 1024.0f;
+    });
+
 }); // ftrUniverseSceneFrame
+
 
 
 struct FIUniPlanetsDraw {
@@ -754,10 +802,10 @@ FeatureDef const ftrUniverseTestPlanetsDraw = feature_def("UniverseTestPlanetsDr
         DependOn<FIMainApp>         mainApp,
         DependOn<FIWindowApp>       windowApp,
         DependOn<FISceneRenderer>   scnRender,
-        DependOn<FICameraControl>   camCtrl,
         DependOn<FICommonScene>     comScn,
         DependOn<FISceneInUniverse> scnInUni,
         DependOn<FIUniCore>         uniCore,
+        DependOn<FIUniScenes>       uniScenes,
         entt::any                   userData)
 {
     auto const &params = entt::any_cast<PlanetDrawParams>(userData);
@@ -770,11 +818,11 @@ FeatureDef const ftrUniverseTestPlanetsDraw = feature_def("UniverseTestPlanetsDr
 
     rPlanetDraw.planetMat = params.planetMat;
 
-    rFB.task()
+     rFB.task()
         .name       ("Read universe datasource changes")
         .sync_with  ({uniPlanetsDraw.pl.trackedSats(Modify), uniPlanetsDraw.pl.resync(ModifyOrSignal), uniCore.pl.accessorIds(ReadyB4New), uniCore.pl.satIds(ReadyB4New)})
-        .args       ({uniPlanetsDraw.di.planetDraw,          uniCore.di.dataAccessors,               uniCore.di.satInst,        uniCore.di.dataSrcs, uniCore.di.coordSpaces, scnInUni.di.scnCospace})
-        .func       ([] (  PlanetDraw &rPlanetDraw, UCtxDataAccessors &rDataAccessors, UCtxSatellites &rSatInst, UCtxDataSources &rDataSrcs, UCtxCoordSpaces const& rCoordSpaces, CoSpaceId scnCospace) noexcept
+        .args       ({uniPlanetsDraw.di.planetDraw,          uniCore.di.dataAccessors,               uniCore.di.satInst,        uniCore.di.dataSrcs, uniCore.di.coordSpaces})
+        .func       ([] (  PlanetDraw &rPlanetDraw, UCtxDataAccessors &rDataAccessors, UCtxSatellites &rSatInst, UCtxDataSources &rDataSrcs, UCtxCoordSpaces const& rCoordSpaces) noexcept
     {
         // TODO: right now this just tracks everything and checks every update. add conditions later
 
@@ -860,12 +908,42 @@ FeatureDef const ftrUniverseTestPlanetsDraw = feature_def("UniverseTestPlanetsDr
 
     rFB.task()
         .name       ("write draw transforms")
-        .sync_with  ({windowApp.pl.sync(Run), uniPlanetsDraw.pl.resync(Run), scnRender.pl.drawEnt(Ready), scnRender.pl.drawTransforms(Ready), uniCore.pl.accessors(Ready), uniCore.pl.accessorIds(Ready), uniCore.pl.cospaceTransform(Ready), uniPlanetsDraw.pl.trackedSats(Ready)})
-        .args       ({    uniPlanetsDraw.di.planetDraw,          uniCore.di.dataAccessors,              uniCore.di.coordSpaces,        uniCore.di.simulations,             uniCore.di.stolenSats,               uniCore.di.satInst,        uniCore.di.dataSrcs,                uniCore.di.compTypes,      scnRender.di.scnRender, scnInUni.di.scnCospace})
-        .func       ([] (      PlanetDraw &rPlanetDraw, UCtxDataAccessors &rDataAccessors, UCtxCoordSpaces const& rCoordSpaces, UCtxSimulations &rSimulations, UCtxStolenSatellites &rStolenSats, UCtxSatellites &rSatInst, UCtxDataSources &rDataSrcs, UCtxComponentTypes const& compTypes, ACtxSceneRender &rScnRender,   CoSpaceId scnCospace) noexcept
+        .sync_with  ({
+            windowApp.pl.sync(Run),
+            uniPlanetsDraw.pl.resync(Run),
+            scnRender.pl.drawEnt(Ready),
+            scnRender.pl.mesh(New),
+            scnRender.pl.material(New),
+            uniCore.pl.accessors(Ready),
+            uniCore.pl.accessorIds(Ready),
+            uniCore.pl.cospaceTransform(Ready),
+            uniPlanetsDraw.pl.trackedSats(Ready)})
+        .args       ({
+            uniPlanetsDraw.di.planetDraw,
+            uniCore.di.dataAccessors,
+            uniCore.di.coordSpaces,
+            uniCore.di.simulations,
+            uniCore.di.stolenSats,
+            uniCore.di.satInst,
+            uniCore.di.dataSrcs,
+            uniCore.di.compTypes,
+            uniScenes.di.scenes,
+            scnRender.di.scnRender,
+            scnInUni.di.sceneId})
+        .func       ([] (
+            PlanetDraw &rPlanetDraw,
+            UCtxDataAccessors &rDataAccessors,
+            UCtxCoordSpaces const& rCoordSpaces,
+            UCtxSimulations &rSimulations,
+            UCtxStolenSatellites &rStolenSats,
+            UCtxSatellites &rSatInst,
+            UCtxDataSources &rDataSrcs,
+            UCtxComponentTypes const& compTypes,
+            UCtxScenes const &rScenes,
+            ACtxSceneRender &rScnRender,
+            SceneId const sceneId) noexcept
     {
         rPlanetDraw.cospaceTransformToScnOf.resize(rCoordSpaces.ids.capacity());
-
 
         TreeWalker<CoordTransformer, CospaceTransformCalculator> walker
         {
@@ -874,7 +952,10 @@ FeatureDef const ftrUniverseTestPlanetsDraw = feature_def("UniverseTestPlanetsDr
         };
 
         // writes to rPlanetDraw.cospaceTransformToScnOf
-        walker.run(rCoordSpaces.treeposOf[scnCospace], {});
+
+
+
+        walker.run(rCoordSpaces.treeposOf[rScenes.connectionOf[sceneId].cospace], {});
 
         DefaultComponents const &dc = compTypes.defaults;
         for (DataAccessorId const accessorId : rPlanetDraw.trackedAccessors)
@@ -939,7 +1020,6 @@ FeatureDef const ftrUniverseTestPlanetsDraw = feature_def("UniverseTestPlanetsDr
 
                         rScnRender.m_drawTransform[rTrackedSat.drawEnt].translation() = qux;
                     }
-
                     if (hasRotXYZW)
                     {
                         Quaternion const rot { {iter.get<float>(9), iter.get<float>(10), iter.get<float>(11)}, iter.get<float>(12)};
@@ -969,6 +1049,5 @@ FeatureDef const ftrUniverseTestPlanetsDraw = feature_def("UniverseTestPlanetsDr
     });
 
 }); // setup_testplanets_draw
-
 
 } // namespace adera

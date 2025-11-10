@@ -81,4 +81,6 @@ void initialize_ico_terrain(
 extern osp::fw::FeatureDef const ftrTerrainDebugDraw;
 
 
+extern osp::fw::FeatureDef const ftrTerrainSimpleFloatingOrigin;
+
 } // namespace adera

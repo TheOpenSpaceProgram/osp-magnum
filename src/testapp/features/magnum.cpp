@@ -268,9 +268,9 @@ FeatureDef const ftrMagnumScene = feature_def("MagnumScene", [] (
 }); // ftrMagnumScene
 
 
-FeatureDef const ftrCameraControl = feature_def("CameraControl", [] (
+FeatureDef const ftrMagnumCamCtrl = feature_def("MagnumCamCtrl", [] (
         FeatureBuilder                  &rFB,
-        Implement<FICameraControl>      camCtrl,
+        Implement<FICamCtrlBase>        camCtrlBase,
         DependOn<FIMainApp>             mainApp,
         DependOn<FICleanupContext>      cleanup,
         DependOn<FIWindowApp>           windowApp,
@@ -279,26 +279,37 @@ FeatureDef const ftrCameraControl = feature_def("CameraControl", [] (
 {
     auto &rUserInput = rFB.data_get< osp::input::UserInputHandler >(windowApp.di.userInput);
 
-    rFB.data_emplace< ACtxCameraController > (camCtrl.di.camCtrl, rUserInput);
+    rFB.data_emplace< ACtxCameraController >    (camCtrlBase.di.camCtrl);
+    rFB.data_emplace< ACtxCameraButtons >       (camCtrlBase.di.camButtons, rUserInput);
 
-    rFB.pipeline(camCtrl.pl.camCtrl).parent(mainApp.loopblks.mainLoop);
+    rFB.pipeline(camCtrlBase.pl.camTarget)   .parent(mainApp.loopblks.mainLoop);
+    rFB.pipeline(camCtrlBase.pl.camTransform).parent(mainApp.loopblks.mainLoop);
 
     rFB.task()
         .name       ("Position Rendering Camera according to Camera Controller")
-        .sync_with  ({scnRender.pl.render(Run), camCtrl.pl.camCtrl(Ready), magnumScn.pl.camera(Modify)})
-        .args       ({                     camCtrl.di.camCtrl, magnumScn.di.camera })
+        .sync_with  ({scnRender.pl.render(Run), camCtrlBase.pl.camTransform(Ready), magnumScn.pl.camera(Modify)})
+        .args       ({                 camCtrlBase.di.camCtrl, magnumScn.di.camera })
         .func       ([] (ACtxCameraController const& rCamCtrl,     Camera &rCamera) noexcept
     {
         rCamera.m_transform = rCamCtrl.m_transform;
     });
 
+     rFB.task()
+        .name       ("Update Camera controller transform")
+        .sync_with  ({camCtrlBase.pl.camTransform(Modify), camCtrlBase.pl.camTarget(Ready)})
+        .args       ({          camCtrlBase.di.camCtrl})
+        .func       ([] (ACtxCameraController& rCamCtrl) noexcept
+    {
+        rCamCtrl.update_transform();
+    });
+
     rFB.task()
         .name       ("Clean up ACtxCameraController's subscription to UserInputHandler")
         .sync_with  ({cleanup.pl.cleanup(Run_)})
-        .args       ({               camCtrl.di.camCtrl })
-        .func       ([] (ACtxCameraController &rCamCtrl) noexcept
+        .args       ({        camCtrlBase.di.camButtons })
+        .func       ([] (ACtxCameraButtons &rCamButtons) noexcept
     {
-        rCamCtrl.m_controls.unsubscribe();
+        rCamButtons.m_controls.unsubscribe();
     });
 
 }); // ftrCameraControl

@@ -60,6 +60,7 @@ using SatelliteId       = osp::StrongId<std::uint32_t, struct DummyForSatId>;
 
 using IntakeId          = osp::StrongId<std::uint32_t, struct DummyForIntakeId>;
 
+using SceneId           = osp::StrongId<std::uint32_t, struct DummyForSceneId>;
 
 using spaceint_t = std::int64_t;
 

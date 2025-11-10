@@ -337,22 +337,22 @@ FeatureDef const ftrPhysicsShapesDraw = feature_def("PhysicsShapesDraw", [] (
 FeatureDef const ftrThrower = feature_def("Thrower", [] (
         FeatureBuilder              &rFB,
         Implement<FIThrower>        thrower,
-        DependOn<FICameraControl>   camCtrl,
+        DependOn<FICamCtrlBase>     camCtrlBase,
         DependOn<FIPhysShapes>      physShapes,
         DependOn<FIWindowApp>       windowApp)
 {
-    auto &rCamCtrl = rFB.data_get< ACtxCameraController > (camCtrl.di.camCtrl);
+    auto &rCamButtons = rFB.data_get< ACtxCameraButtons > (camCtrlBase.di.camButtons);
 
-    rFB.data_emplace< EButtonControlIndex > (thrower.di.button, rCamCtrl.m_controls.button_subscribe("debug_throw"));
+    rFB.data_emplace< EButtonControlIndex > (thrower.di.button, rCamButtons.m_controls.button_subscribe("debug_throw"));
 
     rFB.task()
         .name       ("Throw spheres when pressing space")
-        .sync_with  ({windowApp.pl.inputs(Run), camCtrl.pl.camCtrl(Ready), physShapes.pl.spawnRequest(Modify_)})
-        .args       ({               camCtrl.di.camCtrl,    physShapes.di.physShapes,          thrower.di.button })
-        .func       ([] (ACtxCameraController &rCamCtrl, ACtxPhysShapes &rPhysShapes, EButtonControlIndex button) noexcept
+        .sync_with  ({windowApp.pl.inputs(Run), camCtrlBase.pl.camTransform(Ready), physShapes.pl.spawnRequest(Modify_)})
+        .args       ({        camCtrlBase.di.camButtons,         camCtrlBase.di.camCtrl,    physShapes.di.physShapes,          thrower.di.button })
+        .func       ([] (ACtxCameraButtons &rCamButtons, ACtxCameraController &rCamCtrl, ACtxPhysShapes &rPhysShapes, EButtonControlIndex button) noexcept
     {
         // Throw a sphere when the throw button is pressed
-        if (rCamCtrl.m_controls.button_held(button))
+        if (rCamButtons.m_controls.button_held(button))
         {
             Matrix4 const &camTf = rCamCtrl.m_transform;
             float const speed = 120;

@@ -403,6 +403,7 @@ void write_bytes(ArrayView<std::byte>& rRemaining, T const& value)
 FeatureDef const ftrSolarSystem = feature_def("SolarSystem", [] (
         FeatureBuilder              &rFB,
         Implement<FIUniPlanets>     uniPlanets,
+        DependOn<FIUniScenes>       uniScenes,
         DependOn<FIUniSimpleSims>   uniSimpleSims,
         DependOn<FIUniCore>         uniCore,
         DependOn<FIUniTransfers>    uniTransfers,
@@ -422,7 +423,8 @@ FeatureDef const ftrSolarSystem = feature_def("SolarSystem", [] (
     auto &rCirclePath       = rFB.data_get< UCtxCirclePathSims >    (uniSimpleSims.di.circlePath);
     auto &rConstantSpin     = rFB.data_get< UCtxConstantSpinSims >  (uniSimpleSims.di.constantSpin);
     auto &rSimpleGravity    = rFB.data_get< UCtxSimpleGravitySims > (uniSimpleSims.di.simpleGravity);
-    auto &rScnCospace       = rFB.data_get< CoSpaceId >             (scnInUni.di.scnCospace);
+    auto &rScenes           = rFB.data_get< UCtxScenes >            (uniScenes.di.scenes);
+    auto &rSceneId          = rFB.data_get< SceneId >               (scnInUni.di.sceneId);
 
     CoSpaceId const rootSpace = rCoordSpaces.ids.create();
     rCoordSpaces.resize();
@@ -519,12 +521,13 @@ FeatureDef const ftrSolarSystem = feature_def("SolarSystem", [] (
     CoSpaceId const sceneSpace = rCoordSpaces.ids.create();
     rCoordSpaces.resize();
     rCoordSpaces.insert(rootSpace, sceneSpace);
-    rScnCospace = sceneSpace;
+
+    rSceneId = rScenes.ids.create();
+    rScenes.connectionOf.resize(rScenes.ids.capacity());
+    rScenes.connectionOf[rSceneId].cospace = sceneSpace;
 
     rSimulations.simulationOf.resize(rSimulations.ids.capacity());
     rStolenSats.of.resize(rDataAccessors.ids.capacity());
-
-    rTransferBufs.midTransfersOf.resize(rSimulations.ids.capacity());
 
     rFB.task()
         .name       ("Tell all simulations to advance forward in time")
@@ -545,6 +548,7 @@ FeatureDef const ftrUniverseCospaceTest = feature_def("UniverseCospaceTest", [] 
         DependOn<FISceneInUniverse> scnInUni,
         DependOn<FIUniSimpleSims>   uniSimpleSims,
         DependOn<FIUniCore>         uniCore,
+        DependOn<FIUniScenes>       uniScenes,
         DependOn<FIUniTransfers>    uniTransfers)
 {
     using CoSpaceIdVec_t = std::vector<CoSpaceId>;
@@ -558,10 +562,12 @@ FeatureDef const ftrUniverseCospaceTest = feature_def("UniverseCospaceTest", [] 
     auto &rSimulations      = rFB.data_get< UCtxSimulations >       (uniCore.di.simulations);
     auto &rIntakes          = rFB.data_get< UCtxIntakes >           (uniTransfers.di.intakes);
     auto &rTransferBufs     = rFB.data_get< UCtxTransferBuffers >   (uniTransfers.di.transferBufs);
+    auto &rScenes           = rFB.data_get< UCtxScenes >            (uniScenes.di.scenes);
+
     auto &rCirclePath       = rFB.data_get< UCtxCirclePathSims >    (uniSimpleSims.di.circlePath);
     auto &rConstantSpinSims = rFB.data_get< UCtxConstantSpinSims >  (uniSimpleSims.di.constantSpin);
     auto &rSimpleGravity    = rFB.data_get< UCtxSimpleGravitySims > (uniSimpleSims.di.simpleGravity);
-    auto &rScnCospace       = rFB.data_get< CoSpaceId >             (scnInUni.di.scnCospace);
+    auto &rSceneId          = rFB.data_get< SceneId >               (scnInUni.di.sceneId);
 
     CoSpaceId const rootSpace  = rCoordSpaces.ids.create();
     rCoordSpaces.resize();
@@ -631,12 +637,14 @@ FeatureDef const ftrUniverseCospaceTest = feature_def("UniverseCospaceTest", [] 
     rCoordSpaces.resize();
     rCoordSpaces.transformOf[sceneSpace].parentSat = rCirclePath.instOf[circleSimId].sim.m_data[5].id;
     rCoordSpaces.insert(rootSpace, sceneSpace);
-    rScnCospace = sceneSpace;
+
+
+    rSceneId = rScenes.ids.create();
+    rScenes.connectionOf.resize(rScenes.ids.capacity());
+    rScenes.connectionOf[rSceneId].cospace = sceneSpace;
 
     rSimulations.simulationOf.resize(rSimulations.ids.capacity());
     rStolenSats.of.resize(rDataAccessors.ids.capacity());
-
-    rTransferBufs.midTransfersOf.resize(rSimulations.ids.capacity());
 
     rFB.task()
         .name       ("Tell all simulations to advance forward in time")
