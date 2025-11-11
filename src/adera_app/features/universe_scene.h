@@ -1,6 +1,6 @@
 /**
  * Open Space Program
- * Copyright © 2019-2024 Open Space Program Project
+ * Copyright © 2019-2025 Open Space Program Project
  *
  * MIT License
  *
@@ -24,34 +24,31 @@
  */
 #pragma once
 
-#include "../feature_interfaces.h"
-
 #include <osp/framework/framework.h>
 #include <osp/framework/builder.h>
-#include <osp/universe/universe.h>
 #include <osp/drawing/drawing.h>
-
-
-namespace ftr_inter
-{
-
-
-};
 
 namespace adera
 {
 
-// Universe Scenario
+
+struct PlanetDrawParams
+{
+    osp::draw::MaterialId planetMat;
+    osp::draw::MaterialId axisMat;
+};
 
 /**
- * @brief Core Universe struct with addressable Coordinate Spaces
+ * @brief Represents the physics scene's presence in a Universe
  */
-extern osp::fw::FeatureDef const ftrUniverseCore;
+extern osp::fw::FeatureDef const ftrSceneInUniverse;
+
 
 /**
- * @brief Temporary constant 15ms update rate for all simulations
+ * @brief Draw universe using an OSP scene
  */
-extern osp::fw::FeatureDef const ftrUniverseEqualTimeUpdate;
+extern osp::fw::FeatureDef const ftrUniverseDebugDraw;
+
 
 } // namespace adera
 

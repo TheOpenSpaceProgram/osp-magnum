@@ -33,8 +33,6 @@
 #include <osp/drawing/drawing_fn.h>
 #include <osp/drawing/prefab_draw.h>
 
-#include <random>
-
 using namespace adera;
 using namespace ftr_inter::stages;
 using namespace ftr_inter;
@@ -47,35 +45,6 @@ using osp::input::EButtonControlIndex;
 
 namespace adera
 {
-
-void add_floor(Framework &rFW, ContextId sceneCtx, PkgId pkg, int size)
-{
-    auto const physShapes = rFW.get_interface<FIPhysShapes>(sceneCtx);
-
-    auto &rPhysShapes = rFW.data_get<ACtxPhysShapes>(physShapes.di.physShapes);
-
-    std::mt19937 randGen(69);
-    auto distSizeX  = std::uniform_real_distribution<float>{20.0, 80.0};
-    auto distSizeY  = std::uniform_real_distribution<float>{20.0, 80.0};
-    auto distHeight = std::uniform_real_distribution<float>{1.0, 10.0};
-
-    constexpr float spread      = 128.0f;
-
-    for (int x = -size; x < size+1; ++x)
-    {
-        for (int y = -size; y < size+1; ++y)
-        {
-            float const heightZ = distHeight(randGen);
-            rPhysShapes.m_spawnRequest.emplace_back(SpawnShape{
-                .m_position = Vector3{float(x)*spread, float(y)*spread, heightZ},
-                .m_velocity = {0.0f, 0.0f, 0.0f},
-                .m_size     = Vector3{distSizeX(randGen), distSizeY(randGen), heightZ},
-                .m_mass     = 0.0f,
-                .m_shape    = EShape::Box
-            });
-        }
-    }
-}
 
 
 FeatureDef const ftrPhysicsShapes = feature_def("PhysicsShapes", [] (

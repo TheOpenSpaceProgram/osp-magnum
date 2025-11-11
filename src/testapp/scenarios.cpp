@@ -35,11 +35,13 @@
 #include <adera_app/features/terrain.h>
 #include <adera_app/features/universe.h>
 #include <adera_app/features/universe_sims.h>
+#include <adera_app/features/universe_scene.h>
 #include <adera_app/features/vehicles.h>
 #include <adera_app/features/vehicles_machines.h>
 #include <adera_app/features/vehicles_prebuilt.h>
 
 #include <adera_app/application.h>
+#include <adera_app/scenario_utils.h>
 #include <adera/activescene/vehicles_vb_fn.h>
 #include <adera/drawing/CameraController.h>
 
@@ -330,10 +332,13 @@ static ScenarioMap_t make_scenarios()
         auto const scene = args.rFW.get_interface<FIScene>(sceneCtx);
 
         sceneCB.add_feature(ftrUniverseCore);
+        sceneCB.add_feature(ftrUniverseEqualTimeUpdate);
         sceneCB.add_feature(ftrSceneInUniverse);
         sceneCB.add_feature(ftrUniverseSimpleSimulators);
-        sceneCB.add_feature(ftrUniverseCospaceTest);
+
         ContextBuilder::finalize(std::move(sceneCB));
+
+        setup_uni_cospace_test(args.rFW, sceneCtx);
     }});
 
 
@@ -360,10 +365,12 @@ static ScenarioMap_t make_scenarios()
         auto const scene = args.rFW.get_interface<FIScene>(sceneCtx);
 
         sceneCB.add_feature(ftrUniverseCore);
+        sceneCB.add_feature(ftrUniverseEqualTimeUpdate);
         sceneCB.add_feature(ftrSceneInUniverse);
         sceneCB.add_feature(ftrUniverseSimpleSimulators);
-        sceneCB.add_feature(ftrSolarSystem);
         ContextBuilder::finalize(std::move(sceneCB));
+
+        setup_uni_solar_system(args.rFW, sceneCtx);
     }});
 
 
@@ -391,10 +398,9 @@ static ScenarioMap_t make_scenarios()
         auto const scene = args.rFW.get_interface<FIScene>(sceneCtx);
 
         sceneCB.add_feature(ftrUniverseCore);
+        sceneCB.add_feature(ftrUniverseEqualTimeUpdate);
         sceneCB.add_feature(ftrSceneInUniverse);
         sceneCB.add_feature(ftrUniverseSimpleSimulators);
-        sceneCB.add_feature(ftrUniverseCospaceTest);
-
 
         sceneCB.add_feature(ftrTerrain);
         sceneCB.add_feature(ftrTerrainIcosahedron);
@@ -427,6 +433,8 @@ static ScenarioMap_t make_scenarios()
 
 
         ContextBuilder::finalize(std::move(sceneCB));
+
+        setup_uni_solar_system(args.rFW, sceneCtx);
 
         auto terrain        = args.rFW.get_interface<FITerrain>(sceneCtx);
         auto &rTerrain      = args.rFW.data_get<ACtxTerrain>(terrain.di.terrain);

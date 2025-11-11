@@ -22,6 +22,16 @@
  * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
  * SOFTWARE.
  */
+
+/**
+ * @file
+ * @brief Dead-simple particle/satellite/point-mass simulators, with little dependency on OSP.
+ *
+ * To be integrated into OSP universe, 4 bytes of userdata per-satellite is needed to store
+ * SatelliteIds to keep track of satellites as they're moved around in buffers.
+ * We can add a parallel vectors into simulations_glue.h, but lets keep it simple and just use
+ * SatelliteId directly here.
+ */
 #pragma once
 
 #include <osp/universe/universe.h>
@@ -86,4 +96,4 @@ struct SimpleGravitySim
 
 
 
-} // namespace adera::sims
+} // namespace adera

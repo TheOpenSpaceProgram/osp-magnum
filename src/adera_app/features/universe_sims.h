@@ -62,14 +62,5 @@ namespace adera
 
 extern osp::fw::FeatureDef const ftrUniverseSimpleSimulators;
 
-
-/**
- * @brief Initializes planet information, position, mass etc...
- */
-extern osp::fw::FeatureDef const ftrSolarSystem;
-
-
-extern osp::fw::FeatureDef const ftrUniverseCospaceTest;
-
 } // namespace adera
 

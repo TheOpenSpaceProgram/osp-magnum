@@ -37,6 +37,7 @@
 #include <adera_app/features/terrain.h>
 #include <adera_app/features/universe.h>
 #include <adera_app/features/universe_sims.h>
+#include <adera_app/features/universe_scene.h>
 #include <adera_app/features/vehicles.h>
 #include <adera_app/features/vehicles_machines.h>
 
@@ -163,7 +164,6 @@ ContextId make_scene_renderer(Framework &rFW, PkgId defaultPkg, ContextId mainCo
     if ( ! scnRdrCB.has_error() && rFW.get_interface_id<FITerrain>(sceneCtx).has_value() )
     {
         scnRdrCB.add_feature(ftrTerrainDebugDraw, matVisualizer);
-        scnRdrCB.add_feature(ftrTerrainSimpleFloatingOrigin);
 
         scnRdrCB.add_feature(ftrTerrainDrawMagnum);
 
@@ -177,13 +177,13 @@ ContextId make_scene_renderer(Framework &rFW, PkgId defaultPkg, ContextId mainCo
 
     if (rFW.get_interface_id<FIUniCore>(sceneCtx).has_value())
     {
-        scnRdrCB.add_feature(ftrUniverseTestPlanetsDraw, PlanetDrawParams{
+        scnRdrCB.add_feature(ftrUniverseDebugDraw, PlanetDrawParams{
             .planetMat = matVisualizer,
             .axisMat   = matFlat });
     }
-    else
+    else if (rFW.get_interface_id<FITerrain>(sceneCtx).has_value())
     {
-
+        scnRdrCB.add_feature(ftrTerrainSimpleFloatingOrigin);
     }
 
     auto &rScnRenderGl = rFW.data_get<draw::ACtxSceneRenderGL>(magnumScn.di.scnRenderGl);

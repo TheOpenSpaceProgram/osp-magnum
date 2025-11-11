@@ -1,6 +1,6 @@
 /**
  * Open Space Program
- * Copyright © 2019-2024 Open Space Program Project
+ * Copyright © 2019-2025 Open Space Program Project
  *
  * MIT License
  *
@@ -22,36 +22,16 @@
  * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
  * SOFTWARE.
  */
-#pragma once
-
-#include "../feature_interfaces.h"
 
 #include <osp/framework/framework.h>
-#include <osp/framework/builder.h>
-#include <osp/universe/universe.h>
-#include <osp/drawing/drawing.h>
+#include <osp/core/resourcetypes.h>
 
+namespace adera {
 
-namespace ftr_inter
-{
+void add_floor(osp::fw::Framework &rFW, osp::fw::ContextId sceneCtx, osp::PkgId pkg, int size);
 
+void setup_uni_solar_system(osp::fw::Framework &rFW, osp::fw::ContextId sceneCtx);
 
-};
-
-namespace adera
-{
-
-// Universe Scenario
-
-/**
- * @brief Core Universe struct with addressable Coordinate Spaces
- */
-extern osp::fw::FeatureDef const ftrUniverseCore;
-
-/**
- * @brief Temporary constant 15ms update rate for all simulations
- */
-extern osp::fw::FeatureDef const ftrUniverseEqualTimeUpdate;
+void setup_uni_cospace_test(osp::fw::Framework &rFW, osp::fw::ContextId sceneCtx);
 
 } // namespace adera
-
