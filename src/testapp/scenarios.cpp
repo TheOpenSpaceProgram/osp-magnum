@@ -460,11 +460,7 @@ static ScenarioMap_t make_scenarios()
             });
             rVehicleSpawnVB.dataVB.push_back(rPrebuiltVehicles[gc_pbvSimpleCommandServiceModule].get());
         }
-
-        ContextBuilder::finalize(std::move(sceneCB));
     }});
-
-
 
     return scenarioMap;
 }

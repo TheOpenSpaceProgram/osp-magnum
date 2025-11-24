@@ -180,6 +180,11 @@ ContextId make_scene_renderer(Framework &rFW, PkgId defaultPkg, ContextId mainCo
         scnRdrCB.add_feature(ftrUniverseDebugDraw, PlanetDrawParams{
             .planetMat = matVisualizer,
             .axisMat   = matFlat });
+
+        if (rFW.get_interface_id<FISceneInUniverse>(sceneCtx).has_value())
+        {
+            scnRdrCB.add_feature(ftrCamFloatingOrigin);
+        }
     }
     else if (rFW.get_interface_id<FITerrain>(sceneCtx).has_value())
     {

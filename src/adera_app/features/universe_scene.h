@@ -43,11 +43,15 @@ struct PlanetDrawParams
  */
 extern osp::fw::FeatureDef const ftrSceneInUniverse;
 
+extern osp::fw::FeatureDef const ftrCamFloatingOrigin;
+
+extern osp::fw::FeatureDef const ftrTerrainUniverse;
 
 /**
  * @brief Draw universe using an OSP scene
  */
 extern osp::fw::FeatureDef const ftrUniverseDebugDraw;
+
 
 
 } // namespace adera

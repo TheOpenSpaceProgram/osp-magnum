@@ -473,10 +473,12 @@ FeatureDef const ftrVehicleControl = feature_def("VehicleControl", [] (
 
     rFB.task()
         .name       ("Update vehicle camera")
-        .sync_with  ({windowApp.pl.sync(Run), camCtrlBase.pl.camTarget(Modify), phys.pl.physUpdate(Done), parts.pl.mapWeldActive(Ready)})
-        .args       ({           camCtrlBase.di.camCtrl,      scn.di.deltaTimeIn,         comScn.di.basic,       vhclCtrl.di.vhControls,          parts.di.scnParts,          links.di.links})
-        .func       ([] (ACtxCameraController& rCamCtrl, float const deltaTimeIn, ACtxBasic const& rBasic, VehicleControls& rVhControls, ACtxParts const& rScnParts, ACtxLinks const& rLinks) noexcept
+        .sync_with  ({windowApp.pl.sync(Run), windowApp.pl.inputs(Run), camCtrlBase.pl.camTarget(Modify), phys.pl.physUpdate(Done), parts.pl.mapWeldActive(Ready)})
+        .args       ({           camCtrlBase.di.camCtrl,           camCtrlBase.di.camButtons,      scn.di.deltaTimeIn,         comScn.di.basic,       vhclCtrl.di.vhControls,          parts.di.scnParts,          links.di.links})
+        .func       ([] (ACtxCameraController& rCamCtrl, ACtxCameraButtons const& camButtons, float const deltaTimeIn, ACtxBasic const& rBasic, VehicleControls& rVhControls, ACtxParts const& rScnParts, ACtxLinks const& rLinks) noexcept
     {
+        CameraCommands cmds = camButtons.read_button_inputs(deltaTimeIn);
+
         if (rVhControls.selectedUsrCtrl != lgrn::id_null<MachLocalId>())
         {
             // Follow selected UserControl machine
@@ -493,25 +495,11 @@ FeatureDef const ftrVehicleControl = feature_def("VehicleControl", [] (
             {
                 rCamCtrl.m_target = rBasic.m_transform.get(selectedEnt).m_transform.translation();
             }
-        }
-        else
-        {
-            // Free cam when no vehicle selected
-            //SysCameraController::update_move(
-            //        rCamCtrl,
-            //        deltaTimeIn, true);
-        }
 
-        //SysCameraController::update_view(rCamCtrl, deltaTimeIn);
-    });
+            cmds.moveRelative = {}; // Locked to vehicle, ignore freecam translation
+        }
+        // else, freecam
 
-        rFB.task()
-        .name       ("Move Camera controller")
-        .sync_with  ({windowApp.pl.inputs(Run), camCtrlBase.pl.camTarget(Modify)})
-        .args       ({    camCtrlBase.di.camCtrl,           camCtrlBase.di.camButtons,      scn.di.deltaTimeIn })
-        .func([] (ACtxCameraController& rCamCtrl, ACtxCameraButtons const& camButtons, float const deltaTimeIn) noexcept
-    {
-        CameraCommands const cmds = camButtons.read_button_inputs(deltaTimeIn);
         rCamCtrl.apply(cmds);
     });
 

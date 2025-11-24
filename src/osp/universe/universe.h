@@ -91,6 +91,29 @@ struct UCtxCoordSpaces
         transformOf.resize(cospaceCapacity);
     }
 
+    /**
+     * linear search backwards in treeDescendants to find parent
+     */
+    CoSpaceId parent_of(CoSpaceId const child) const
+    {
+        TreePos_t const childPos = treeposOf[child];
+
+        TreePos_t parent = childPos;
+        std::uint32_t required = 0;
+
+        while (parent != 0)
+        {
+            parent   -= 1;
+            required += 1;
+            if (treeDescendants[parent] >= required)
+            {
+                return treeToId[parent];
+            }
+        }
+
+        return {};
+    }
+
     void insert(CoSpaceId parent, CoSpaceId addme)
     {
         if (parent.has_value())
@@ -134,6 +157,10 @@ struct UCtxCoordSpaces
                     }
                 }
             }
+
+            auto const capacity = ids.capacity();
+            transformOf    .resize(capacity);
+            treeposOf      .resize(capacity);
         }
         else
         {

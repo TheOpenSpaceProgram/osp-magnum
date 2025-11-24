@@ -678,7 +678,6 @@ struct FISceneInUniverse {
 };
 
 
-
 //-----------------------------------------------------------------------------
 
 // Solar System feature interfaces
@@ -775,6 +774,7 @@ struct FICamCtrlBase {
 
     struct Pipelines {
         PipelineDef<EStgCont> camTarget         {"camTarget"};
+        PipelineDef<EStgCont> camRefFrame       {"camRefFrame"};
         PipelineDef<EStgCont> camTransform      {"camTransform"};
     };
 };
@@ -809,8 +809,6 @@ struct FICursor {
     struct Pipelines { };
 };
 
-
-
 struct FIVehicleControl {
     struct DataIds {
         DataId vhControls;
@@ -818,6 +816,16 @@ struct FIVehicleControl {
 
     struct Pipelines {
         PipelineDef<EStgCont> selectedVehicle   {"selectedVehicle"};
+    };
+};
+
+struct FICamFltOrig {
+    struct DataIds {
+        DataId translateOriginDelayed;
+    };
+
+    struct Pipelines {
+        PipelineDef<EStgIntr> translateOriginDelayed   {"translateOriginDelayed"};
     };
 };
 

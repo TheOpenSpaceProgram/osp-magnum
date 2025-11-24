@@ -528,12 +528,14 @@ FeatureDef const ftrUniverseCore = feature_def("UniverseCore", [] (
     rFB.task()
         .name       ("Apply requestTranslates")
         .sync_with  ({ uniScenes.pl.requestTranslate(UseOrRun), uniCore.pl.cospaceTransform(Modify) })
-        .args       ({   uniScenes.di.scenes})
-        .func       ([] (UCtxScenes &rScenes) noexcept
+        .args       ({   uniScenes.di.scenes, uniCore.di.coordSpaces})
+        .func       ([] (UCtxScenes &rScenes, UCtxCoordSpaces &coordSpaces) noexcept
     {
-        for (ConnectedScene &rConnectedScene : rScenes.connectionOf)
+        for (SceneId const sceneId : rScenes.ids)
         {
-            // TODO
+            ConnectedScene const &cs = rScenes.connectionOf[sceneId];
+            CospaceTransform &rTf = coordSpaces.transformOf[cs.cospace];
+            rTf.position += cs.requestTranslate;
         }
     });
 

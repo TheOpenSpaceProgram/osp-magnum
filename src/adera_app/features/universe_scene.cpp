@@ -26,6 +26,8 @@
 
 #include "../feature_interfaces.h"
 
+#include <planet-a/activescene/terrain.h>
+
 #include <adera/universe_demo/simulations.h>
 #include <adera/universe_demo/simulations_glue.h>
 
@@ -39,7 +41,9 @@
 using namespace adera;
 using namespace ftr_inter::stages;
 using namespace ftr_inter;
+using namespace osp::active;
 using namespace osp::draw;
+using namespace osp::math;
 using namespace osp::fw;
 using namespace osp::universe;
 using namespace osp;
@@ -58,11 +62,6 @@ FeatureDef const ftrSceneInUniverse = feature_def("UniverseSceneFrame", [] (
 {
     rFB.data_emplace< SceneId > (scnInUni.di.sceneId);
 
-    //floatingOrigin.di.translateScene
-
-    // scene in universe moves -> floating origin translation
-    //                         ->
-
     rFB.task()
         .name       ("translate scene according to universe")
         .sync_with  ({ uniScenes.pl.requestTranslate(UseOrRun), comScn.pl.translateOrigin(Modify_) })
@@ -71,11 +70,98 @@ FeatureDef const ftrSceneInUniverse = feature_def("UniverseSceneFrame", [] (
     {
         ConnectedScene const &connection = rScenes.connectionOf[sceneId];
 
+        if (connection.requestTranslate.isZero()) { return; }
+
         rBasic.m_translateOrigin += Vector3(connection.requestTranslate) / 1024.0f;
     });
 
 }); // ftrUniverseSceneFrame
 
+
+FeatureDef const ftrCamFloatingOrigin = feature_def("ftrCameraFloatingOrigin", [] (
+        FeatureBuilder                  &rFB,
+        Implement<FICamFltOrig>         camFltOrig,
+        DependOn<FIMainApp>             mainApp,
+        DependOn<FICommonScene>         comScn,
+        DependOn<FISceneInUniverse>     scnInUni,
+        DependOn<FICamCtrlBase>         camCtrl,
+        DependOn<FIUniCore>             uniCore,
+        DependOn<FIUniScenes>           uniScenes)
+{
+    rFB.pipeline(camFltOrig.pl.translateOriginDelayed).parent(mainApp.loopblks.mainLoop).initial_stage(UseOrRun);
+
+    rFB.data_emplace< Vector3 > (camFltOrig.di.translateOriginDelayed);
+
+    rFB.task()
+        .name       ("Request floating origin translation from camera target position")
+        .sync_with  ({ camCtrl.pl.camTarget(Ready), camFltOrig.pl.translateOriginDelayed(Modify_) })
+        .args       ({               camCtrl.di.camCtrl, camFltOrig.di.translateOriginDelayed})
+        .func       ([] (ACtxCameraController &rCamCtrl,     Vector3 &rTranslateOriginDelayed) noexcept
+    {
+        Vector3 &rCamPos = rCamCtrl.m_target.value();
+
+        constexpr float maxDist = 1024.0f;
+
+        // Round up/down x, y, or z to nearest multiple of maxDist
+        // TODO: consider scale
+        rTranslateOriginDelayed = sign(rCamPos) * floor(abs(rCamPos) / maxDist) * maxDist;
+    });
+
+    rFB.task()
+        .name       ("Request to translate universe-side scene according to translateOriginDelayed")
+        .sync_with  ({ uniScenes.pl.requestTranslate(Modify_), camFltOrig.pl.translateOriginDelayed(UseOrRun)})
+        .args       ({   uniScenes.di.scenes,              uniCore.di.coordSpaces, scnInUni.di.sceneId,   camFltOrig.di.translateOriginDelayed})
+        .func       ([] (UCtxScenes &rScenes, UCtxCoordSpaces const &rCoordSpaces,     SceneId sceneId, Vector3 const &rTranslateOriginDelayed) noexcept
+    {
+        ConnectedScene &rConnection = rScenes.connectionOf[sceneId];
+
+        float const scale = 1024; // TODO: get scale from cospace
+
+        // Redundant if statement, but you can put a breakpoint in the body.
+        if ( ! rTranslateOriginDelayed.isZero() )
+        {
+            rConnection.requestTranslate += Vector3l(rTranslateOriginDelayed) * scale;
+        }
+    });
+
+    rFB.task()
+        .name       ("Translate camera according to rBasic.m_translateOrigin")
+        .sync_with  ({ comScn.pl.translateOrigin(UseOrRun), camCtrl.pl.camTarget(Modify) })
+        .args       ({           comScn.di.basic,             camCtrl.di.camCtrl})
+        .func       ([] (ACtxBasic const& rBasic, ACtxCameraController &rCamCtrl) noexcept
+    {
+        if (rCamCtrl.m_target.has_value())
+        {
+            rCamCtrl.m_target.value() -= rBasic.m_translateOrigin;
+        }
+    });
+}); // ftrCamFloatingOrigin
+
+
+FeatureDef const ftrTerrainUniverse = feature_def("TerrainUniverse", [] (
+        FeatureBuilder                  &rFB,
+        DependOn<FIUniCore>             uniCore,
+        DependOn<FIUniScenes>           uniScenes,
+        DependOn<FISceneInUniverse>     scnInUni,
+        DependOn<FITerrain>             terrain)
+{
+    using namespace planeta;
+
+    rFB.task()
+        .name       ("read planet position and orient terrain")
+        .sync_with  ({uniCore.pl.cospaceTransform(ReadyB4New), terrain.pl.terrainFrame(Modify)})
+        .args       ({                  uniCore.di.dataAccessors,             uniCore.di.coordSpaces,       uniScenes.di.scenes,         terrain.di.terrainFrame,   scnInUni.di.sceneId })
+        .func       ([] (UCtxDataAccessors const &rDataAccessors, UCtxCoordSpaces const& coordSpaces, UCtxScenes const& rScenes, ACtxTerrainFrame &rTerrainFrame, SceneId const sceneId) noexcept
+    {
+        // what is the position of terrain relative to scene origin?
+
+        auto &fish = rScenes.connectionOf[sceneId];
+        CoSpaceId parent = coordSpaces.parent_of(fish.cospace);
+        Vector3g pos = coordSpaces.transformOf[fish.cospace].position;
+        rTerrainFrame.position = pos;
+    });
+
+}); // ftrTerrainSimpleFloatingOrigin
 
 
 struct FIUniDebugDraw {

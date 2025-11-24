@@ -283,7 +283,9 @@ FeatureDef const ftrMagnumCamCtrl = feature_def("MagnumCamCtrl", [] (
     rFB.data_emplace< ACtxCameraButtons >       (camCtrlBase.di.camButtons, rUserInput);
 
     rFB.pipeline(camCtrlBase.pl.camTarget)   .parent(mainApp.loopblks.mainLoop);
+    rFB.pipeline(camCtrlBase.pl.camRefFrame) .parent(mainApp.loopblks.mainLoop);
     rFB.pipeline(camCtrlBase.pl.camTransform).parent(mainApp.loopblks.mainLoop);
+
 
     rFB.task()
         .name       ("Position Rendering Camera according to Camera Controller")
@@ -296,7 +298,7 @@ FeatureDef const ftrMagnumCamCtrl = feature_def("MagnumCamCtrl", [] (
 
      rFB.task()
         .name       ("Update Camera controller transform")
-        .sync_with  ({camCtrlBase.pl.camTransform(Modify), camCtrlBase.pl.camTarget(Ready)})
+        .sync_with  ({camCtrlBase.pl.camTransform(Modify), camCtrlBase.pl.camTarget(Ready), camCtrlBase.pl.camRefFrame(Ready)})
         .args       ({          camCtrlBase.di.camCtrl})
         .func       ([] (ACtxCameraController& rCamCtrl) noexcept
     {

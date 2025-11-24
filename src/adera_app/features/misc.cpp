@@ -54,8 +54,8 @@ FeatureDef const ftrCameraFree = feature_def("CameraFree", [] (
     rFB.task()
         .name       ("Move Camera controller")
         .sync_with  ({windowApp.pl.inputs(Run), camCtrl.pl.camTarget(Modify)})
-        .args       ({        camCtrl.di.camCtrl,     camCtrl.di.camButtons,        scn.di.deltaTimeIn })
-        .func([] (ACtxCameraController& rCamCtrl, ACtxCameraButtons const& camButtons, float const deltaTimeIn) noexcept
+        .args       ({               camCtrl.di.camCtrl,               camCtrl.di.camButtons,      scn.di.deltaTimeIn })
+        .func       ([] (ACtxCameraController& rCamCtrl, ACtxCameraButtons const& camButtons, float const deltaTimeIn) noexcept
     {
         CameraCommands const cmds = camButtons.read_button_inputs(deltaTimeIn);
         rCamCtrl.apply(cmds);
@@ -94,7 +94,7 @@ FeatureDef const ftrCursor = feature_def("Cursor", [] (
     rMat.m_ents.insert(cursorEnt);
 
     rFB.task()
-        .name       ("Move cursor")
+        .name       ("Update cursor position")
         .sync_with  ({scnRender.pl.render(Run), camCtrlBase.pl.camTransform(Ready), scnRender.pl.drawTransforms(New)})
         .args       ({       cursor.di.drawEnt,               camCtrlBase.di.camCtrl,      scnRender.di.scnRender })
         .func       ([] (DrawEnt const drawEnt, ACtxCameraController const& rCamCtrl, ACtxSceneRender& rScnRender) noexcept

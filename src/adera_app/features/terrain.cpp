@@ -44,6 +44,7 @@
 using namespace adera;
 using namespace ftr_inter::stages;
 using namespace ftr_inter;
+using namespace osp::active;
 using namespace osp::draw;
 using namespace osp::fw;
 using namespace osp::math;
@@ -452,149 +453,6 @@ FeatureDef const ftrTerrainSubdivDist = feature_def("TerrainSubdivDist", [] (
     });
 }); // ftrTerrainSubdivDist
 
-void initialize_ico_terrain(
-        osp::fw::Framework          &rFW,
-        osp::fw::ContextId          sceneCtx,
-        TerrainTestPlanetSpecs      specs)
-{
-    auto const terrain      = rFW.get_interface<FITerrain>(sceneCtx);
-    auto const terrainIco   = rFW.get_interface<FITerrainIco>(sceneCtx);
-
-    auto &rTerrain          = rFW.data_get<ACtxTerrain>      (terrain.di.terrain);
-    auto &rTerrainFrame     = rFW.data_get<ACtxTerrainFrame> (terrain.di.terrainFrame);
-    auto &rTerrainIco       = rFW.data_get<ACtxTerrainIco>   (terrainIco.di.terrainIco);
-
-    rTerrainFrame.active = true;
-
-    // ## Create initial icosahedron skeleton
-
-    rTerrainIco.radius          = specs.radius;
-    rTerrainIco.height          = specs.height;
-    rTerrain.skData.precision   = specs.skelPrecision;
-    rTerrain.skeleton = create_skeleton_icosahedron(
-            rTerrainIco.radius,
-            rTerrainIco.icoVrtx,
-            rTerrainIco.icoGroups,
-            rTerrainIco.icoTri,
-            rTerrain.skData);
-
-    rTerrain.skeleton.levelMax = specs.skelMaxSubdivLevels;
-
-    // ## Assign skeleton icosahedron position data
-
-    rTerrain.skData.resize(rTerrain.skeleton);
-
-    double const scale     = std::exp2(double(rTerrain.skData.precision));
-    double const maxRadius = rTerrainIco.radius + rTerrainIco.height;
-
-    for (SkTriGroupId const groupId : rTerrainIco.icoGroups)
-    {
-        ico_calc_sphere_tri_center(groupId, maxRadius, rTerrainIco.height, rTerrain.skeleton, rTerrain.skData);
-    }
-
-    // ## Prepare the skeleton subdiv scratchpad.
-    // This contains intermediate variables used when subdividing the triangle skeleton.
-
-    SkeletonSubdivScratchpad &rSP = rTerrain.scratchpad;
-    rSP.resize(rTerrain.skeleton);
-    for (SkTriGroupId const groupId : rTerrainIco.icoGroups)
-    {
-        // Notify subsequent functions of the newly added initial icosahedron faces
-        rSP.surfaceAdded.insert(tri_id(groupId, 0));
-        rSP.surfaceAdded.insert(tri_id(groupId, 1));
-        rSP.surfaceAdded.insert(tri_id(groupId, 2));
-        rSP.surfaceAdded.insert(tri_id(groupId, 3));
-    }
-
-    // Set function pointer to apply spherical curvature to the skeleton on subdivision.
-    // Spherical planets are not hard-coded into subdivision logic, it's intended to work
-    // to work for non-spherical shapes too.
-    rTerrain.scratchpad.onSubdivUserData[0] = &rTerrainIco;
-    rSP.onSubdiv = [] (
-            SkTriId                             tri,
-            SkTriGroupId                        groupId,
-            std::array<SkVrtxId, 3>             corners,
-            std::array<MaybeNewId<SkVrtxId>, 3> middles,
-            SubdivTriangleSkeleton              &rSkel,
-            SkeletonVertexData                  &rSkData,
-            SkeletonSubdivScratchpad::UserData_t userData) noexcept
-    {
-        auto const& rTerrainIco = *reinterpret_cast<ACtxTerrainIco*>(userData[0]);
-        ico_calc_middles(rTerrainIco.radius, corners, middles, rSkData);
-        ico_calc_sphere_tri_center(groupId, rTerrainIco.radius + rTerrainIco.height, rTerrainIco.height, rSkel, rSkData);
-    };
-
-    // Nothing to do on un-subdivide
-    rSP.onUnsubdiv = [] (
-            SkTriId                         tri,
-            SkeletonTriangle                &rTri,
-            SubdivTriangleSkeleton          &rSkel,
-            SkeletonVertexData              &rSkData,
-            SkeletonSubdivScratchpad::UserData_t userData) noexcept
-    { };
-
-    // Calculate distance thresholds for when skeleton triangles should be subdivided and
-    // unsubdivided. These threshold values are used by
-    // subdivide_level_by_distance(...) and unsubdivide_select_by_distance(...)
-    for (int level = 0; level < gc_maxSubdivLevels; ++level)
-    {
-        // Good-enough bounding sphere is ~75% of the edge length (determined using Blender)
-        double const edgeLength = gc_icoMaxEdgeVsLevel[level] * rTerrainIco.radius * scale;
-        double const subdivRadius = 0.75 * edgeLength;
-
-        // TODO: Pick thresholds based on the angular diameter (size on screen) of the
-        //       chunk triangle mesh that will actually be rendered.
-        rSP.distanceThresholdSubdiv[level] = subdivRadius;
-
-        // Unsubdivide thresholds should be slightly larger (arbitrary x2) to avoid rapid
-        // terrain changes when moving back and forth quickly
-        rSP.distanceThresholdUnsubdiv[level] = 2.0f * subdivRadius;
-    }
-
-    // ## Prepare Chunk Skeleton
-
-    std::uint8_t const chunkSubdivLevels = specs.chunkSubdivLevels;
-
-    rTerrain.skChunks = make_skeleton_chunks(chunkSubdivLevels);
-
-    // Approximate max number of chunks. Determined experimentally with margin. Surprisingly linear.
-    std::uint32_t const maxChunksApprox = 42 * specs.skelMaxSubdivLevels + 30;
-
-    // Approximate max number of shared vertices. Determined experimentally, roughly 60% of all
-    // vertices end up being shared. Margin is inherited from maxChunksApprox.
-    std::uint32_t const maxVrtxApprox = maxChunksApprox * rTerrain.skChunks.m_chunkSharedCount;
-    std::uint32_t const maxSharedVrtxApprox = std::uint32_t(0.6f * float(maxVrtxApprox));
-
-    rTerrain.skChunks.chunk_reserve(std::uint16_t(maxChunksApprox));
-    rTerrain.skChunks.shared_reserve(maxSharedVrtxApprox);
-
-    // ## Prepare Chunk geometry and buffer information
-
-    rTerrain.chunkInfo = make_chunk_mesh_buffer_info(rTerrain.skChunks);
-    rTerrain.chunkGeom.resize(rTerrain.skChunks, rTerrain.chunkInfo);
-
-    // ## Prepare Chunk scratchpad
-
-    rTerrain.chunkSP.lut = make_chunk_vrtx_subdiv_lut(chunkSubdivLevels);
-    rTerrain.chunkSP.resize(rTerrain.skChunks);
-
-    OSP_LOG_INFO("Terrain Chunk Properties:\n"
-                 "* MaxChunks: {}\n"
-                 "* FillVerticesPerChunk: {}\n"
-                 "* SharedVerticesPerChunk: {}\n"
-                 "* MaxTrianglesPerChunk: {}\n"
-                 "* MaxSharedVertices: {}\n"
-                 "* VertexBufferSize: {} bytes\n"
-                 "* IndexBufferSize: {} bytes",
-                 rTerrain.skChunks.m_chunkIds.capacity(),
-                 rTerrain.chunkInfo.fillVrtxCount,
-                 rTerrain.skChunks.m_chunkSharedCount,
-                 rTerrain.chunkInfo.chunkMaxFaceCount,
-                 rTerrain.skChunks.m_sharedIds.capacity(),
-                 fmt::group_digits(rTerrain.chunkGeom.vrtxBuffer.size()),
-                 fmt::group_digits(rTerrain.chunkGeom.indxBuffer.size() * sizeof(Vector3u)));
-}
-
 
 
 struct TerrainDebugDraw
@@ -639,7 +497,7 @@ FeatureDef const ftrTerrainDebugDraw = feature_def("TerrainDebugDraw", [] (
 
     rFB.task()
         .name       ("Update terrain viewer position")
-        .sync_with  ({camCtrlBase.pl.camTarget(Ready), terrain.pl.terrainFrame(Ready)})
+        .sync_with  ({camCtrlBase.pl.camTarget(Ready), camCtrlBase.pl.camRefFrame(Modify), terrain.pl.terrainFrame(Ready)})
         .args       ({           camCtrlBase.di.camCtrl,      scn.di.deltaTimeIn,         terrain.di.terrainFrame,    terrain.di.terrain,    terrainIco.di.terrainIco })
         .func       ([] (ACtxCameraController& rCamCtrl, float const deltaTimeIn, ACtxTerrainFrame &rTerrainFrame, ACtxTerrain &rTerrain, ACtxTerrainIco &rTerrainIco) noexcept
     {
@@ -693,9 +551,10 @@ FeatureDef const ftrTerrainDebugDraw = feature_def("TerrainDebugDraw", [] (
         .args       ({    terrainDbgDraw.di.draw,         terrain.di.terrainFrame,    terrain.di.terrain,     scnRender.di.scnRender })
         .func       ([] (TerrainDebugDraw& rDraw, ACtxTerrainFrame &rTerrainFrame, ACtxTerrain &rTerrain, ACtxSceneRender &rScnRender) noexcept
     {
-        float const scale = std::exp2(float(rTerrain.skData.precision));
+        float   const scale = std::exp2(float(rTerrain.skData.precision));
+        Vector3 const pos   = Vector3(rTerrain.chunkGeom.originSkelPos-rTerrainFrame.position) / scale;
 
-        Vector3 const pos = Vector3(rTerrain.chunkGeom.originSkelPos-rTerrainFrame.position) / scale;
+        LGRN_ASSERTM(pos.isZero(), "For now, this is expected to always be zero. see TODO in 'Update Terrain Chunks'");
 
         rScnRender.m_drawTransform[rDraw.surface] = Matrix4::translation(pos);
     });
