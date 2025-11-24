@@ -133,18 +133,22 @@ FeatureDef const ftrPrebuiltVehicles = feature_def("PrebuiltVehicles", [] (
         VehicleBuilder vbuilder{&rResources};
         VehicleBuilder::WeldVec_t toWeld;
 
-        auto const [ capsule, fueltank, engineA, engineB ] = vbuilder.create_parts<4>();
+        auto const [ capsule, fueltank, engineA, engineB, engineC, engineD ] = vbuilder.create_parts<6>();
         vbuilder.set_prefabs({
             { capsule,  "phCapsule" },
             { fueltank, "phFuselage" },
             { engineA,  "phEngine" },
             { engineB,  "phEngine" },
+            { engineC,  "phEngine" },
+            { engineD,  "phEngine" },
         });
 
-        toWeld.push_back( {capsule,  quick_transform({ 0.0f,  0.0f,  3.0f}, {})} );
+        toWeld.push_back( {capsule,  quick_transform({ 0.0f,  0.0f,  3.128f}, {})} );
         toWeld.push_back( {fueltank, quick_transform({ 0.0f,  0.0f,  0.0f}, {})} );
-        toWeld.push_back( {engineA,  quick_transform({ 0.7f,  0.0f, -2.9f}, {})} );
-        toWeld.push_back( {engineB,  quick_transform({-0.7f,  0.0f, -2.9f}, {})} );
+        toWeld.push_back( {engineA,  quick_transform({ 0.7f,  0.7f, -2.9f}, {})} );
+        toWeld.push_back( {engineB,  quick_transform({-0.7f,  0.7f, -2.9f}, {})} );
+        toWeld.push_back( {engineC,  quick_transform({ 0.7f, -0.7f, -2.9f}, {})} );
+        toWeld.push_back( {engineD,  quick_transform({-0.7f, -0.7f, -2.9f}, {})} );
 
         namespace ports_magicrocket = adera::ports_magicrocket;
         namespace ports_userctrl = adera::ports_userctrl;
@@ -152,7 +156,7 @@ FeatureDef const ftrPrebuiltVehicles = feature_def("PrebuiltVehicles", [] (
         auto const [ pitch, yaw, roll, throttle, thrustMul ] = vbuilder.create_nodes<5>(gc_ntSigFloat);
 
         auto &rFloatValues = vbuilder.node_values< SignalValues_t<float> >(gc_ntSigFloat);
-        rFloatValues[thrustMul] = 50000.0f;
+        rFloatValues[thrustMul] = 100000.0f;
 
         vbuilder.create_machine(capsule, gc_mtUserCtrl, {
             { ports_userctrl::gc_throttleOut,   throttle },
@@ -171,6 +175,17 @@ FeatureDef const ftrPrebuiltVehicles = feature_def("PrebuiltVehicles", [] (
             { ports_magicrocket::gc_multiplierIn, thrustMul }
         } );
 
+        vbuilder.create_machine(engineC, gc_mtMagicRocket, {
+            { ports_magicrocket::gc_throttleIn, throttle },
+            { ports_magicrocket::gc_multiplierIn, thrustMul }
+        } );
+
+        vbuilder.create_machine(engineD, gc_mtMagicRocket, {
+            { ports_magicrocket::gc_throttleIn, throttle },
+            { ports_magicrocket::gc_multiplierIn, thrustMul }
+        } );
+
+
         RCSInputs rcsInputs{pitch, yaw, roll};
 
         static constexpr int const   rcsRingBlocks   = 4;
@@ -178,7 +193,7 @@ FeatureDef const ftrPrebuiltVehicles = feature_def("PrebuiltVehicles", [] (
         static constexpr float const rcsRingZ        = -2.0f;
         static constexpr float const rcsZStep        = 4.0f;
         static constexpr float const rcsRadius       = 1.1f;
-        static constexpr float const rcsThrust       = 3000.0f;
+        static constexpr float const rcsThrust       = 4000.0f;
 
         for (int ring = 0; ring < rcsRingCount; ++ring)
         {
