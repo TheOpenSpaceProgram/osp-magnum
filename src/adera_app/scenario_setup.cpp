@@ -22,7 +22,7 @@
  * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
  * SOFTWARE.
  */
-#include "scenario_utils.h"
+#include "scenario_setup.h"
 #include "feature_interfaces.h"
 
 #include "features/shapes.h"
@@ -31,10 +31,14 @@
 #include <adera/universe_demo/simulations.h>
 #include <adera/universe_demo/simulations_glue.h>
 
+#include <planet-a/activescene/terrain.h>
+#include <planet-a/icosahedron.h>
+
 #include <osp/activescene/physics.h>
 #include <osp/drawing/drawing.h>
 
 #include <osp/core/math_2pow.h>
+#include <osp/util/logging.h>
 
 #include <random>
 
@@ -46,6 +50,8 @@ using namespace osp::universe;
 using namespace osp::draw;
 using namespace osp::fw;
 using namespace osp;
+using namespace planeta;
+
 
 void adera::add_floor(Framework &rFW, ContextId sceneCtx, PkgId pkg, int size)
 {
@@ -308,14 +314,282 @@ void adera::setup_uni_cospace_test(Framework &rFW, ContextId sceneCtx)
 
     rSceneId = rScenes.ids.create();
     rScenes.connectionOf.resize(rScenes.ids.capacity());
-    rScenes.connectionOf[rSceneId].cospace = sceneSpace;
+    ConnectedScene &rCS = rScenes.connectionOf[rSceneId];
+    rCS.cospace = sceneSpace;
 
     rSimulations.simulationOf   .resize(rSimulations.ids.capacity());
     rTransferBufs.midTransfersOf.resize(rSimulations.ids.capacity());
 
     rStolenSats.of.resize(rDataAccessors.ids.capacity());
 
+} // adera::setup_uni_cospace_test
 
+void adera::initialize_ico_terrain(
+        osp::fw::Framework          &rFW,
+        osp::fw::ContextId          sceneCtx,
+        TerrainTestPlanetSpecs      specs)
+{
+    using namespace planeta;
 
+    auto const terrain      = rFW.get_interface<FITerrain>(sceneCtx);
+    auto const terrainIco   = rFW.get_interface<FITerrainIco>(sceneCtx);
+
+    auto &rTerrain          = rFW.data_get<ACtxTerrain>      (terrain.di.terrain);
+    auto &rTerrainFrame     = rFW.data_get<ACtxTerrainFrame> (terrain.di.terrainFrame);
+    auto &rTerrainIco       = rFW.data_get<ACtxTerrainIco>   (terrainIco.di.terrainIco);
+
+    rTerrainFrame.active = true;
+
+    // ## Create initial icosahedron skeleton
+
+    rTerrainIco.radius          = specs.radius;
+    rTerrainIco.height          = specs.height;
+    rTerrain.skData.precision   = specs.skelPrecision;
+    rTerrain.skeleton = create_skeleton_icosahedron(
+            rTerrainIco.radius,
+            rTerrainIco.icoVrtx,
+            rTerrainIco.icoGroups,
+            rTerrainIco.icoTri,
+            rTerrain.skData);
+
+    rTerrain.skeleton.levelMax = specs.skelMaxSubdivLevels;
+
+    // ## Assign skeleton icosahedron position data
+
+    rTerrain.skData.resize(rTerrain.skeleton);
+
+    double const scale     = std::exp2(double(rTerrain.skData.precision));
+    double const maxRadius = rTerrainIco.radius + rTerrainIco.height;
+
+    for (SkTriGroupId const groupId : rTerrainIco.icoGroups)
+    {
+        ico_calc_sphere_tri_center(groupId, maxRadius, rTerrainIco.height, rTerrain.skeleton, rTerrain.skData);
+    }
+
+    // ## Prepare the skeleton subdiv scratchpad.
+    // This contains intermediate variables used when subdividing the triangle skeleton.
+
+    SkeletonSubdivScratchpad &rSP = rTerrain.scratchpad;
+    rSP.resize(rTerrain.skeleton);
+    for (SkTriGroupId const groupId : rTerrainIco.icoGroups)
+    {
+        // Notify subsequent functions of the newly added initial icosahedron faces
+        rSP.surfaceAdded.insert(tri_id(groupId, 0));
+        rSP.surfaceAdded.insert(tri_id(groupId, 1));
+        rSP.surfaceAdded.insert(tri_id(groupId, 2));
+        rSP.surfaceAdded.insert(tri_id(groupId, 3));
+    }
+
+    // Set function pointer to apply spherical curvature to the skeleton on subdivision.
+    // Spherical planets are not hard-coded into subdivision logic, it's intended to work
+    // to work for non-spherical shapes too.
+    rTerrain.scratchpad.onSubdivUserData[0] = &rTerrainIco;
+    rSP.onSubdiv = [] (
+            SkTriId                             tri,
+            SkTriGroupId                        groupId,
+            std::array<SkVrtxId, 3>             corners,
+            std::array<MaybeNewId<SkVrtxId>, 3> middles,
+            SubdivTriangleSkeleton              &rSkel,
+            SkeletonVertexData                  &rSkData,
+            SkeletonSubdivScratchpad::UserData_t userData) noexcept
+    {
+        auto const& rTerrainIco = *reinterpret_cast<ACtxTerrainIco*>(userData[0]);
+        ico_calc_middles(rTerrainIco.radius, corners, middles, rSkData);
+        ico_calc_sphere_tri_center(groupId, rTerrainIco.radius + rTerrainIco.height, rTerrainIco.height, rSkel, rSkData);
+    };
+
+    // Nothing to do on un-subdivide
+    rSP.onUnsubdiv = [] (
+            SkTriId                         tri,
+            SkeletonTriangle                &rTri,
+            SubdivTriangleSkeleton          &rSkel,
+            SkeletonVertexData              &rSkData,
+            SkeletonSubdivScratchpad::UserData_t userData) noexcept
+    { };
+
+    // Calculate distance thresholds for when skeleton triangles should be subdivided and
+    // unsubdivided. These threshold values are used by
+    // subdivide_level_by_distance(...) and unsubdivide_select_by_distance(...)
+    for (int level = 0; level < gc_maxSubdivLevels; ++level)
+    {
+        // Good-enough bounding sphere is ~75% of the edge length (determined using Blender)
+        double const edgeLength = gc_icoMaxEdgeVsLevel[level] * rTerrainIco.radius * scale;
+        double const subdivRadius = 0.75 * edgeLength;
+
+        // TODO: Pick thresholds based on the angular diameter (size on screen) of the
+        //       chunk triangle mesh that will actually be rendered.
+        rSP.distanceThresholdSubdiv[level] = subdivRadius;
+
+        // Unsubdivide thresholds should be slightly larger (arbitrary x2) to avoid rapid
+        // terrain changes when moving back and forth quickly
+        rSP.distanceThresholdUnsubdiv[level] = 2.0f * subdivRadius;
+    }
+
+    // ## Prepare Chunk Skeleton
+
+    std::uint8_t const chunkSubdivLevels = specs.chunkSubdivLevels;
+
+    rTerrain.skChunks = make_skeleton_chunks(chunkSubdivLevels);
+
+    // Approximate max number of chunks. Determined experimentally with margin. Surprisingly linear.
+    std::uint32_t const maxChunksApprox = 42 * specs.skelMaxSubdivLevels + 30;
+
+    // Approximate max number of shared vertices. Determined experimentally, roughly 60% of all
+    // vertices end up being shared. Margin is inherited from maxChunksApprox.
+    std::uint32_t const maxVrtxApprox = maxChunksApprox * rTerrain.skChunks.m_chunkSharedCount;
+    std::uint32_t const maxSharedVrtxApprox = std::uint32_t(0.6f * float(maxVrtxApprox));
+
+    rTerrain.skChunks.chunk_reserve(std::uint16_t(maxChunksApprox));
+    rTerrain.skChunks.shared_reserve(maxSharedVrtxApprox);
+
+    // ## Prepare Chunk geometry and buffer information
+
+    rTerrain.chunkInfo = make_chunk_mesh_buffer_info(rTerrain.skChunks);
+    rTerrain.chunkGeom.resize(rTerrain.skChunks, rTerrain.chunkInfo);
+
+    // ## Prepare Chunk scratchpad
+
+    rTerrain.chunkSP.lut = make_chunk_vrtx_subdiv_lut(chunkSubdivLevels);
+    rTerrain.chunkSP.resize(rTerrain.skChunks);
+
+    OSP_LOG_INFO("Terrain Chunk Properties:\n"
+                 "* MaxChunks: {}\n"
+                 "* FillVerticesPerChunk: {}\n"
+                 "* SharedVerticesPerChunk: {}\n"
+                 "* MaxTrianglesPerChunk: {}\n"
+                 "* MaxSharedVertices: {}\n"
+                 "* VertexBufferSize: {} bytes\n"
+                 "* IndexBufferSize: {} bytes",
+                 rTerrain.skChunks.m_chunkIds.capacity(),
+                 rTerrain.chunkInfo.fillVrtxCount,
+                 rTerrain.skChunks.m_chunkSharedCount,
+                 rTerrain.chunkInfo.chunkMaxFaceCount,
+                 rTerrain.skChunks.m_sharedIds.capacity(),
+                 fmt::group_digits(rTerrain.chunkGeom.vrtxBuffer.size()),
+                 fmt::group_digits(rTerrain.chunkGeom.indxBuffer.size() * sizeof(Vector3u)));
 }
+
+
+
+void adera::setup_flight_test(Framework &rFW, ContextId sceneCtx)
+{
+    using CoSpaceIdVec_t = std::vector<CoSpaceId>;
+
+    auto const uniCore          = rFW.get_interface<FIUniCore>          (sceneCtx);
+    auto const uniTransfers     = rFW.get_interface<FIUniTransfers>     (sceneCtx);
+    auto const uniSimpleSims    = rFW.get_interface<FIUniSimpleSims>    (sceneCtx);
+    auto const uniScenes        = rFW.get_interface<FIUniScenes>        (sceneCtx);
+    auto const scnInUni         = rFW.get_interface<FISceneInUniverse>  (sceneCtx);
+
+    auto &rCoordSpaces      = rFW.data_get< UCtxCoordSpaces >       (uniCore.di.coordSpaces);
+    auto &rCompTypes        = rFW.data_get< UCtxComponentTypes >    (uniCore.di.compTypes);
+    auto &rDataAccessors    = rFW.data_get< UCtxDataAccessors >     (uniCore.di.dataAccessors);
+    auto &rStolenSats       = rFW.data_get< UCtxStolenSatellites >  (uniCore.di.stolenSats);
+    auto &rDataSrcs         = rFW.data_get< UCtxDataSources >       (uniCore.di.dataSrcs);
+    auto &rSatInst          = rFW.data_get< UCtxSatellites >        (uniCore.di.satInst);
+    auto &rSimulations      = rFW.data_get< UCtxSimulations >       (uniCore.di.simulations);
+    auto &rIntakes          = rFW.data_get< UCtxIntakes >           (uniTransfers.di.intakes);
+    auto &rTransferBufs     = rFW.data_get< UCtxTransferBuffers >   (uniTransfers.di.transferBufs);
+    auto &rScenes           = rFW.data_get< UCtxScenes >            (uniScenes.di.scenes);
+
+    auto &rCirclePath       = rFW.data_get< UCtxCirclePathSims >    (uniSimpleSims.di.circlePath);
+    auto &rConstantSpinSims = rFW.data_get< UCtxConstantSpinSims >  (uniSimpleSims.di.constantSpin);
+    auto &rSimpleGravity    = rFW.data_get< UCtxSimpleGravitySims > (uniSimpleSims.di.simpleGravity);
+    auto &rSceneId          = rFW.data_get< SceneId >               (scnInUni.di.sceneId);
+
+    auto terrain        = rFW.get_interface<FITerrain>(sceneCtx);
+    auto &rTerrain      = rFW.data_get<ACtxTerrain>(terrain.di.terrain);
+
+    constexpr std::uint64_t c_earthRadius = 6371000;
+    initialize_ico_terrain(rFW, sceneCtx, {
+        .radius                 = double(c_earthRadius),
+        .height                 = 20000.0,   // Height between Mariana Trench and Mount Everest
+        .skelPrecision          = 10,        // 2^10 units = 1024 units = 1 meter
+        .skelMaxSubdivLevels    = 16,
+        .chunkSubdivLevels      = 4
+    });
+
+    CoSpaceId const rootSpace  = rCoordSpaces.ids.create();
+    rCoordSpaces.resize();
+    rCoordSpaces.insert({}, rootSpace);
+
+    constexpr int seed = 328;
+    std::mt19937 gen(seed);
+
+    auto add_circle_orbit = [&rCirclePath, &rSimulations, &rDataAccessors, &rCoordSpaces, &rSatInst, &gen, dist = std::uniform_real_distribution<double>(0.0, 1.0)]
+            (CoSpaceId parentCospace, SatelliteId parentSat, Quaterniond rot, double minR, double maxR, double GM, std::initializer_list<double> dists) mutable -> CirclePathSimId
+    {
+        CirclePathSimId const circleSimId = rCirclePath.ids.create();
+        rCirclePath.instOf.resize(rCirclePath.ids.size());
+
+        UCtxCirclePathSims::Instance &rCircleSim = rCirclePath.instOf[circleSimId];
+        rCircleSim = UCtxCirclePathSims::Instance{
+            .simId             = rSimulations.ids.create(),
+            .updateInterval    = 15,
+            .accessorId        = rDataAccessors.ids.create(),
+            .cospaceId         = parentCospace,
+        };
+
+        if (parentSat.has_value())
+        {
+            rCircleSim.cospaceId = rCoordSpaces.ids.create();
+            auto const cospaceCapacity = rCoordSpaces.ids.capacity();
+            rCoordSpaces.resize();
+            rCoordSpaces.transformOf[rCircleSim.cospaceId].parentSat = parentSat;
+            rCoordSpaces.transformOf[rCircleSim.cospaceId].rotation = rot;
+            rCoordSpaces.insert(parentCospace, rCircleSim.cospaceId);
+        }
+        else
+        {
+            rCircleSim.cospaceId = parentCospace;
+        }
+
+        rCircleSim.sim.m_data.resize(dists.size());
+        for (int i = 0; i < dists.size(); ++i)
+        {
+            double const r = *(dists.begin() + i) * 1000.0;
+            double const T = (r == 0.0) ? (123456.0) : (2 * 3.1415926536 * std::sqrt(r*r*r / GM) * 1000.0);
+
+            CirclePathSim::SatData &rSatData = rCircleSim.sim.m_data[i];
+            rSatData = CirclePathSim::SatData{
+                .radius     = r,
+                .period     = std::uint64_t(T),
+                .cycleTime  = std::uint64_t(dist(gen) * T),
+                .id         = rSatInst.ids.create()
+            };
+        }
+        return circleSimId;
+    };
+
+    CirclePathSimId const circleSimId = add_circle_orbit(rootSpace, {}, {}, 10.0*1024.0, 100.0*1024.0, 2000000000000.0,
+    {
+        0.0, 5.0, 20.0, 30.0, 38.0, 49.0, 60.0, 85.0, 90.0, 110.0
+    });
+
+    CirclePathSimId const fnslfalfl = add_circle_orbit(rootSpace, rCirclePath.instOf[circleSimId].sim.m_data[4].id, Quaterniond({1.0, 0.0, 0.0}, 0.69*3.1415926536), 10.0*1024.0, 100.0*1024.0, 2000000000000.0,
+    {
+        2.0, 4.0
+    });
+
+
+    // Setup coordinate space used by Scene-In-Universe system
+    CoSpaceId const sceneSpace = rCoordSpaces.ids.create();
+    rCoordSpaces.resize();
+    rCoordSpaces.transformOf[sceneSpace].position = Vector3l{0, 0, c_earthRadius} * 1024;
+    //rCoordSpaces.transformOf[sceneSpace].parentSat = rCirclePath.instOf[circleSimId].sim.m_data[5].id;
+    rCoordSpaces.insert(rootSpace, sceneSpace);
+
+
+    rSceneId = rScenes.ids.create();
+
+    rScenes.connectionOf.resize(rScenes.ids.capacity());
+    ConnectedScene &rCS = rScenes.connectionOf[rSceneId];
+    rCS.cospace = sceneSpace;
+
+    rSimulations.simulationOf   .resize(rSimulations.ids.capacity());
+    rTransferBufs.midTransfersOf.resize(rSimulations.ids.capacity());
+
+    rStolenSats.of.resize(rDataAccessors.ids.capacity());
+
+} // adera::setup_flight_test
 

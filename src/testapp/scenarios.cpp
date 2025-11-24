@@ -41,7 +41,7 @@
 #include <adera_app/features/vehicles_prebuilt.h>
 
 #include <adera_app/application.h>
-#include <adera_app/scenario_utils.h>
+#include <adera_app/scenario_setup.h>
 #include <adera/activescene/vehicles_vb_fn.h>
 #include <adera/drawing/CameraController.h>
 
@@ -406,6 +406,7 @@ static ScenarioMap_t make_scenarios()
         sceneCB.add_feature(ftrTerrainIcosahedron);
         sceneCB.add_feature(ftrTerrainSubdivDist);
 
+        sceneCB.add_feature(ftrTerrainUniverse);
 
         sceneCB.add_feature(ftrPhysics);
         sceneCB.add_feature(ftrPhysicsShapes, osp::draw::MaterialId{0});
@@ -422,7 +423,6 @@ static ScenarioMap_t make_scenarios()
         sceneCB.add_feature(ftrMachMagicRockets);
         sceneCB.add_feature(ftrMachRCSDriver);
 
-
         sceneCB.add_feature(ftrJolt);
         sceneCB.add_feature(ftrJoltConstAccel);
         sceneCB.add_feature(ftrPhysicsShapesJolt);
@@ -434,30 +434,13 @@ static ScenarioMap_t make_scenarios()
 
         ContextBuilder::finalize(std::move(sceneCB));
 
-        setup_uni_solar_system(args.rFW, sceneCtx);
-
-        auto terrain        = args.rFW.get_interface<FITerrain>(sceneCtx);
-        auto &rTerrain      = args.rFW.data_get<ACtxTerrain>(terrain.di.terrain);
-        auto &rTerrainFrame = args.rFW.data_get<ACtxTerrainFrame>(terrain.di.terrainFrame);
-
-        constexpr std::uint64_t c_earthRadius = 6371000;
-        initialize_ico_terrain(args.rFW, sceneCtx, {
-            .radius                 = double(c_earthRadius),
-            .height                 = 20000.0,   // Height between Mariana Trench and Mount Everest
-            .skelPrecision          = 10,        // 2^10 units = 1024 units = 1 meter
-            .skelMaxSubdivLevels    = 16,
-            .chunkSubdivLevels      = 4
-        });
-
-
-        // Set scene position relative to planet to be just on the surface
-        rTerrainFrame.position = Vector3l{0,0,c_earthRadius} * 1024;
+        setup_flight_test(args.rFW, sceneCtx);
 
         ospjolt::ForceFactors_t const gravity = add_constant_acceleration(sc_gravityForce, args.rFW, sceneCtx);
         set_phys_shape_factors(gravity, args.rFW, sceneCtx);
         set_vehicle_default_factors(gravity, args.rFW, sceneCtx);
 
-        add_floor(args.rFW, sceneCtx, args.defaultPkg, 4);
+        //add_floor(args.rFW, sceneCtx, args.defaultPkg, 4);
 
         auto vhclSpawn          = args.rFW.get_interface<FIVehicleSpawn>(sceneCtx);
         auto vhclSpawnVB        = args.rFW.get_interface<FIVehicleSpawnVB>(sceneCtx);
