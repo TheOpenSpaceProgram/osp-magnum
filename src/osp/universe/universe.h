@@ -91,6 +91,29 @@ struct UCtxCoordSpaces
         transformOf.resize(cospaceCapacity);
     }
 
+    /**
+     * linear search backwards in treeDescendants to find parent
+     */
+    CoSpaceId parent_of(CoSpaceId const child) const
+    {
+        TreePos_t const childPos = treeposOf[child];
+
+        TreePos_t parent = childPos;
+        std::uint32_t required = 0;
+
+        while (parent != 0)
+        {
+            parent   -= 1;
+            required += 1;
+            if (treeDescendants[parent] >= required)
+            {
+                return treeToId[parent];
+            }
+        }
+
+        return {};
+    }
+
     void insert(CoSpaceId parent, CoSpaceId addme)
     {
         if (parent.has_value())
@@ -134,6 +157,10 @@ struct UCtxCoordSpaces
                     }
                 }
             }
+
+            auto const capacity = ids.capacity();
+            transformOf    .resize(capacity);
+            treeposOf      .resize(capacity);
         }
         else
         {
@@ -379,6 +406,17 @@ struct UCtxStolenSatellites
 
 using ComponentTypeIdSet_t = StaticIdSet_t<ComponentTypeId, 128>;
 
+inline ComponentTypeIdSet_t component_type_set(std::initializer_list<ComponentTypeId const> typeIds)
+{
+    ComponentTypeIdSet_t out{};
+    out.clear(); // paranoid this might not zero-init, so just clear to zero
+    for (ComponentTypeId const typeId : typeIds)
+    {
+        out.emplace(typeId);
+    }
+    return out;
+}
+
 /**
  * @brief Determines what components a satellite has and which data accessors it uses.
  *
@@ -574,16 +612,29 @@ struct UCtxTransferBuffers
 
 //-----------------------------------------------------------------------------
 
-static ComponentTypeIdSet_t component_type_set(std::initializer_list<ComponentTypeId const> typeIds)
+struct ConnectedScene
 {
-    ComponentTypeIdSet_t out{};
-    out.clear(); // paranoid this might not zero-init, so just clear to zero
-    for (ComponentTypeId const typeId : typeIds)
-    {
-        out.emplace(typeId);
-    }
-    return out;
-}
+    Vector3g requestTranslate;
+
+    //Vector3d newVelocity;
+    //bool     reqestNewVelocity;
+
+    CoSpaceId cospace;
+};
+
+struct UCtxScenes
+{
+    SimulationId simId;
+    lgrn::IdRegistryStl<SceneId> ids;
+
+    osp::KeyedVec<SceneId, ConnectedScene> connectionOf;
+};
+
+
+struct ACtxSceneInUniverse
+{
+    SceneId sceneId;
+};
 
 
 } // namespace osp::universe

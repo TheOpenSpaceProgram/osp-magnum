@@ -41,7 +41,6 @@ namespace ftr_inter
 namespace adera
 {
 
-
 // Universe Scenario
 
 /**
@@ -49,25 +48,10 @@ namespace adera
  */
 extern osp::fw::FeatureDef const ftrUniverseCore;
 
-
 /**
- * @brief Represents the physics scene's presence in a Universe
+ * @brief Temporary constant 15ms update rate for all simulations
  */
-extern osp::fw::FeatureDef const ftrSceneInUniverse;
-
-
-/**
- * @brief Draw universe, specifically designed for setup_uni_test_planets
- */
-extern osp::fw::FeatureDef const ftrUniverseTestPlanetsDraw;
-
-
-struct PlanetDrawParams
-{
-    osp::draw::MaterialId planetMat;
-    osp::draw::MaterialId axisMat;
-};
-
+extern osp::fw::FeatureDef const ftrUniverseEqualTimeUpdate;
 
 } // namespace adera
 

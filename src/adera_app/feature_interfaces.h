@@ -86,9 +86,9 @@ inline osp::PipelineTypeInfo const gc_infoForEStgIntr
  *   it is rendered. The entity should live at least one frame for other systems to be able to
  *   process and respond to entities being added or removed.
  * * Creating an entity and simultaneously requesting a floating origin translation is tough case.
- *   Make sure all positions are translated before requesting to spawn new entites.
+ *   Make sure all positions are translated before requesting to spawn new entities.
  *
- * More explainations on the current order:
+ * More explanations on the current order:
  * * Modify comes before Delete and New, because it's janky to modify elements directly after
  *   they're added. It only cares about 'what currently exists'.
  * * ReadyB4New is there to read results of Modify, without considering new or deleted elements.
@@ -522,6 +522,40 @@ struct FISignalsFloat {
     };
 };
 
+struct FITerrain {
+    struct DataIds {
+        DataId terrainFrame;
+        DataId terrain;
+    };
+
+    struct Pipelines {
+        PipelineDef<EStgCont> skeleton          {"skeleton"};
+        PipelineDef<EStgIntr> surfaceChanges    {"surfaceChanges"};
+        PipelineDef<EStgCont> chunkMesh         {"chunkMesh"};
+        PipelineDef<EStgCont> terrainFrame      {"terrainFrame"};
+    };
+};
+
+struct FITerrainIco {
+    struct DataIds {
+        DataId terrainIco;
+    };
+
+    struct Pipelines { };
+};
+
+struct FITerrainDbgDraw {
+    struct DataIds {
+        DataId draw;
+    };
+
+    struct Pipelines { };
+};
+
+//-----------------------------------------------------------------------------
+
+// Jolt feature interfaces
+
 struct FIJolt {
     struct DataIds {
         DataId jolt;
@@ -557,6 +591,7 @@ struct FIJoltConstAccel {
     struct Pipelines { };
 };
 
+
 struct FIRocketsJolt {
     struct DataIds {
         DataId rocketsJolt;
@@ -567,42 +602,17 @@ struct FIRocketsJolt {
 };
 
 
-struct FITerrain {
+struct FITerrainJolt {
     struct DataIds {
-        DataId terrainFrame;
-        DataId terrain;
-    };
-
-    struct Pipelines {
-        PipelineDef<EStgCont> skeleton          {"skeleton"};
-        PipelineDef<EStgIntr> surfaceChanges    {"surfaceChanges"};
-        PipelineDef<EStgCont> chunkMesh         {"chunkMesh"};
-        PipelineDef<EStgCont> terrainFrame      {"terrainFrame"};
-    };
-};
-
-struct FITerrainIco {
-    struct DataIds {
-        DataId terrainIco;
+        DataId terrainJolt;
     };
 
     struct Pipelines { };
 };
-
-struct FITerrainDbgDraw {
-    struct DataIds {
-        DataId draw;
-    };
-
-    struct Pipelines { };
-};
-
-
-
 
 //-----------------------------------------------------------------------------
 
-// Universe sessions
+// Universe feature interfaces
 
 struct FIUniCore {
     struct DataIds {
@@ -648,9 +658,18 @@ struct FIUniTransfers {
     };
 };
 
+struct FIUniScenes {
+    struct DataIds {
+        DataId scenes;
+    };
+    struct Pipelines {
+        PipelineDef<EStgIntr> requestTranslate  {"requestTranslate"};
+    };
+};
+
 struct FISceneInUniverse {
     struct DataIds {
-        DataId scnCospace;
+        DataId sceneId;
     };
 
     struct Pipelines {
@@ -659,11 +678,9 @@ struct FISceneInUniverse {
 };
 
 
-
-
 //-----------------------------------------------------------------------------
 
-// Solar System sessions
+// Solar System feature interfaces
 
 struct FISolarSys {
     struct DataIds {
@@ -685,7 +702,7 @@ struct FISolarSysDraw {
 
 //-----------------------------------------------------------------------------
 
-// Renderer sessions, tend to exist only when the window is open
+// Renderer feature interfaces, tend to exist only when the window is open
 
 struct FIWindowApp {
     struct DataIds {
@@ -749,14 +766,22 @@ struct FISceneRenderer {
 };
 
 
-struct FICameraControl {
+struct FICamCtrlBase {
     struct DataIds {
+        DataId camButtons;
         DataId camCtrl;
     };
 
     struct Pipelines {
-        PipelineDef<EStgCont> camCtrl           {"camCtrl"};
+        PipelineDef<EStgCont> camTarget         {"camTarget"};
+        PipelineDef<EStgCont> camRefFrame       {"camRefFrame"};
+        PipelineDef<EStgCont> camTransform      {"camTransform"};
     };
+};
+
+struct FICamCtrlSpecial {
+    struct DataIds { };
+    struct Pipelines { };
 };
 
 
@@ -784,8 +809,6 @@ struct FICursor {
     struct Pipelines { };
 };
 
-
-
 struct FIVehicleControl {
     struct DataIds {
         DataId vhControls;
@@ -793,6 +816,16 @@ struct FIVehicleControl {
 
     struct Pipelines {
         PipelineDef<EStgCont> selectedVehicle   {"selectedVehicle"};
+    };
+};
+
+struct FICamFltOrig {
+    struct DataIds {
+        DataId translateOriginDelayed;
+    };
+
+    struct Pipelines {
+        PipelineDef<EStgIntr> translateOriginDelayed   {"translateOriginDelayed"};
     };
 };
 

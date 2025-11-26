@@ -215,6 +215,16 @@ FeatureDef const ftrCommonScene = feature_def("CommonScene", [] (
               .func(  [] (ActiveEntVec_t const &rActiveEntDel) noexcept -> TaskActions
                       { return {.cancel = rActiveEntDel.empty()}; });
 
+    rFB.task()
+        .name       ("Clear translateOrigin vector once we're done with it")
+        .sync_with  ({comScn.pl.translateOrigin(Clear)})
+        .args       ({     comScn.di.basic })
+        .func       ([] (ACtxBasic &rBasic) noexcept
+    {
+        rBasic.m_translateOrigin = Vector3{0.0f, 0.0f, 0.0f};
+    });
+
+
 
     // Clean up tasks
 

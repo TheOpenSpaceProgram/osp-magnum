@@ -39,7 +39,7 @@ extern osp::fw::FeatureDef const ftrMagnumScene;
 /**
  * @brief Create CameraController connected to an app's UserInputHandler
  */
-extern osp::fw::FeatureDef const ftrCameraControl;
+extern osp::fw::FeatureDef const ftrMagnumCamCtrl;
 
 /**
  * @brief Magnum MeshVisualizer shader and optional material for drawing ActiveEnts with it

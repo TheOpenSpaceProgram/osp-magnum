@@ -1,6 +1,6 @@
 /**
  * Open Space Program
- * Copyright © 2019-2024 Open Space Program Project
+ * Copyright © 2019-2025 Open Space Program Project
  *
  * MIT License
  *
@@ -24,36 +24,35 @@
  */
 #pragma once
 
+#include <osp/framework/framework.h>
 #include <osp/framework/builder.h>
+#include <osp/drawing/drawing.h>
 
 namespace adera
 {
 
 
-/**
- * @brief Skeleton, mesh data, and scratchpads to support a single terrain surface within a scene
- */
-extern osp::fw::FeatureDef const ftrTerrain;
-
-
-/**
- * @brief Icosahedron-specific data for spherical planet terrains
- */
-extern osp::fw::FeatureDef const ftrTerrainIcosahedron;
-
+struct PlanetDrawParams
+{
+    osp::draw::MaterialId planetMat;
+    osp::draw::MaterialId axisMat;
+};
 
 /**
- * @brief Subdivide-by-distance logic for icosahedron sphere planets
+ * @brief Represents the physics scene's presence in a Universe
  */
-extern osp::fw::FeatureDef const ftrTerrainSubdivDist;
+extern osp::fw::FeatureDef const ftrSceneInUniverse;
 
+extern osp::fw::FeatureDef const ftrCamFloatingOrigin;
+
+extern osp::fw::FeatureDef const ftrTerrainUniverse;
 
 /**
- * @brief Uses camera target as position relative to planet, and visualizes terrain skeleton.
+ * @brief Draw universe using an OSP scene
  */
-extern osp::fw::FeatureDef const ftrTerrainDebugDraw;
+extern osp::fw::FeatureDef const ftrUniverseDebugDraw;
 
 
-extern osp::fw::FeatureDef const ftrTerrainSimpleFloatingOrigin;
 
 } // namespace adera
+

@@ -31,124 +31,81 @@
 // for the 0xrrggbb_rgbf and angle literals
 using namespace Magnum::Math::Literals;
 
-using adera::SysCameraController;
-using adera::ACtxCameraController;
-
 using Magnum::Rad;
+using Magnum::Math::clamp;
 
-using osp::input::ControlSubscriber;
-
-using osp::Matrix4;
 using osp::Quaternion;
 using osp::Vector3;
 
-void SysCameraController::update_view(ACtxCameraController& rCtrl, float const delta)
+adera::CameraCommands adera::ACtxCameraButtons::read_button_inputs(float deltaTime) const
 {
-    // Process control inputs
+    Rad yaw     = 0.0_degf;
+    Rad pitch   = 0.0_degf;
 
-    ControlSubscriber const& controls = rCtrl.m_controls;
+    Rad const keyRotDelta = 180.0_degf * deltaTime; // 180 degrees per second
 
-    Rad yaw = 0.0_degf;
-    Rad pitch = 0.0_degf;
+    // Direction buttons for rotation (default: Arrow keys)
+    yaw   += (  float(m_controls.button_held(m_btnRotRt))
+              - float(m_controls.button_held(m_btnRotLf)) ) * keyRotDelta;
+    pitch += (  float(m_controls.button_held(m_btnRotDn))
+              - float(m_controls.button_held(m_btnRotUp)) ) * keyRotDelta;
 
-    // Arrow key rotation
-
-    Rad const keyRotDelta = 180.0_degf * delta; // 180 degrees per second
-
-    yaw   += (  float(controls.button_held(rCtrl.m_btnRotRt))
-              - float(controls.button_held(rCtrl.m_btnRotLf)) ) * keyRotDelta;
-    pitch += (  float(controls.button_held(rCtrl.m_btnRotDn))
-              - float(controls.button_held(rCtrl.m_btnRotUp)) ) * keyRotDelta;
-
-    // Mouse rotation, if right mouse button is down
-
-    if (rCtrl.m_controls.button_held(rCtrl.m_btnOrbit))
+    // Mouse rotation
+    if (m_controls.button_held(m_btnOrbit))
     {
         // 1 degrees per step
         constexpr Rad const mouseRotDelta = 1.0_degf;
 
-        yaw -= controls.get_input_handler()->mouse_state().m_smoothDelta.x()
-                * mouseRotDelta;
-        pitch -= controls.get_input_handler()->mouse_state().m_smoothDelta.y()
-                  * mouseRotDelta;
+        yaw   -= m_controls.get_input_handler()->mouse_state().m_smoothDelta.x() * mouseRotDelta;
+        pitch -= m_controls.get_input_handler()->mouse_state().m_smoothDelta.y() * mouseRotDelta;
     }
 
-    auto const scroll = float(rCtrl.m_controls.get_input_handler()
-                              ->scroll_state().offset.y());
-
-    Vector3 const up
-            = rCtrl.m_up.isZero() ? rCtrl.m_transform.up() : rCtrl.m_up;
-
-    // Prevent pitch overshoot if up is defined
-    if ( ! rCtrl.m_up.isZero())
-    {
-        using Magnum::Math::angle;
-        using Magnum::Math::clamp;
-
-        Rad const currentPitch = angle(rCtrl.m_up, -rCtrl.m_transform.backward());
-        Rad const nextPitch = currentPitch - pitch;
-
-        // Limit from 1 degree (looking down) to 179 degrees (looking up)
-        Rad const clampped  = clamp<Rad>(nextPitch, 1.0_degf, 179.0_degf);
-        Rad const overshoot = clampped - nextPitch;
-
-        pitch -= overshoot;
-    }
-
-    if (rCtrl.m_target.has_value())
-    {
-        // Orbit around target
-
-        // Scroll to move in/out
-        constexpr float const distSensitivity = 0.3f;
-        rCtrl.m_orbitDistance
-                -= rCtrl.m_orbitDistance * distSensitivity * scroll;
-        rCtrl.m_orbitDistance = std::max(rCtrl.m_orbitDistance, rCtrl.m_orbitDistanceMin);
-
-        // Convert requested rotation to quaternion
-        Quaternion const rotationDelta
-                = Quaternion::rotation(yaw, up)
-                * Quaternion::rotation(pitch, rCtrl.m_transform.right());
-
-        Vector3 const translation
-                = rCtrl.m_target.value()
-                + rotationDelta.transformVector(
-                    rCtrl.m_transform.backward() * rCtrl.m_orbitDistance);
-
-        // look at target
-        rCtrl.m_transform = Matrix4::lookAt(translation, rCtrl.m_target.value(), up);
-    }
-    else
-    {
-        // TODO: No target, Rotate in place
-    }
-}
-
-void SysCameraController::update_move(
-        ACtxCameraController& rCtrl,
-        float const delta, bool const moveTarget)
-{
-    ControlSubscriber const& controls = rCtrl.m_controls;
-
-    Vector3 const command(
-        float(    controls.button_held(rCtrl.m_btnMovRt))
-         - float( controls.button_held(rCtrl.m_btnMovLf)),
-        float(    controls.button_held(rCtrl.m_btnMovUp))
-         - float( controls.button_held(rCtrl.m_btnMovDn)),
-        float(    controls.button_held(rCtrl.m_btnMovBk))
-         - float( controls.button_held(rCtrl.m_btnMovFd))
+    // Direction buttons for translation (default: WASD)
+    auto const moveRelative = deltaTime * Vector3(
+        float(m_controls.button_held(m_btnMovRt)) - float(m_controls.button_held(m_btnMovLf)),
+        float(m_controls.button_held(m_btnMovUp)) - float(m_controls.button_held(m_btnMovDn)),
+        float(m_controls.button_held(m_btnMovBk)) - float(m_controls.button_held(m_btnMovFd))
     );
 
-    Vector3 const translation
-            = (   rCtrl.m_transform.right()    * command.x()
-                + rCtrl.m_transform.up()       * command.y()
-                + rCtrl.m_transform.backward() * command.z())
-            * delta * rCtrl.m_moveSpeed * rCtrl.m_orbitDistance;
+    constexpr float zoomSensitivity = 0.3f;
+    auto const scroll = float(m_controls.get_input_handler()->scroll_state().offset.y());
 
-    rCtrl.m_transform.translation() += translation;
-
-    if (moveTarget)
-    {
-        rCtrl.m_target.value() += translation;
-    }
+    return CameraCommands{
+        .zoom   = -scroll * zoomSensitivity,
+        .yaw    = yaw,
+        .pitch  = pitch,
+        .moveRelative = moveRelative
+    };
 }
+
+
+void adera::ACtxCameraController::apply(adera::CameraCommands commands)
+{
+    m_yaw   = m_yaw + commands.yaw;
+    m_pitch = clamp<Rad>(m_pitch + commands.pitch, 0.0_degf, 180.0_degf);
+
+    m_orbitDistance = std::max(m_orbitDistance + m_orbitDistance * commands.zoom, m_orbitDistanceMin);
+
+    //Vector3 const up = m_up.isZero() ? m_transform.up() : m_up;
+
+    m_rot = m_refFrameRot * Quaternion::rotation(m_yaw, Vector3{0.0f, 0.0f, 1.0f}) * Quaternion::rotation(m_pitch, Vector3{1.0f, 0.0f, 0.0f});
+
+    if (m_target.has_value())
+    {
+        // "* m_orbitDistance" to move faster when zoomed out
+        m_target.value() += m_rot.transformVector(commands.moveRelative) * m_orbitDistance;
+    }
+};
+
+
+void adera::ACtxCameraController::update_transform()
+{
+    Magnum::Matrix3x3 const rotMatrix = m_rot.toMatrix();
+
+    Vector3 const pos = m_target.has_value()
+                      ? (m_target.value() + rotMatrix[2] * m_orbitDistance)
+                      : m_transform[3].xyz();
+
+    m_transform = osp::Matrix4::from(rotMatrix, pos);
+};
+

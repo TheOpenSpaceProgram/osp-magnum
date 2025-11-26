@@ -50,12 +50,6 @@ extern osp::fw::FeatureDef const ftrVehicleControl;
 
 
 /**
- * @brief Camera which can free cam or follow a selected vehicle
- */
-extern osp::fw::FeatureDef const ftrVehicleCamera;
-
-
-/**
  * @brief Red indicators over Magic Rockets
  */
 extern osp::fw::FeatureDef const ftrMagicRocketThrustIndicator;

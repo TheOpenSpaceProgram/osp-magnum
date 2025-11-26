@@ -300,8 +300,9 @@ public:
     PhysicsStepListenerImpl                             m_listener;
 
     lgrn::IdRegistryStl<BodyId>                         m_bodyIds;
+    lgrn::IdSetStl<BodyId>                              m_bodyUseOriginTranslate;
     osp::IdMap_t<BodyId, ForceFactors_t>                m_bodyFactors;
-    lgrn::IdSetStl<BodyId>                              m_bodyDirty;
+    //lgrn::IdSetStl<BodyId>                              m_bodyDirty;
 
     osp::IdMap_t<BodyId, osp::active::ActiveEnt>        m_bodyToEnt;
     osp::IdMap_t<osp::active::ActiveEnt, BodyId>        m_entToBody;

@@ -46,18 +46,19 @@ namespace adera
 
 FeatureDef const ftrCameraFree = feature_def("CameraFree", [] (
         FeatureBuilder              &rFB,
+        Implement<FICamCtrlSpecial> camCtrlSpecial,
+        DependOn<FICamCtrlBase>     camCtrl,
         DependOn<FIWindowApp>       windowApp,
-        DependOn<FIScene>           scn,
-        DependOn<FICameraControl>   camCtrl)
+        DependOn<FIScene>           scn)
 {
     rFB.task()
         .name       ("Move Camera controller")
-        .sync_with  ({windowApp.pl.inputs(Run), camCtrl.pl.camCtrl(Modify)})
-        .args       ({                 camCtrl.di.camCtrl,           scn.di.deltaTimeIn })
-        .func([] (ACtxCameraController& rCamCtrl, float const deltaTimeIn) noexcept
+        .sync_with  ({windowApp.pl.inputs(Run), camCtrl.pl.camTarget(Modify)})
+        .args       ({               camCtrl.di.camCtrl,               camCtrl.di.camButtons,      scn.di.deltaTimeIn })
+        .func       ([] (ACtxCameraController& rCamCtrl, ACtxCameraButtons const& camButtons, float const deltaTimeIn) noexcept
     {
-        SysCameraController::update_view(rCamCtrl, deltaTimeIn);
-        SysCameraController::update_move(rCamCtrl, deltaTimeIn, true);
+        CameraCommands const cmds = camButtons.read_button_inputs(deltaTimeIn);
+        rCamCtrl.apply(cmds);
     });
 }); // ftrCameraFree
 
@@ -69,7 +70,7 @@ FeatureDef const ftrCursor = feature_def("Cursor", [] (
         DependOn<FIMainApp>         mainApp,
         DependOn<FIScene>           scn,
         DependOn<FICommonScene>     comScn,
-        DependOn<FICameraControl>   camCtrl,
+        DependOn<FICamCtrlBase>     camCtrlBase,
         DependOn<FISceneRenderer>   scnRender,
         entt::any                   userData)
 {
@@ -93,12 +94,12 @@ FeatureDef const ftrCursor = feature_def("Cursor", [] (
     rMat.m_ents.insert(cursorEnt);
 
     rFB.task()
-        .name       ("Move cursor")
-        .sync_with  ({scnRender.pl.render(Run), camCtrl.pl.camCtrl(Ready), scnRender.pl.drawTransforms(New)})
-        .args       ({        cursor.di.drawEnt,                            camCtrl.di.camCtrl,                 scnRender.di.scnRender })
-        .func([] (DrawEnt const cursorEnt, ACtxCameraController const& rCamCtrl, ACtxSceneRender& rScnRender) noexcept
+        .name       ("Update cursor position")
+        .sync_with  ({scnRender.pl.render(Run), camCtrlBase.pl.camTransform(Ready), scnRender.pl.drawTransforms(New)})
+        .args       ({       cursor.di.drawEnt,               camCtrlBase.di.camCtrl,      scnRender.di.scnRender })
+        .func       ([] (DrawEnt const drawEnt, ACtxCameraController const& rCamCtrl, ACtxSceneRender& rScnRender) noexcept
     {
-        rScnRender.m_drawTransform[cursorEnt] = Matrix4::translation(rCamCtrl.m_target.value());
+        rScnRender.m_drawTransform[drawEnt] = Matrix4::translation(rCamCtrl.m_target.value());
     });
 
 }); // ftrCursor

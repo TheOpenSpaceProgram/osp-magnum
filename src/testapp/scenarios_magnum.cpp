@@ -37,6 +37,7 @@
 #include <adera_app/features/terrain.h>
 #include <adera_app/features/universe.h>
 #include <adera_app/features/universe_sims.h>
+#include <adera_app/features/universe_scene.h>
 #include <adera_app/features/vehicles.h>
 #include <adera_app/features/vehicles_machines.h>
 
@@ -94,8 +95,7 @@ ContextId make_scene_renderer(Framework &rFW, PkgId defaultPkg, ContextId mainCo
 
     ContextId const scnRdrCtx = rFW.m_contextIds.create();
 
-    // Choose which renderer features to use based on information on which features the scene
-    // context contains.
+    // Choose which renderer features to use based on which features the scene context contains.
 
     ContextBuilder  scnRdrCB { scnRdrCtx, { mainContext, windowCtx, sceneCtx }, rFW };
 
@@ -127,8 +127,7 @@ ContextId make_scene_renderer(Framework &rFW, PkgId defaultPkg, ContextId mainCo
     rScnRender.m_materials.resize(rScnRender.m_materialIds.size());
     rCamera.set_aspect_ratio(Vector2{Magnum::GL::defaultFramebuffer.viewport().size()});
 
-    scnRdrCB.add_feature(ftrCameraControl);
-
+    scnRdrCB.add_feature(ftrMagnumCamCtrl);
 
     if (rFW.get_interface_id<FIPhysShapes>(sceneCtx).has_value())
     {
@@ -149,10 +148,8 @@ ContextId make_scene_renderer(Framework &rFW, PkgId defaultPkg, ContextId mainCo
 
     if (rFW.get_interface_id<FIVehicleSpawn>(sceneCtx).has_value())
     {
-        scnRdrCB.add_feature(ftrVehicleControl);
-        scnRdrCB.add_feature(ftrVehicleCamera);
         scnRdrCB.add_feature(ftrVehicleSpawnDraw);
-        scnRdrCB.add_feature(ftrCameraFree);
+        scnRdrCB.add_feature(ftrVehicleControl);
     }
     else
     {
@@ -167,10 +164,11 @@ ContextId make_scene_renderer(Framework &rFW, PkgId defaultPkg, ContextId mainCo
     if ( ! scnRdrCB.has_error() && rFW.get_interface_id<FITerrain>(sceneCtx).has_value() )
     {
         scnRdrCB.add_feature(ftrTerrainDebugDraw, matVisualizer);
+
         scnRdrCB.add_feature(ftrTerrainDrawMagnum);
 
-        auto scnRender      = rFW.get_interface<FICameraControl>    (scnRdrCB.m_ctx);
-        auto &rCamCtrl      = rFW.data_get<ACtxCameraController>    (scnRender.di.camCtrl);
+        auto camCtrlBase    = rFW.get_interface<FICamCtrlBase>      (scnRdrCB.m_ctx);
+        auto &rCamCtrl      = rFW.data_get<ACtxCameraController>    (camCtrlBase.di.camCtrl);
 
         rCamCtrl.m_target = Vector3(0.0f, 0.0f, 0.0f);
         rCamCtrl.m_orbitDistanceMin = 1.0f;
@@ -179,23 +177,19 @@ ContextId make_scene_renderer(Framework &rFW, PkgId defaultPkg, ContextId mainCo
 
     if (rFW.get_interface_id<FIUniCore>(sceneCtx).has_value())
     {
-        scnRdrCB.add_feature(ftrUniverseTestPlanetsDraw, PlanetDrawParams{
+        scnRdrCB.add_feature(ftrUniverseDebugDraw, PlanetDrawParams{
             .planetMat = matVisualizer,
             .axisMat   = matFlat });
-    }
-/*
-    if (rFW.get_interface_id<FISolarSys>(sceneCtx).has_value())
-    {
-        scnRdrCB.add_feature(ftrSolarSystemDraw, PlanetDrawParams{
-            .planetMat = matFlat
-        });
 
-        // Zoom out the camera so that all planets are in view
-        auto scnRender      = rFW.get_interface<FICameraControl>    (scnRdrCB.m_ctx);
-        auto &rCamCtrl      = rFW.data_get<ACtxCameraController>    (scnRender.di.camCtrl);
-        rCamCtrl.m_orbitDistance += 75000;
+        if (rFW.get_interface_id<FISceneInUniverse>(sceneCtx).has_value())
+        {
+            scnRdrCB.add_feature(ftrCamFloatingOrigin);
+        }
     }
-*/
+    else if (rFW.get_interface_id<FITerrain>(sceneCtx).has_value())
+    {
+        scnRdrCB.add_feature(ftrTerrainSimpleFloatingOrigin);
+    }
 
     auto &rScnRenderGl = rFW.data_get<draw::ACtxSceneRenderGL>(magnumScn.di.scnRenderGl);
 
@@ -278,41 +272,50 @@ IMainLoopFunc::Status MagnumMainLoop::run(osp::fw::Framework &rFW, osp::fw::IExe
     IMainLoopFunc::Status status;
 
     auto const mainApp        = rFW.get_interface<FIMainApp>   (m_mainCtx);
-    auto       &appContexts   = rFW.data_get<AppContexts>      (mainApp.di.appContexts);
-    auto const windowApp      = rFW.get_interface<FIWindowApp> (appContexts.window);
-    auto const magnum         = rFW.get_interface<FIMagnum>    (appContexts.window);
-    auto       &rMainLoopCtrl = rFW.data_get<MainLoopControl&> (mainApp.di.mainLoopCtrl);
-    auto       &rWindowLoopCtrl = rFW.data_get<WindowAppLoopControl>  (windowApp.di.windowAppLoopCtrl);
-    auto       &rFWModify     = rFW.data_get<FrameworkModify&> (mainApp.di.frameworkModify);
-    auto       &rMagnumApp    = rFW.data_get<MagnumWindowApp>  (magnum.di.magnumApp);
 
     bool stopMainLoop = false;
     bool closeWindow  = false;
 
-    if (rFWModify.commands.empty())
+    // note: Be careful with references from rFW.data_get, as framework data can be reallocated
+
     {
-        CommonMagnumApp &rCommonMagnumApp = *static_cast<CommonMagnumApp*>(rMagnumApp.m_events.get());
-        rCommonMagnumApp.mainContext    = m_mainCtx;
-        rCommonMagnumApp.pFW            = &rFW;
-        rCommonMagnumApp.pExec          = &rExecutor;
-        rCommonMagnumApp.pMainLoopCtrl  = &rMainLoopCtrl;
+        auto       &appContexts   = rFW.data_get<AppContexts>      (mainApp.di.appContexts);
+        auto const windowApp      = rFW.get_interface<FIWindowApp> (appContexts.window);
+        auto const magnum         = rFW.get_interface<FIMagnum>    (appContexts.window);
+        auto       &rWindowLoopCtrl = rFW.data_get<WindowAppLoopControl>  (windowApp.di.windowAppLoopCtrl);
+        auto       &rFWModify     = rFW.data_get<FrameworkModify&> (mainApp.di.frameworkModify);
 
-        bool const stayOpen = rMagnumApp.mainLoopIteration();
-
-        if (!stayOpen)
+        if (rFWModify.commands.empty())
         {
-            stopMainLoop  = true;
-            closeWindow  = true;
+            auto &rMainLoopCtrl = rFW.data_get<MainLoopControl&> (mainApp.di.mainLoopCtrl);
+            auto &rMagnumApp    = rFW.data_get<MagnumWindowApp>  (magnum.di.magnumApp);
+
+            CommonMagnumApp &rCommonMagnumApp = *static_cast<CommonMagnumApp*>(rMagnumApp.m_events.get());
+            rCommonMagnumApp.mainContext    = m_mainCtx;
+            rCommonMagnumApp.pFW            = &rFW;
+            rCommonMagnumApp.pExec          = &rExecutor;
+            rCommonMagnumApp.pMainLoopCtrl  = &rMainLoopCtrl;
+
+            bool const stayOpen = rMagnumApp.mainLoopIteration();
+
+            if (!stayOpen)
+            {
+                stopMainLoop  = true;
+                closeWindow  = true;
+            }
         }
-    }
-    else
-    {
-        stopMainLoop = true;
+        else
+        {
+            stopMainLoop = true;
+        }
     }
 
     if (stopMainLoop)
     {
-        auto &rWindowLoopCtrl = rFW.data_get<WindowAppLoopControl>   (windowApp.di.windowAppLoopCtrl);
+        auto       &appContexts     = rFW.data_get<AppContexts>         (mainApp.di.appContexts);
+        auto const windowApp        = rFW.get_interface<FIWindowApp>    (appContexts.window);
+        auto       &rWindowLoopCtrl = rFW.data_get<WindowAppLoopControl>(windowApp.di.windowAppLoopCtrl);
+        auto       &rMainLoopCtrl = rFW.data_get<MainLoopControl&> (mainApp.di.mainLoopCtrl);
 
         rWindowLoopCtrl.doRender = false;
         rWindowLoopCtrl.doResync = false;
@@ -343,6 +346,8 @@ IMainLoopFunc::Status MagnumMainLoop::run(osp::fw::Framework &rFW, osp::fw::IExe
 
     if (closeWindow)
     {
+        auto       &appContexts   = rFW.data_get<AppContexts>      (mainApp.di.appContexts);
+
         run_cleanup(appContexts.window, rFW, rExecutor);
         rFW.close_context(appContexts.window);
         appContexts.window = {};
@@ -352,7 +357,10 @@ IMainLoopFunc::Status MagnumMainLoop::run(osp::fw::Framework &rFW, osp::fw::IExe
 
     if (stopMainLoop)
     {
-        for (std::unique_ptr<IFrameworkModifyCommand> &pCmd : rFWModify.commands)
+        auto &rFWModify = rFW.data_get<FrameworkModify&> (mainApp.di.frameworkModify);
+        auto commands   = std::exchange(rFWModify.commands, {});
+
+        for (std::unique_ptr<IFrameworkModifyCommand> &pCmd : commands)
         {
             pCmd->run(rFW);
 
@@ -365,12 +373,21 @@ IMainLoopFunc::Status MagnumMainLoop::run(osp::fw::Framework &rFW, osp::fw::IExe
                 status.pushNew = std::move(newMainLoop);
             }
         }
-        rFWModify.commands.clear();
+
+        auto       &appContexts   = rFW.data_get<AppContexts>      (mainApp.di.appContexts);
 
         if ( ! closeWindow )
         {
             appContexts.sceneRender = make_scene_renderer(rFW, m_defaultPkg, m_mainCtx, appContexts.scene, appContexts.window);
+            auto const windowApp  = rFW.get_interface<FIWindowApp>     (appContexts.window);
+            auto &rWindowLoopCtrl = rFW.data_get<WindowAppLoopControl> (windowApp.di.windowAppLoopCtrl);
+
+            rWindowLoopCtrl.doRender = true;
+            rWindowLoopCtrl.doResync = true;
+            rWindowLoopCtrl.doSync   = true;
         }
+
+        auto &rMainLoopCtrl   = rFW.data_get<MainLoopControl&>     (mainApp.di.mainLoopCtrl);
 
         // Restart framework main loop
         rExecutor.load(rFW);
@@ -378,9 +395,6 @@ IMainLoopFunc::Status MagnumMainLoop::run(osp::fw::Framework &rFW, osp::fw::IExe
         rExecutor.task_finish(rFW, mainApp.tasks.schedule, true, {.cancel = false});
         rMainLoopCtrl.mainScheduleWaiting = false;
 
-        rWindowLoopCtrl.doRender = true;
-        rWindowLoopCtrl.doResync = true;
-        rWindowLoopCtrl.doSync   = true;
     }
 
 

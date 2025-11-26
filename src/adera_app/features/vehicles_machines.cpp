@@ -341,11 +341,15 @@ struct VehicleControls
 FeatureDef const ftrVehicleControl = feature_def("VehicleControl", [] (
         FeatureBuilder              &rFB,
         Implement<FIVehicleControl> vhclCtrl,
+        Implement<FICamCtrlSpecial> camCtrlSpecial,
+        DependOn<FICamCtrlBase>     camCtrlBase,
         DependOn<FIMainApp>         mainApp,
         DependOn<FIWindowApp>       windowApp,
         DependOn<FIScene>           scn,
+        DependOn<FICommonScene>     comScn,
         DependOn<FIParts>           parts,
         DependOn<FILinks>           links,
+        DependOn<FIPhysics>         phys,
         DependOn<FISignalsFloat>    sigFloat)
 {
     rFB.pipeline(vhclCtrl.pl.selectedVehicle).parent(mainApp.loopblks.mainLoop);
@@ -466,33 +470,15 @@ FeatureDef const ftrVehicleControl = feature_def("VehicleControl", [] (
             rUpdMach.requestMachineUpdateLoop = true;
         }
     });
-}); // ftrVehicleControl
 
-
-FeatureDef const ftrVehicleCamera = feature_def("VehicleCamera", [] (
-        FeatureBuilder              &rFB,
-        DependOn<FIWindowApp>       windowApp,
-        DependOn<FIScene>           scn,
-        DependOn<FISceneRenderer>   scnRender,
-        DependOn<FICommonScene>     comScn,
-        DependOn<FIPhysics>         phys,
-        DependOn<FIParts>           parts,
-        DependOn<FILinks>           links,
-        DependOn<FICameraControl>   camCtrl,
-        DependOn<FIVehicleControl>  vhclCtrl)
-{
-    // Don't add comScn.pl.transform(Modify) to sync_with, even though this uses transforms.
-    // phys.pls.physUpdate(Done) assures physics transforms are done.
-    //
-    // camCtrl.pl.camCtrl(Ready) is needed by the shape thrower, which needs comScn.pl.transform(New),
-    // causing a circular dependency. The transform pipeline probably needs to be split into
-    // a few separate ones.
     rFB.task()
         .name       ("Update vehicle camera")
-        .sync_with  ({windowApp.pl.sync(Run), camCtrl.pl.camCtrl(Modify), phys.pl.physUpdate(Done), parts.pl.mapWeldActive(Ready)})
-        .args       ({               camCtrl.di.camCtrl,      scn.di.deltaTimeIn,         comScn.di.basic,       vhclCtrl.di.vhControls,          parts.di.scnParts,          links.di.links})
-        .func       ([] (ACtxCameraController& rCamCtrl, float const deltaTimeIn, ACtxBasic const& rBasic, VehicleControls& rVhControls, ACtxParts const& rScnParts, ACtxLinks const& rLinks) noexcept
+        .sync_with  ({windowApp.pl.sync(Run), windowApp.pl.inputs(Run), camCtrlBase.pl.camTarget(Modify), phys.pl.physUpdate(Done), parts.pl.mapWeldActive(Ready)})
+        .args       ({           camCtrlBase.di.camCtrl,           camCtrlBase.di.camButtons,      scn.di.deltaTimeIn,         comScn.di.basic,       vhclCtrl.di.vhControls,          parts.di.scnParts,          links.di.links})
+        .func       ([] (ACtxCameraController& rCamCtrl, ACtxCameraButtons const& camButtons, float const deltaTimeIn, ACtxBasic const& rBasic, VehicleControls& rVhControls, ACtxParts const& rScnParts, ACtxLinks const& rLinks) noexcept
     {
+        CameraCommands cmds = camButtons.read_button_inputs(deltaTimeIn);
+
         if (rVhControls.selectedUsrCtrl != lgrn::id_null<MachLocalId>())
         {
             // Follow selected UserControl machine
@@ -509,17 +495,16 @@ FeatureDef const ftrVehicleCamera = feature_def("VehicleCamera", [] (
             {
                 rCamCtrl.m_target = rBasic.m_transform.get(selectedEnt).m_transform.translation();
             }
-        }
-        else
-        {
-            // Free cam when no vehicle selected
-            SysCameraController::update_move(
-                    rCamCtrl,
-                    deltaTimeIn, true);
-        }
 
-        SysCameraController::update_view(rCamCtrl, deltaTimeIn);
+            cmds.moveRelative = {}; // Locked to vehicle, ignore freecam translation
+        }
+        // else, freecam
+
+        rCamCtrl.apply(cmds);
     });
-}); // setup_camera_vehicle
+
+}); // ftrVehicleControl
+
+
 
 } // namespace adera

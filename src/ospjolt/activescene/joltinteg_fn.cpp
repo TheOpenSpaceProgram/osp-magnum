@@ -61,6 +61,22 @@ void SysJolt::update_world(
     rJoltWorld.m_listener.m_pCtxPhysics      = &rPhys;
     rJoltWorld.m_listener.m_pCtxJoltWorld    = &rJoltWorld;
 
+    if (!rBasic.m_translateOrigin.isZero())
+    {
+        JPH::RVec3 const translate = Vec3MagnumToJolt(-rBasic.m_translateOrigin);
+
+        JPH::BodyInterface &bodyInterface = rJoltWorld.m_physicsSystem.GetBodyInterface();
+
+        for (BodyId const bodyId : rJoltWorld.m_bodyUseOriginTranslate)
+        {
+            JPH::BodyID const bodyIdJ = BToJolt(bodyId);
+            JPH::RVec3 position = bodyInterface.GetPosition(bodyIdJ);
+            position += translate;
+            // As we are translating the whole world, we don't need to wake up asleep bodies.
+            bodyInterface.SetPosition(bodyIdJ, position, JPH::EActivation::DontActivate);
+        }
+    }
+
     // calls PhysicsStepListenerImpl::OnStep
     rJoltWorld.m_physicsSystem.Update(timestep, collisionSteps, &rJoltWorld.m_oAllocator.value(), &rJoltWorld.m_jobSystem);
 }
@@ -77,6 +93,7 @@ void SysJolt::remove_components(ACtxJoltWorld& rCtxWorld, ActiveEnt ent) noexcep
         bodyInterface.RemoveBody(joltBodyId);
         bodyInterface.DestroyBody(joltBodyId);
         rCtxWorld.m_bodyIds.remove(bodyId);
+        rCtxWorld.m_bodyUseOriginTranslate.erase(bodyId);
         rCtxWorld.m_bodyToEnt[bodyId] = lgrn::id_null<ActiveEnt>();
         rCtxWorld.m_entToBody.erase(itBodyId);
     }
@@ -182,29 +199,7 @@ void SysJolt::find_shapes_recurse(
 void PhysicsStepListenerImpl::OnStep(float inDeltaTime, JPH::PhysicsSystem &rPhysicsSystem)
 {
     JPH::BodyInterface &bodyInterface = rPhysicsSystem.GetBodyInterfaceNoLock();
-    JPH::BodyLockInterfaceNoLock const &bodyLockInterface = rPhysicsSystem.GetBodyLockInterfaceNoLock();
-
-    bool const doOriginTranslation = !m_pCtxBasic->m_translateOrigin.isZero();
-    JPH::Vec3 const translateOrigin = Vec3MagnumToJolt(m_pCtxBasic->m_translateOrigin);
-
-
-//    if (!translateOrigin.isZero())
-//    {
-//        JPH::BodyIDVector allBodiesIds;
-//        pJoltWorld->GetBodies(allBodiesIds);
-
-//        JPH::BodyInterface &bodyInterface = pJoltWorld->GetBodyInterface();
-
-//        // Translate every jolt body
-//        for (JPH::BodyID bodyId : allBodiesIds)
-//        {
-//            JPH::RVec3 position = bodyInterface.GetPosition(bodyId);S
-//            Matrix4 matrix;
-//            position -= Vec3MagnumToJolt(translateOrigin);
-//            //As we are translating the whole world, we don't need to wake up asleep bodies.
-//            bodyInterface.SetPosition(bodyId, position, JPH::EActivation::DontActivate);
-//        }
-//    }
+    JPH::BodyLockInterface const &bodyLockInterface = rPhysicsSystem.GetBodyLockInterfaceNoLock();
 
     // Apply changed velocities
     for (auto const& [ent, vel] : m_pCtxPhysics->m_setVelocity)
@@ -215,12 +210,13 @@ void PhysicsStepListenerImpl::OnStep(float inDeltaTime, JPH::PhysicsSystem &rPhy
     }
     m_pCtxPhysics->m_setVelocity.clear();
 
+    bool const updateAllPositions = !m_pCtxBasic->m_translateOrigin.isZero();
 
     for (BodyId bodyId : m_pCtxJoltWorld->m_bodyIds)
     {
         JPH::BodyID joltBodyId = BToJolt(bodyId);
 
-        bool        updateOspTf     = false;
+        bool        updateOspTf     = updateAllPositions;
         bool        forcesDirty     = false;
 
         JPH::Vec3 newPos;
@@ -256,23 +252,12 @@ void PhysicsStepListenerImpl::OnStep(float inDeltaTime, JPH::PhysicsSystem &rPhy
             rBody.AddTorque(Vec3MagnumToJolt(torque));
         }
 
-//        if (doOriginTranslation && JPH::BodyManager::sIsValidBodyPointer(&rBody))
-//        {
-//            // TODO: SetPositionAndRotationInternal is the only way to set position?
-//            //       Some unneeded center-of-mass calculations are involved, can this be fixed?
-//            newPos = rBody.GetPosition() - translateOrigin;
-//            newRot = rBody.GetRotation();
-//            bodyInterface.SetPositionAndRotation(joltBodyId, newPos, newRot, JPH::EActivation::DontActivate);
-//            //rBody.SetPositionAndRotationInternal(newPos, newRot, false);
-//            updateOspTf = true;
-//        }
-
         if (forcesDirty)
         {
             bodyInterface.ActivateBody(joltBodyId);
         }
 
-        if (updateOspTf)
+        if (ent.has_value() && updateOspTf)
         {
             JPH::Quat a;
             JPH::Vec3 b;
