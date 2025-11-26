@@ -43,21 +43,9 @@ if(NOT Threads_FOUND)
     message(FATAL_ERROR "Can't find a thread library to use!")
 endif()
 
-#compile as position-independant to avoid link errors on static link
-set(CMAKE_POSITION_INDEPENDENT_CODE ON)
 
-add_subdirectory(adera)
-add_subdirectory(adera_app)
-add_subdirectory(osp)
-add_subdirectory(planet-a)
-add_subdirectory(ospjolt)
-add_subdirectory(osp_drawing_gl)
-add_subdirectory(adera_drawing_gl)
-add_subdirectory(gdextension)
-
-if(OSP_BUILD_TESTAPP)
-    add_subdirectory(testapp)
-endif()
+add_library(osp-magnum-deps INTERFACE)
+add_custom_target(compile-osp-magnum-deps)
 
 # TODO: This list shouldn't be required, but there appears to be a bug in cmake where
 # the add_custom_target() command, pointing to an INTERFACE dependency, doesn't
@@ -80,7 +68,45 @@ SET(OSP_MAGNUM_DEPS_LIBS
             toml11
             spdlog
             longeron
-            Jolt)
+            OpenSpaceProgram
+            Adera
+            AderaApp
+            AderaGL
+            OspGL
+            OspJolt
+            PlanetA)
 target_link_libraries(osp-magnum-deps INTERFACE ${OSP_MAGNUM_DEPS_LIBS})
 add_dependencies(compile-osp-magnum-deps ${OSP_MAGNUM_DEPS_LIBS})
+
+add_executable(osp-magnum)
+
+target_compile_features(osp-magnum PUBLIC cxx_std_20)
+
+target_include_directories(osp-magnum PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})
+
+# Link it to the interface library that describes the dependencies
+target_link_libraries(osp-magnum PRIVATE osp-magnum-deps)
+
+# Gather paths to OSP headers and sources
+file(GLOB_RECURSE CPP_FILES CONFIGURE_DEPENDS *.cpp)
+file(GLOB_RECURSE H_FILES CONFIGURE_DEPENDS *.h)
+target_sources(osp-magnum PRIVATE "${CPP_FILES}" "${H_FILES}")
+
+# Enforce conformance mode for osp-magnum
+target_compile_options(osp-magnum PRIVATE $<$<CXX_COMPILER_ID:MSVC>:/permissive->)
+
+set_target_properties(osp-magnum PROPERTIES
+    EXPORT_COMPILE_COMMANDS TRUE
+    INSTALL_RPATH "$ORIGIN/lib"
+    C_EXTENSIONS OFF
+    C_STANDARD_REQUIRED ON
+    CXX_EXTENSIONS OFF
+    CXX_STANDARD_REQUIRED ON
+)
+
+add_custom_target(run-osp-magnum
+                  COMMAND $<TARGET_FILE:osp-magnum>
+                  WORKING_DIRECTORY ${CMAKE_BINARY_DIR}/$<CONFIG>)
+
+set_property(TARGET osp-magnum PROPERTY VS_DEBUGGER_WORKING_DIRECTORY "${CMAKE_SOURCE_DIR}/bin")
 

@@ -1,6 +1,6 @@
 /**
  * Open Space Program
- * Copyright © 2019-2024 Open Space Program Project
+ * Copyright © 2019-2021 Open Space Program Project
  *
  * MIT License
  *
@@ -24,31 +24,21 @@
  */
 #pragma once
 
-#include <osp/framework/builder.h>
+#include <osp/util/UserInputHandler.h>
 
-#include <adera/activescene/VehicleBuilder.h>
-
-#include <osp/core/copymove_macros.h>
-#include <osp/core/global_id.h>
-#include <osp/core/strong_id.h>
-
-#include <memory>
-
-namespace adera
+namespace ospgdext
 {
+    
+void config_controls(osp::input::UserInputHandler& rUserInput);
 
-using PrebuiltVhId          = osp::StrongId<uint32_t, struct DummyForPBV>;
-using PrebuiltVhIdReg_t     = osp::GlobalIdReg<PrebuiltVhId>;
+}
 
-struct PrebuiltVehicles : osp::KeyedVec< PrebuiltVhId, std::unique_ptr<adera::VehicleData> >
-{
-    PrebuiltVehicles() = default;
-    OSP_MOVE_ONLY_CTOR_ASSIGN(PrebuiltVehicles);
-};
-
-inline PrebuiltVhId const gc_pbvSimpleCommandServiceModule = PrebuiltVhIdReg_t::create();
-
-extern osp::fw::FeatureDef const ftrPrebuiltVehicles;
-
-} // namespace adera
-
+/**
+ * Parses the control string from the config file.
+ *
+ * A "None" input returns a empty vector.
+ *
+ * @param Control string
+ * @returns vector of the control created from the string.
+ */
+osp::input::ControlExprConfig_t parse_control(std::string_view str) noexcept;

@@ -500,7 +500,6 @@ struct FIVehicleSpawnVB {
     };
 };
 
-
 struct FITestVehicles {
     struct DataIds {
         DataId prebuiltVehicles;

@@ -15,3 +15,4 @@ out/
 build/
 .vscode/
 .cache
+.clang-format

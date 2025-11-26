@@ -138,7 +138,7 @@ TEST(Resources, RefCounting)
 
             storage = res.owner_create(restypes::gc_image, id);
         }
-    }, "only_zeros_remaining\\(0\\)");
+    }, "non-zero refcount");
 
 
 }

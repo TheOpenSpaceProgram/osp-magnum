@@ -50,7 +50,7 @@ TexId SysRender::own_texture_resource(ACtxDrawing& rCtxDrawing, ACtxDrawingRes& 
     auto const& [it, success] = rCtxDrawingRes.m_resToTex.try_emplace(resId);
     if (success)
     {
-        ResIdOwner_t owner = rResources.owner_create(restypes::gc_mesh, resId);
+        ResIdOwner_t owner = rResources.owner_create(restypes::gc_texture, resId);
         TexId const texId = rCtxDrawing.m_texIds.create();
         rCtxDrawingRes.m_texToRes.emplace(texId, std::move(owner));
         it->second = texId;

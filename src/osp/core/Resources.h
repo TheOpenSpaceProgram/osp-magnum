@@ -48,11 +48,21 @@ class Resources
     using res_data_family_t = entt::family<struct ResourceType>;
     using res_data_type_t = res_data_family_t::value_type;
 
+    struct DataType
+    {
+        res_data_type_t id;
+        entt::type_info info;
+    };
+
     struct PerResType
     {
+        PerResType() = default;
+        ~PerResType();
+        OSP_MOVE_ONLY_CTOR_ASSIGN(PerResType);
+
         lgrn::IdRegistryStl<ResId>      m_resIds;
         lgrn::RefCount<int>             m_resRefs;
-        std::vector<res_data_type_t>    m_resDataTypes;
+        std::vector<DataType>           m_resDataTypes;
         std::vector<entt::any>          m_resData;
 
         // Pointed to by PerPkgResType::m_nameToResId
@@ -214,15 +224,17 @@ private:
 template<typename T>
 void Resources::data_register(ResTypeId typeId)
 {
-    res_data_type_t const type = res_data_family_t::value<T>;
+    res_data_type_t const newType = res_data_family_t::value<T>;
     PerResType &rPerResType = get_type(typeId);
 
-    std::vector<res_data_type_t> &rTypes = rPerResType.m_resDataTypes;
-
     // Check to make sure type isn't already registered
-    assert(std::find(rTypes.begin(), rTypes.end(), type) == rTypes.end());
+    LGRN_ASSERTMV(std::all_of(rPerResType.m_resDataTypes.begin(), rPerResType.m_resDataTypes.end(),
+                              [newType] (DataType const &rType)
+    {
+        return rType.id != newType;
+    }), "Resource data type is already registered", std::size_t(typeId), entt::type_id<T>().name());
 
-    rTypes.push_back(type);
+    rPerResType.m_resDataTypes.push_back({newType, entt::type_id<T>() });
     rPerResType.m_resData.emplace_back(res_container_t<T>{});
 }
 
@@ -306,15 +318,16 @@ res_container_t<T>& Resources::get_container(PerResType &rPerResType, ResTypeId 
 {
     res_data_type_t const type = res_data_family_t::value<T>;
 
-    std::vector<res_data_type_t> const &rTypes = rPerResType.m_resDataTypes;
-    auto typeFound = std::find(rTypes.cbegin(), rTypes.cend(), type);
-    assert(typeFound != rTypes.cend()); // Ensure type is registered
+    for (std::size_t i = 0; i < rPerResType.m_resDataTypes.size(); ++i)
+    {
+        if (rPerResType.m_resDataTypes[i].id == type)
+        {
+            return entt::any_cast<res_container_t<T>&>(rPerResType.m_resData[i]);
+        }
+    }
 
-    using Container_t = res_container_t<T>;
-
-    size_t const typeIndex = std::distance(rTypes.begin(), typeFound);
-
-    return entt::any_cast<Container_t&>(rPerResType.m_resData[typeIndex]);
+    LGRN_ASSERTMV(0, "Resource data type is not registered", std::size_t(typeId), entt::type_id<T>().name());
+    std::abort();
 }
 
 template <typename T>

@@ -160,6 +160,7 @@ FeatureDef const ftrMagicRocketThrustIndicator = feature_def("MagicRocketThrustI
             if (thrustMag == 0.0f)
             {
                 rScnRender.m_visible.erase(drawEnt);
+                rMat.m_dirty.push_back(drawEnt);
                 continue;
             }
 

@@ -29,58 +29,31 @@ find_package(Magnum REQUIRED
     MeshTools
     Primitives
     Trade
-    Sdl2Application
-    AnyImageImporter
     )
 
-find_package(MagnumPlugins REQUIRED
-    TinyGltfImporter
-    StbImageImporter)
-
-set(THREADS_PREFER_PTHREAD_FLAG TRUE)
-find_package(Threads)
-if(NOT Threads_FOUND)
-    message(FATAL_ERROR "Can't find a thread library to use!")
-endif()
-
-#compile as position-independant to avoid link errors on static link
-set(CMAKE_POSITION_INDEPENDENT_CODE ON)
-
-add_subdirectory(adera)
-add_subdirectory(adera_app)
-add_subdirectory(osp)
-add_subdirectory(planet-a)
-add_subdirectory(ospjolt)
-add_subdirectory(osp_drawing_gl)
-add_subdirectory(adera_drawing_gl)
-add_subdirectory(gdextension)
-
-if(OSP_BUILD_TESTAPP)
-    add_subdirectory(testapp)
-endif()
-
-# TODO: This list shouldn't be required, but there appears to be a bug in cmake where
-# the add_custom_target() command, pointing to an INTERFACE dependency, doesn't
-# result in the dependencies of the interface building.
-# See: https://gitlab.kitware.com/cmake/cmake/-/issues/23569
-SET(OSP_MAGNUM_DEPS_LIBS
-            Threads::Threads
-            EnTT::EnTT
+SET(DEPS_LIBS
             Corrade::Main
-            Magnum::Application
             Magnum::GL
             Magnum::Magnum
             Magnum::MeshTools
             Magnum::Primitives
             Magnum::Shaders
             Magnum::Trade
-            Magnum::AnyImageImporter
-            MagnumPlugins::TinyGltfImporter
-            MagnumPlugins::StbImageImporter
-            toml11
-            spdlog
+            OpenSpaceProgram
             longeron
-            Jolt)
-target_link_libraries(osp-magnum-deps INTERFACE ${OSP_MAGNUM_DEPS_LIBS})
-add_dependencies(compile-osp-magnum-deps ${OSP_MAGNUM_DEPS_LIBS})
+            OspGL)
 
+add_library(AderaGL STATIC)
+
+target_compile_features(AderaGL PUBLIC cxx_std_20)
+
+# Link it to the interface library that describes the dependencies
+target_link_libraries(AderaGL PRIVATE ${DEPS_LIBS})
+
+# Gather paths to OSP headers and sources
+file(GLOB_RECURSE CPP_FILES CONFIGURE_DEPENDS *.cpp)
+file(GLOB_RECURSE H_FILES CONFIGURE_DEPENDS *.h)
+target_sources(AderaGL PRIVATE "${CPP_FILES}" "${H_FILES}")
+
+# Enforce conformance mode for adera
+target_compile_options(AderaGL PRIVATE $<$<CXX_COMPILER_ID:MSVC>:/permissive->)

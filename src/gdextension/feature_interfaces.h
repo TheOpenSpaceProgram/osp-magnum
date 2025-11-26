@@ -24,31 +24,63 @@
  */
 #pragma once
 
-#include <osp/framework/builder.h>
+#include <adera_app/feature_interfaces.h>
 
-#include <adera/activescene/VehicleBuilder.h>
-
-#include <osp/core/copymove_macros.h>
-#include <osp/core/global_id.h>
-#include <osp/core/strong_id.h>
-
-#include <memory>
-
-namespace adera
+namespace ftr_inter
 {
 
-using PrebuiltVhId          = osp::StrongId<uint32_t, struct DummyForPBV>;
-using PrebuiltVhIdReg_t     = osp::GlobalIdReg<PrebuiltVhId>;
+struct FIGodot {
+    struct DataIds {
+        DataId app;
+        DataId render;
+    };
 
-struct PrebuiltVehicles : osp::KeyedVec< PrebuiltVhId, std::unique_ptr<adera::VehicleData> >
-{
-    PrebuiltVehicles() = default;
-    OSP_MOVE_ONLY_CTOR_ASSIGN(PrebuiltVehicles);
+    struct Pipelines {
+        PipelineDef<EStgCont> mesh            {"mesh"};
+        PipelineDef<EStgCont> texture         {"texture"};
+
+        PipelineDef<EStgCont> entMesh         {"entMesh"};
+        PipelineDef<EStgCont> entTexture      {"entTexture"};
+    };
 };
 
-inline PrebuiltVhId const gc_pbvSimpleCommandServiceModule = PrebuiltVhIdReg_t::create();
 
-extern osp::fw::FeatureDef const ftrPrebuiltVehicles;
+struct FIGodotScene {
+    struct DataIds {
+        DataId scnRenderGd;
+        DataId camera;
+    };
 
-} // namespace adera
+    struct Pipelines {
+        PipelineDef<EStgFBO>  fbo               {"fboRender"};
+        PipelineDef<EStgCont> camera            {"camera"};
+    };
+};
 
+
+struct FIShaderVisualizerGD {
+    struct DataIds {
+        DataId shader;
+    };
+
+    struct Pipelines { };
+};
+
+struct FIShaderFlatGD {
+    struct DataIds {
+        DataId shader;
+    };
+
+    struct Pipelines { };
+};
+
+struct FIShaderPhongGD {
+    struct DataIds {
+        DataId shader;
+    };
+
+    struct Pipelines { };
+};
+
+
+} // namespace ftr_inter
