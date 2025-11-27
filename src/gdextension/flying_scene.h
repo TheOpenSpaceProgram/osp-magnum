@@ -8,7 +8,7 @@
 
 #include <adera_app/application.h>
 #include <osp/core/resourcetypes.h>
-#include <osp/framework/executor.h>
+#include <osp/executor/singlethread_framework.h>
 #include <osp/framework/framework.h>
 #include <osp/util/UserInputHandler.h>
 
@@ -20,7 +20,7 @@ class FlyingScene : public Node3D
     GDCLASS(FlyingScene, Node3D)
 
 private:
-    using ExecutorType = osp::fw::SingleThreadedExecutor;
+    using ExecutorType = osp::exec::SinglethreadFWExecutor;
 
     struct UpdateParams {
         float deltaTimeIn;
@@ -36,10 +36,6 @@ private:
     RID               m_lightInstance;
     RID               m_light;
 
-    //TestApp           m_testApp;
-    //adera::MainLoopControl  *m_mainLoopCtrl;
-
-    //MainLoopSignals   m_signals;
 
     std::stringstream m_dbgStream;
     std::stringstream m_errStream;
@@ -94,16 +90,6 @@ public:
     {
         return m_viewport;
     };
-
-//    inline void set_user_input(UserInputHandler *pUserInput)
-//    {
-//        m_pUserInput = pUserInput;
-//    }
-//    inline void set_ctrl(adera::MainLoopControl *mainLoopCtrl)
-//    {
-//        m_mainLoopCtrl = mainLoopCtrl;
-//        //m_signals      = signals;
-//    }
 };
 
 } // namespace godot

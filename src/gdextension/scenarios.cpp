@@ -122,6 +122,7 @@ static ScenarioMap_t make_scenarios()
 
         ContextBuilder  sceneCB { sceneCtx, {mainCtx}, rFW };
         sceneCB.add_feature(ftrScene);
+        sceneCB.add_feature(ftrCleanupCtx);
         sceneCB.add_feature(ftrCommonScene, pkg);
         sceneCB.add_feature(ftrPhysics);
         sceneCB.add_feature(ftrPhysicsShapes);

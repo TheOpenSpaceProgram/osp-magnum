@@ -286,7 +286,6 @@ FeatureDef const ftrMagnumCamCtrl = feature_def("MagnumCamCtrl", [] (
     rFB.pipeline(camCtrlBase.pl.camRefFrame) .parent(mainApp.loopblks.mainLoop);
     rFB.pipeline(camCtrlBase.pl.camTransform).parent(mainApp.loopblks.mainLoop);
 
-
     rFB.task()
         .name       ("Position Rendering Camera according to Camera Controller")
         .sync_with  ({scnRender.pl.render(Run), camCtrlBase.pl.camTransform(Ready), magnumScn.pl.camera(Modify)})
@@ -296,7 +295,7 @@ FeatureDef const ftrMagnumCamCtrl = feature_def("MagnumCamCtrl", [] (
         rCamera.m_transform = rCamCtrl.m_transform;
     });
 
-     rFB.task()
+    rFB.task()
         .name       ("Update Camera controller transform")
         .sync_with  ({camCtrlBase.pl.camTransform(Modify), camCtrlBase.pl.camTarget(Ready), camCtrlBase.pl.camRefFrame(Ready)})
         .args       ({          camCtrlBase.di.camCtrl})

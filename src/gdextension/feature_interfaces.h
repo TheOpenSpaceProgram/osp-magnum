@@ -38,9 +38,6 @@ struct FIGodot {
     struct Pipelines {
         PipelineDef<EStgCont> mesh            {"mesh"};
         PipelineDef<EStgCont> texture         {"texture"};
-
-        PipelineDef<EStgCont> entMesh         {"entMesh"};
-        PipelineDef<EStgCont> entTexture      {"entTexture"};
     };
 };
 
@@ -54,6 +51,11 @@ struct FIGodotScene {
     struct Pipelines {
         PipelineDef<EStgFBO>  fbo               {"fboRender"};
         PipelineDef<EStgCont> camera            {"camera"};
+
+        PipelineDef<EStgCont> entMeshGD         {"entMeshGD"};
+        PipelineDef<EStgCont> entDiffuseGD      {"entDiffuseGD"};
+        PipelineDef<EStgCont> entInstIds        {"entInstIds"};
+        PipelineDef<EStgCont> renderEnts        {"renderEnts"};
     };
 };
 

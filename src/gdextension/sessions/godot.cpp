@@ -88,23 +88,20 @@ osp::fw::FeatureDef const ftrGodot = feature_def("Godot", [] (
 
     rFB.data_emplace<godot::FlyingScene *>(godot.di.app, pMainApp);
 
-    rFB.pipeline(godot.pl.mesh).parent(windowApp.pl.sync);
-    rFB.pipeline(godot.pl.texture).parent(windowApp.pl.sync);
-    rFB.pipeline(godot.pl.entMesh).parent(windowApp.pl.sync);
-    rFB.pipeline(godot.pl.entTexture).parent(windowApp.pl.sync);
-    // Order-dependent; MagnumApplication construction starts OpenGL context, needed by RenderGL
-    /* unused */ // rFB.data_emplace<MagnumApplication>(idActiveApp, args, rUserInput);
+    rFB.pipeline(godot.pl.mesh)         .parent(mainApp.loopblks.mainLoop);
+    rFB.pipeline(godot.pl.texture)      .parent(mainApp.loopblks.mainLoop);
+
     auto &rRenderGd    = rFB.data_emplace<RenderGd>(godot.di.render);
 
     rRenderGd.scenario = pMainApp->get_main_scenario();
     rRenderGd.viewport = pMainApp->get_main_viewport();
     rFB.task()
-        .name("Clean up renderer")
-        .run_on({ cleanup.pl.cleanup(Run_) })
-        .args({ mainApp.di.resources, godot.di.render })
-        .func([](Resources &rResources, RenderGd &rRenderGd) noexcept {
+        .name       ("Clean up renderer")
+        .sync_with  ({ cleanup.pl.cleanup(Run_) })
+        .args       ({ mainApp.di.resources, godot.di.render })
+        .func       ([](Resources &rResources, RenderGd &rRenderGd) noexcept {
             SysRenderGd::clear_resource_owners(rRenderGd, rResources);
-            rRenderGd = {}; // Needs the OpenGL thread for destruction
+            rRenderGd = {};
         });
 }); // ftrGodot
 
@@ -127,8 +124,12 @@ osp::fw::FeatureDef const ftrGodotScene = feature_def("GodotScene", [] (
 
     auto       rs       = godot::RenderingServer::get_singleton();
 
-    rFB.pipeline(gdScn.pl.fbo).parent(scnRender.pl.render);
-    rFB.pipeline(gdScn.pl.camera).parent(scnRender.pl.render);
+    rFB.pipeline(gdScn.pl.fbo)              .parent(mainApp.loopblks.mainLoop);
+    rFB.pipeline(gdScn.pl.camera)           .parent(mainApp.loopblks.mainLoop);
+    rFB.pipeline(gdScn.pl.entDiffuseGD)     .parent(mainApp.loopblks.mainLoop);
+    rFB.pipeline(gdScn.pl.entMeshGD)        .parent(mainApp.loopblks.mainLoop);
+    rFB.pipeline(gdScn.pl.entInstIds)       .parent(mainApp.loopblks.mainLoop);
+    rFB.pipeline(gdScn.pl.renderEnts)       .parent(mainApp.loopblks.mainLoop);
 
     rFB.data_emplace<draw::ACtxSceneRenderGd>(gdScn.di.scnRenderGd);
     godot::RID &rCamera = rFB.data_emplace<godot::RID>(gdScn.di.camera);
@@ -139,24 +140,21 @@ osp::fw::FeatureDef const ftrGodotScene = feature_def("GodotScene", [] (
     // rs->camera_set_perspective(rCamera, 45., 1.0f, 1u << 24);
     rFB.task()
         .name("Resize ACtxSceneRenderGd to fit all DrawEnts")
-        .run_on({ scnRender.pl.drawEntResized(Run) })
-        .sync_with({})
+        .sync_with({scnRender.pl.drawEnt(Ready), gdScn.pl.entMeshGD(Resize_), gdScn.pl.entDiffuseGD(Resize_), gdScn.pl.entInstIds(Resize_), gdScn.pl.renderEnts(Resize_) })
         .args({ scnRender.di.scnRender, gdScn.di.scnRenderGd })
         .func([](osp::draw::ACtxSceneRender const &rScnRender,
-                 draw::ACtxSceneRenderGd          &rScnRenderGd) noexcept {
-            std::size_t const capacity = rScnRender.m_drawIds.capacity();
-            rScnRenderGd.m_diffuseTexId.resize(capacity);
-            rScnRenderGd.m_meshId.resize(capacity);
-            rScnRenderGd.m_instanceId.resize(capacity);
-            rScnRenderGd.m_render.resize(capacity);
-        });
+                 draw::ACtxSceneRenderGd          &rScnRenderGd) noexcept
+    {
+        std::size_t const capacity = rScnRender.m_drawIds.capacity();
+        rScnRenderGd.m_diffuseTexId .resize(capacity);
+        rScnRenderGd.m_meshId       .resize(capacity);
+        rScnRenderGd.m_instanceId   .resize(capacity);
+        rScnRenderGd.m_render       .resize(capacity);
+    });
 
     rFB.task()
         .name("Compile Resource Meshes to Gd")
-        .run_on({ scnRender.pl.meshResDirty(UseOrRun) })
-        .sync_with({ scnRender.pl.mesh(Ready),
-                     godot.pl.mesh(New),
-                     scnRender.pl.entMeshDirty(UseOrRun) })
+        .sync_with({ scnRender.pl.mesh(Ready), godot.pl.mesh(New)})
         .args({ comScn.di.drawingRes, mainApp.di.resources, godot.di.render })
         .func([](osp::draw::ACtxDrawingRes const &rDrawingRes,
                  osp::Resources                  &rResources,
@@ -166,8 +164,7 @@ osp::fw::FeatureDef const ftrGodotScene = feature_def("GodotScene", [] (
 
     rFB.task()
         .name("Compile Resource Textures to Gd")
-        .run_on({ scnRender.pl.textureResDirty(UseOrRun) })
-        .sync_with({ scnRender.pl.texture(Ready), godot.pl.texture(New) })
+        .sync_with({ scnRender.pl.diffuseTex(Ready), godot.pl.texture(New) })
         .args({ comScn.di.drawingRes, mainApp.di.resources, godot.di.render })
         .func([](draw::ACtxDrawingRes const &rDrawingRes,
                  osp::Resources             &rResources,
@@ -176,21 +173,19 @@ osp::fw::FeatureDef const ftrGodotScene = feature_def("GodotScene", [] (
         });
 
     rFB.task()
-        .name("Sync GL textures to entities with scene textures")
-        .run_on({ scnRender.pl.entTextureDirty(UseOrRun) })
-        .sync_with({ scnRender.pl.texture(Ready),
-                     scnRender.pl.entTexture(Ready),
-                     godot.pl.texture(Ready),
-                     godot.pl.entTexture(Modify),
-                     scnRender.pl.drawEntResized(Done) })
+        .name("Assign GD textures to DrawEnts with diffuse textures")
+        .sync_with({ scnRender.pl.diffuseTexDirty(UseOrRun),
+                     scnRender.pl.diffuseTex(Ready),
+                     gdScn.pl.entDiffuseGD(New),
+                     godot.pl.texture(Ready)})
         .args({ comScn.di.drawing, comScn.di.drawingRes, scnRender.di.scnRender, gdScn.di.scnRenderGd, godot.di.render })
         .func([](draw::ACtxDrawing       &rDrawing,
                  draw::ACtxDrawingRes    &rDrawingRes,
                  draw::ACtxSceneRender   &rScnRender,
                  draw::ACtxSceneRenderGd &rScnRenderGd,
                  draw::RenderGd          &rRenderGd) noexcept {
-            draw::SysRenderGd::sync_drawent_texture(rScnRender.m_diffuseDirty.begin(),
-                                                    rScnRender.m_diffuseDirty.end(),
+            draw::SysRenderGd::sync_drawent_texture(rScnRender.m_diffuseTexDirty.begin(),
+                                                    rScnRender.m_diffuseTexDirty.end(),
                                                     rScnRender.m_diffuseTex,
                                                     rDrawingRes.m_texToRes,
                                                     rScnRenderGd.m_diffuseTexId,
@@ -198,12 +193,11 @@ osp::fw::FeatureDef const ftrGodotScene = feature_def("GodotScene", [] (
         });
 
     rFB.task()
-        .name("Resync GL textures")
-        .run_on({ windowApp.pl.resync(Run) })
-        .sync_with({ scnRender.pl.texture(Ready),
+        .name("Resync godot textures")
+        .sync_with({ windowApp.pl.resync(Run),
+                     scnRender.pl.diffuseTex(Ready),
                      godot.pl.texture(Ready),
-                     godot.pl.entTexture(Modify),
-                     scnRender.pl.drawEntResized(Done) })
+                     gdScn.pl.entDiffuseGD(New) })
         .args({ comScn.di.drawingRes, scnRender.di.scnRender, gdScn.di.scnRenderGd, godot.di.render })
         .func([](draw::ACtxDrawingRes    &rDrawingRes,
                  draw::ACtxSceneRender   &rScnRender,
@@ -220,13 +214,9 @@ osp::fw::FeatureDef const ftrGodotScene = feature_def("GodotScene", [] (
         });
 
     rFB.task()
-        .name("Sync GL meshes to entities with scene meshes")
-        .run_on({ scnRender.pl.entMeshDirty(UseOrRun) })
-        .sync_with({ scnRender.pl.mesh(Ready),
-                     scnRender.pl.entMesh(Ready),
-                     godot.pl.mesh(Ready),
-                     godot.pl.entMesh(Modify),
-                     scnRender.pl.drawEntResized(Done) })
+        .name("Assign GD meshes to entities with scene meshes")
+        .sync_with({ scnRender.pl.meshDirty(UseOrRun), scnRender.pl.mesh(Ready),
+                     godot.pl.mesh(Ready), gdScn.pl.entMeshGD(New) })
         .args({ comScn.di.drawingRes, scnRender.di.scnRender, gdScn.di.scnRenderGd, godot.di.render })
         .func([](draw::ACtxDrawingRes    &rDrawingRes,
                  draw::ACtxSceneRender   &rScnRender,
@@ -242,12 +232,12 @@ osp::fw::FeatureDef const ftrGodotScene = feature_def("GodotScene", [] (
         });
 
     rFB.task()
-        .name("Resync GL meshes")
-        .run_on({ windowApp.pl.resync(Run) })
-        .sync_with({ scnRender.pl.mesh(Ready),
+        .name("Resync GD meshes")
+        .sync_with({ windowApp.pl.resync(Run),
+                     scnRender.pl.drawEnt(Ready),
+                     scnRender.pl.mesh(Ready),
                      godot.pl.mesh(Ready),
-                     godot.pl.entMesh(Modify),
-                     scnRender.pl.drawEntResized(Done) })
+                     gdScn.pl.entMeshGD(New) })
         .args({ comScn.di.drawingRes, scnRender.di.scnRender, gdScn.di.scnRenderGd, godot.di.render })
         .func([](draw::ACtxDrawingRes    &rDrawingRes,
                  draw::ACtxSceneRender   &rScnRender,
@@ -265,41 +255,39 @@ osp::fw::FeatureDef const ftrGodotScene = feature_def("GodotScene", [] (
         });
 
     rFB.task()
-        .name("Sync entity parameters")
-        .run_on({ scnRender.pl.render(Run) })
-        .sync_with({ scnRender.pl.group(Ready),
-                     scnRender.pl.groupEnts(Ready),
+        .name("Sync DrawEnt parameters")
+        .sync_with({ scnRender.pl.render(Run),
+                     scnRender.pl.drawTransforms(Ready),
+                     scnRender.pl.mesh(Ready),
+                     scnRender.pl.diffuseTex(Ready),
+                     scnRender.pl.drawEnt(Ready),
                      gdScn.pl.camera(Ready),
-                     scnRender.pl.drawTransforms(UseOrRun),
-                     scnRender.pl.entMesh(Ready),
-                     scnRender.pl.entTexture(Ready),
-                     godot.pl.entMesh(Ready),
-                     godot.pl.entTexture(Ready),
-                     scnRender.pl.drawEnt(Ready) })
+                     gdScn.pl.renderEnts(Ready),
+                     gdScn.pl.entMeshGD(Ready),
+                     gdScn.pl.entDiffuseGD(Ready)})
         .args({ scnRender.di.scnRender, godot.di.render, gdScn.di.scnRenderGd })
         .func([](draw::ACtxSceneRender   &rScnRender,
                  draw::RenderGd          &rRenderGd,
                  draw::ACtxSceneRenderGd &rScnRenderGd) noexcept {
-            for (DrawEnt const& ent : rScnRenderGd.m_render) 
+            for (DrawEnt const& ent : rScnRenderGd.m_render)
             {
                 sync_godot_ent(ent, rScnRender, rScnRenderGd, rRenderGd);
             }
         });
 
     rFB.task()
-        .name("Delete entities from render groups")
-        .run_on({ scnRender.pl.drawEntDelete(UseOrRun) })
-        .sync_with({ scnRender.pl.groupEnts(Delete) })
-        .args({ comScn.di.drawEntDel, gdScn.di.scnRenderGd})
+        .name("Delete DrawEnts from ACtxSceneRenderGd::m_render")
+        .sync_with({ scnRender.pl.drawEntDelete(UseOrRun), gdScn.pl.renderEnts(Delete) })
+        .args({ scnRender.di.drawEntDel, gdScn.di.scnRenderGd})
         .func([](draw::DrawEntVec_t const &rDrawEntDel, 
                     draw::ACtxSceneRenderGd  &rScnRenderGl) noexcept {
             rScnRenderGl.m_render.erase(rDrawEntDel.begin(), rDrawEntDel.end());
         });
 
     rFB.task()
-        .name("Delete entities instance from scene")
-        .run_on({ scnRender.pl.drawEntDelete(UseOrRun) })
-        .args({ comScn.di.drawing, comScn.di.drawEntDel, gdScn.di.scnRenderGd })
+        .name("Delete DrawEnts from Godot scene")
+        .sync_with({ scnRender.pl.drawEntDelete(UseOrRun) })
+        .args({ comScn.di.drawing, scnRender.di.drawEntDel, gdScn.di.scnRenderGd })
         .func([](draw::ACtxDrawing const  &rDrawing,
                  draw::DrawEntVec_t const &rDrawEntDel,
                  draw::ACtxSceneRenderGd  &rScnRenderGl) noexcept {
@@ -313,10 +301,9 @@ osp::fw::FeatureDef const ftrGodotScene = feature_def("GodotScene", [] (
         });
     
     rFB.task()
-        .name("Sync Flat shader DrawEnts")
-        .run_on({ windowApp.pl.sync(Run) })
-        .sync_with({ scnRender.pl.groupEnts(Modify),
-                     scnRender.pl.group(Modify),
+        .name("Sync Flat shader ACtxSceneRenderGd::m_render")
+        .sync_with({ windowApp.pl.sync(Run),
+                     gdScn.pl.renderEnts(New),
                      scnRender.pl.materialDirty(UseOrRun) })
         .args({ scnRender.di.scnRender, gdScn.di.scnRenderGd, godot.di.render})
         .func([](ACtxSceneRender         &rScnRender,
@@ -330,12 +317,10 @@ osp::fw::FeatureDef const ftrGodotScene = feature_def("GodotScene", [] (
         });
 
     rFB.task()
-        .name("Resync Flat shader DrawEnts")
-        .run_on({ windowApp.pl.resync(Run) })
-        .sync_with({ scnRender.pl.materialDirty(UseOrRun),
-                     godot.pl.texture(Ready),
-                     scnRender.pl.groupEnts(Modify),
-                     scnRender.pl.group(Modify) })
+        .name("Resync Flat shader ACtxSceneRenderGd::m_render")
+        .sync_with({ windowApp.pl.resync(Run),
+                     gdScn.pl.renderEnts(Ready),
+                     scnRender.pl.material(Ready)})
         .args({ scnRender.di.scnRender, gdScn.di.scnRenderGd, godot.di.render})
         .func([](ACtxSceneRender         &rScnRender,
                  ACtxSceneRenderGd  &rScnRenderGd, 
@@ -347,7 +332,7 @@ osp::fw::FeatureDef const ftrGodotScene = feature_def("GodotScene", [] (
         });
     rFB.task()
         .name("Clean up scene")
-        .run_on({ cleanup.pl.cleanup(Run_) })
+        .sync_with({ cleanup.pl.cleanup(Run_) })
         .args({ gdScn.di.scnRenderGd , gdScn.di.camera})
         .func([](ACtxSceneRenderGd &rScnRenderGd, godot::RID& rCamera) noexcept {
             godot::RenderingServer *rs = godot::RenderingServer::get_singleton();
@@ -425,23 +410,35 @@ void sync_godot_ent(DrawEnt ent, ACtxSceneRender &rScnRender, ACtxSceneRenderGd 
 
 osp::fw::FeatureDef const ftrCameraControlGD = feature_def("CameraControlGodot", [] (
         FeatureBuilder              &rFB,
-        Implement<FICameraControl>  camCtrl,
+        Implement<FICamCtrlBase>    camCtrlBase,
+        DependOn<FIMainApp>         mainApp,
         DependOn<FIGodot>           godot,
         DependOn<FIGodotScene>      gdScn,
         DependOn<FIWindowApp>       windowApp,
         DependOn<FISceneRenderer>   scnRender)
 {
-    auto      &rUserInput = rFB.data_get<osp::input::UserInputHandler>(windowApp.di.userInput);
+    auto &rUserInput = rFB.data_get< osp::input::UserInputHandler >(windowApp.di.userInput);
 
-    rFB.data_emplace<ACtxCameraController>(camCtrl.di.camCtrl, rUserInput);
+    rFB.data_emplace< ACtxCameraController >    (camCtrlBase.di.camCtrl);
+    rFB.data_emplace< ACtxCameraButtons >       (camCtrlBase.di.camButtons, rUserInput);
 
-    rFB.pipeline(camCtrl.pl.camCtrl).parent(windowApp.pl.sync);
+    rFB.pipeline(camCtrlBase.pl.camTarget)   .parent(mainApp.loopblks.mainLoop);
+    rFB.pipeline(camCtrlBase.pl.camRefFrame) .parent(mainApp.loopblks.mainLoop);
+    rFB.pipeline(camCtrlBase.pl.camTransform).parent(mainApp.loopblks.mainLoop);
+
+    rFB.task()
+        .name       ("Update Camera controller transform")
+        .sync_with  ({camCtrlBase.pl.camTransform(Modify), camCtrlBase.pl.camTarget(Ready), camCtrlBase.pl.camRefFrame(Ready)})
+        .args       ({          camCtrlBase.di.camCtrl})
+        .func       ([] (ACtxCameraController& rCamCtrl) noexcept
+    {
+        rCamCtrl.update_transform();
+    });
 
     rFB.task()
         .name("Position Rendering Camera according to Camera Controller")
-        .run_on({ scnRender.pl.render(Run) })
-        .sync_with({ camCtrl.pl.camCtrl(Ready), gdScn.pl.camera(Modify) })
-        .args({ camCtrl.di.camCtrl, gdScn.di.camera })
+        .sync_with({ scnRender.pl.render(Run), camCtrlBase.pl.camTransform(Ready), gdScn.pl.camera(Modify) })
+        .args({ camCtrlBase.di.camCtrl, gdScn.di.camera })
         .func([](ACtxCameraController const &rCamCtrl, godot::RID &rCamera) noexcept {
             godot::RenderingServer *rs     = godot::RenderingServer::get_singleton();
             Vector3                 mTrans = rCamCtrl.m_transform.translation();

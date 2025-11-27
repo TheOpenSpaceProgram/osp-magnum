@@ -124,7 +124,7 @@ void FlyingScene::_enter_tree() // practically main()?
   m_mainContext = m_framework.m_contextIds.create();
 
   ContextBuilder mainCB{m_mainContext, {}, m_framework};
-  mainCB.add_feature(ftrMain);
+  mainCB.add_feature(ftrMainApp);
   ContextBuilder::finalize(std::move(mainCB));
 
   auto const fiMain = m_framework.get_interface<FIMainApp>(m_mainContext);
@@ -208,48 +208,38 @@ void FlyingScene::_process(double delta) {
 void FlyingScene::_exit_tree() { destroy_app(); }
 
 void FlyingScene::drive_scene_cycle(UpdateParams p) {
-  Framework &rFW = m_framework;
+//  Framework &rFW = m_framework;
 
-  auto const mainApp = rFW.get_interface<FIMainApp>(m_mainContext);
-  auto const &rAppCtxs = rFW.data_get<AppContexts>(mainApp.di.appContexts);
-  auto &rMainLoopCtrl = rFW.data_get<MainLoopControl>(mainApp.di.mainLoopCtrl);
-  rMainLoopCtrl.doUpdate = p.update;
+//  auto const mainApp = rFW.get_interface<FIMainApp>(m_mainContext);
+//  auto const &rAppCtxs = rFW.data_get<AppContexts>(mainApp.di.appContexts);
+//  auto &rMainLoopCtrl = rFW.data_get<MainLoopControl>(mainApp.di.mainLoopCtrl);
+//  rMainLoopCtrl.doUpdate = p.update;
 
-  auto const scene = rFW.get_interface<FIScene>(rAppCtxs.scene);
-  if (scene.id.has_value()) {
-    auto &rSceneLoopCtrl = rFW.data_get<SceneLoopControl>(scene.di.loopControl);
-    auto &rDeltaTimeIn = rFW.data_get<float>(scene.di.deltaTimeIn);
-    rSceneLoopCtrl.doSceneUpdate = p.sceneUpdate;
-    rDeltaTimeIn = p.deltaTimeIn;
-  }
+//  auto const scene = rFW.get_interface<FIScene>(rAppCtxs.scene);
+//  if (scene.id.has_value()) {
+//    auto &rSceneLoopCtrl = rFW.data_get<SceneLoopControl>(scene.di.loopControl);
+//    auto &rDeltaTimeIn = rFW.data_get<float>(scene.di.deltaTimeIn);
+//    rSceneLoopCtrl.doSceneUpdate = p.sceneUpdate;
+//    rDeltaTimeIn = p.deltaTimeIn;
+//  }
 
-  auto const windowApp = rFW.get_interface<FIWindowApp>(rAppCtxs.window);
-  auto &rWindowLoopCtrl =
-      rFW.data_get<WindowAppLoopControl>(windowApp.di.windowAppLoopCtrl);
-  rWindowLoopCtrl.doRender = p.render;
-  rWindowLoopCtrl.doSync = p.sync;
-  rWindowLoopCtrl.doResync = p.resync;
+//  auto const windowApp = rFW.get_interface<FIWindowApp>(rAppCtxs.window);
+//  auto &rWindowLoopCtrl =
+//      rFW.data_get<WindowAppLoopControl>(windowApp.di.windowAppLoopCtrl);
+//  rWindowLoopCtrl.doRender = p.render;
+//  rWindowLoopCtrl.doSync = p.sync;
+//  rWindowLoopCtrl.doResync = p.resync;
 
-  m_executor.signal(m_framework, mainApp.pl.mainLoop);
-  m_executor.signal(m_framework, windowApp.pl.inputs);
-  m_executor.signal(m_framework, windowApp.pl.sync);
-  m_executor.signal(m_framework, windowApp.pl.resync);
+//  m_executor.signal(m_framework, mainApp.pl.mainLoop);
+//  m_executor.signal(m_framework, windowApp.pl.inputs);
+//  m_executor.signal(m_framework, windowApp.pl.sync);
+//  m_executor.signal(m_framework, windowApp.pl.resync);
 
-  m_executor.wait(m_framework);
+//  m_executor.wait(m_framework);
 }
 
 void FlyingScene::run_context_cleanup(ContextId ctx) {
-  auto const cleanup = m_framework.get_interface<FICleanupContext>(ctx);
-  if (cleanup.id.has_value()) {
-    // Run cleanup pipeline for the window context
-    m_executor.run(m_framework, cleanup.pl.cleanup);
-    m_executor.wait(m_framework);
 
-    if (m_executor.is_running(m_framework)) {
-      OSP_LOG_CRITICAL("Deadlock in cleanup pipeline");
-      std::abort();
-    }
-  }
 }
 
 void FlyingScene::clear_resource_owners() {
@@ -362,54 +352,62 @@ void FlyingScene::load_a_bunch_of_stuff() {
 ContextId make_scene_renderer(Framework &rFW, ContextId mainCtx,
                               ContextId sceneCtx, ContextId windowCtx,
                               PkgId defaultPkg) {
-  auto const godot = rFW.get_interface<FIGodot>(windowCtx);
+    auto const godot = rFW.get_interface<FIGodot>(windowCtx);
 
-  ContextId const scnRdrCtx = rFW.m_contextIds.create();
 
-  // TODO: comment below is lying, and just adds features without guidance.
+    ContextId const scnRdrCtx = rFW.m_contextIds.create();
 
-  // Choose which renderer features to use based on information on which
-  // features the scene context contains.
+    // TODO: comment below is lying, and just adds features without guidance.
 
-  ContextBuilder scnRdrCB{scnRdrCtx, {mainCtx, windowCtx, sceneCtx}, rFW};
+    // Choose which renderer features to use based on information on which
+    // features the scene context contains.
 
-  if (rFW.get_interface<FIScene>(sceneCtx).id.has_value()) {
-    scnRdrCB.add_feature(ftrSceneRenderer);
-    scnRdrCB.add_feature(ftrGodotScene);
+    ContextBuilder scnRdrCB{scnRdrCtx, {mainCtx, windowCtx, sceneCtx}, rFW};
 
-    auto scnRender = rFW.get_interface<FISceneRenderer>(scnRdrCtx);
-    auto &rScnRender =
-        rFW.data_get<draw::ACtxSceneRender>(scnRender.di.scnRender);
+    if (rFW.get_interface<FIScene>(sceneCtx).id.has_value())
+    {
+        scnRdrCB.add_feature(ftrSceneRenderer);
+        scnRdrCB.add_feature(ftrGodotScene);
 
-    MaterialId const matFlat = rScnRender.m_materialIds.create();
-    rScnRender.m_materials.resize(rScnRender.m_materialIds.size());
+        auto       scnRender   = rFW.get_interface<FISceneRenderer>(scnRdrCtx);
+        auto const gdScn       = rFW.get_interface<FIGodotScene>(scnRdrCtx);
+        auto       &rScnRender = rFW.data_get<draw::ACtxSceneRender>(scnRender.di.scnRender);
 
-    scnRdrCB.add_feature(ftrCameraControlGD);
+        MaterialId const matFlat = rScnRender.m_materialIds.create();
+        rScnRender.m_materials.resize(rScnRender.m_materialIds.size());
 
-    scnRdrCB.add_feature(ftrThrower);
-    scnRdrCB.add_feature(ftrPhysicsShapesDraw, matFlat);
-    scnRdrCB.add_feature(ftrCursor, TplPkgIdMaterialId{defaultPkg, matFlat});
+        scnRdrCB.add_feature(ftrCameraControlGD);
 
-    if (rFW.get_interface_id<FIPrefabs>(sceneCtx).has_value()) {
-      scnRdrCB.add_feature(ftrPrefabDraw, matFlat);
+        scnRdrCB.add_feature(ftrThrower);
+        scnRdrCB.add_feature(ftrPhysicsShapesDraw, matFlat);
+        scnRdrCB.add_feature(ftrCursor, TplPkgIdMaterialId{defaultPkg, matFlat});
+
+        if (rFW.get_interface_id<FIPrefabs>(sceneCtx).has_value()) {
+            scnRdrCB.add_feature(ftrPrefabDraw, matFlat);
+        }
+
+        if (rFW.get_interface_id<FIVehicleSpawn>(sceneCtx).has_value()) {
+            scnRdrCB.add_feature(ftrVehicleControl);
+            scnRdrCB.add_feature(ftrVehicleSpawnDraw);
+        } else {
+            scnRdrCB.add_feature(ftrCameraFree);
+        }
+
+        if (rFW.get_interface_id<FIRocketsJolt>(sceneCtx).has_value()) {
+            scnRdrCB.add_feature(ftrMagicRocketThrustIndicator, TplPkgIdMaterialId{defaultPkg, matFlat});
+        }
+
+        auto &rScnRenderGd = rFW.data_get<draw::ACtxSceneRenderGd>(gdScn.di.scnRenderGd);
+
+        rScnRenderGd.m_diffuseTexId .resize(rScnRender.m_drawIds.capacity());
+        rScnRenderGd.m_meshId       .resize(rScnRender.m_drawIds.capacity());
+        rScnRenderGd.m_instanceId   .resize(rScnRender.m_drawIds.capacity());
+        rScnRenderGd.m_render       .resize(rScnRender.m_drawIds.capacity());
+
     }
 
-    if (rFW.get_interface_id<FIVehicleSpawn>(sceneCtx).has_value()) {
-      scnRdrCB.add_feature(ftrVehicleControl);
-      scnRdrCB.add_feature(ftrVehicleCamera);
-      scnRdrCB.add_feature(ftrVehicleSpawnDraw);
-    } else {
-      scnRdrCB.add_feature(ftrCameraFree);
-    }
-
-    if (rFW.get_interface_id<FIRocketsJolt>(sceneCtx).has_value()) {
-      scnRdrCB.add_feature(ftrMagicRocketThrustIndicator,
-                           TplPkgIdMaterialId{defaultPkg, matFlat});
-    }
-  }
-
-  ContextBuilder::finalize(std::move(scnRdrCB));
-  return scnRdrCtx;
+    ContextBuilder::finalize(std::move(scnRdrCB));
+    return scnRdrCtx;
 } // make_scene_renderer
 
 void FlyingScene::setup_app() {
@@ -443,27 +441,43 @@ void FlyingScene::setup_app() {
   // Start the main loop
 
   m_executor.load(m_framework);
-  m_executor.run(m_framework, mainApp.pl.mainLoop);
+    m_executor.wait(m_framework);
 
-  // Resynchronize renderer; Resync+Sync without stepping through time.
-  // This makes sure meshes, textures, shaders, and other GPU-related resources
-  // specified by the scene are properly loaded and assigned to entities within
-  // the renderer.
-  drive_scene_cycle({.deltaTimeIn = 0.0f,
-                     .update = true,
-                     .sceneUpdate = false,
-                     .resync = true,
-                     .sync = true,
-                     .render = false});
+ OSP_LOG_INFO("hi");
+    // start
+    {
+        auto &rMainLoopCtrl = m_framework.data_get<MainLoopControl>(mainApp.di.mainLoopCtrl);
+        LGRN_ASSERT(rMainLoopCtrl.mainScheduleWaiting);
+        m_executor.task_finish(m_framework, mainApp.tasks.schedule, true, {.cancel = false});
+        rMainLoopCtrl.mainScheduleWaiting = false;
+    }
+
+        auto const windowApp        = m_framework.get_interface<FIWindowApp>      (rAppCtxs.window);
+    auto       &rWindowLoopCtrl = m_framework.data_get<WindowAppLoopControl>  (windowApp.di.windowAppLoopCtrl);
+
+    rWindowLoopCtrl.doRender = true;
+    rWindowLoopCtrl.doResync = true;
+    rWindowLoopCtrl.doSync   = true;
 }
 
 void FlyingScene::draw_event() {
-  drive_scene_cycle({.deltaTimeIn = 1.0f / 60.0f,
-                     .update = true,
-                     .sceneUpdate = true,
-                     .resync = false,
-                     .sync = true,
-                     .render = true});
+//  drive_scene_cycle({.deltaTimeIn = 1.0f / 60.0f,
+//                     .update = true,
+//                     .sceneUpdate = true,
+//                     .resync = false,
+//                     .sync = true,
+//                     .render = true});
+    Framework &rFW = m_framework;
+
+    m_executor.wait(m_framework);
+    auto const mainApp        = rFW.get_interface<FIMainApp>(m_mainContext);
+    auto &rMainLoopCtrl = m_framework.data_get<MainLoopControl>(mainApp.di.mainLoopCtrl);
+
+    if (rMainLoopCtrl.keepOpenWaiting)
+    {
+        rMainLoopCtrl.keepOpenWaiting = false;
+        m_executor.task_finish(m_framework, mainApp.tasks.keepOpen, true, {.cancel = false});
+    }
 }
 
 void FlyingScene::_input(const Ref<InputEvent> &input) {
@@ -543,40 +557,40 @@ void FlyingScene::_input(const Ref<InputEvent> &input) {
 void FlyingScene::destroy_app() {
   OSP_LOG_INFO("Destroy App");
 
-  // Stops the pipeline loop
-  drive_scene_cycle({.deltaTimeIn = 0.0f,
-                     .update = false,
-                     .sceneUpdate = false,
-                     .resync = false,
-                     .sync = false,
-                     .render = false});
-  if (m_executor.is_running(m_framework)) {
-    OSP_LOG_CRITICAL("Expected main loop to stop, but something is blocking it "
-                     "and cannot exit");
-    std::abort();
-  }
+//  // Stops the pipeline loop
+//  drive_scene_cycle({.deltaTimeIn = 0.0f,
+//                     .update = false,
+//                     .sceneUpdate = false,
+//                     .resync = false,
+//                     .sync = false,
+//                     .render = false});
+//  if (m_executor.is_running(m_framework)) {
+//    OSP_LOG_CRITICAL("Expected main loop to stop, but something is blocking it "
+//                     "and cannot exit");
+//    std::abort();
+//  }
 
-  auto const mainApp = m_framework.get_interface<FIMainApp>(m_mainContext);
-  auto const appCtxs =
-      m_framework.data_get<AppContexts>(mainApp.di.appContexts);
+//  auto const mainApp = m_framework.get_interface<FIMainApp>(m_mainContext);
+//  auto const appCtxs =
+//      m_framework.data_get<AppContexts>(mainApp.di.appContexts);
 
-  run_context_cleanup(appCtxs.sceneRender);
-  run_context_cleanup(appCtxs.window);
-  run_context_cleanup(appCtxs.scene);
-  run_context_cleanup(appCtxs.main);
+//  run_context_cleanup(appCtxs.sceneRender);
+//  run_context_cleanup(appCtxs.window);
+//  run_context_cleanup(appCtxs.scene);
+//  run_context_cleanup(appCtxs.main);
 
-  if (m_executor.is_running(m_framework)) {
-    OSP_LOG_CRITICAL("Expected main loop to stop, but something is blocking it "
-                     "and cannot exit");
-    std::abort();
-  }
+//  if (m_executor.is_running(m_framework)) {
+//    OSP_LOG_CRITICAL("Expected main loop to stop, but something is blocking it "
+//                     "and cannot exit");
+//    std::abort();
+//  }
 
-  m_framework.close_context(appCtxs.sceneRender);
-  m_framework.close_context(appCtxs.window);
-  m_framework.close_context(appCtxs.scene);
+//  m_framework.close_context(appCtxs.sceneRender);
+//  m_framework.close_context(appCtxs.window);
+//  m_framework.close_context(appCtxs.scene);
 
-  clear_resource_owners();
-  m_framework.close_context(appCtxs.main);
+//  clear_resource_owners();
+//  m_framework.close_context(appCtxs.main);
 
   // leak test app cause there is a free bug. FIXME of course.
   //    auto leak_tp = new TestApp;
