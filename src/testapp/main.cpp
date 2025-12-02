@@ -417,9 +417,8 @@ void load_a_bunch_of_stuff()
         "ph_capsule.sturdy.gltf",
         "ph_fuselage.sturdy.gltf",
         "ph_engine.sturdy.gltf",
-        //"ph_plume.sturdy.gltf",
-        "ph_rcs.sturdy.gltf"
-        //"ph_rcs_plume.sturdy.gltf"
+        "ph_rcs.sturdy.gltf",
+        "solvalot.sturdy.gltf"
     };
 
     // TODO: Make new gltf loader. This will read gltf files and dump meshes,

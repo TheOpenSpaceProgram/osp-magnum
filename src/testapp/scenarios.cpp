@@ -450,7 +450,7 @@ static ScenarioMap_t make_scenarios()
         auto &rVehicleSpawnVB   = args.rFW.data_get<ACtxVehicleSpawnVB>   (vhclSpawnVB.di.vehicleSpawnVB);
         auto &rPrebuiltVehicles = args.rFW.data_get<PrebuiltVehicles>     (testVhcls.di.prebuiltVehicles);
 
-        for (int i = 0; i < 10; ++i)
+        for (int i = 0; i < 2; ++i)
         {
             rVehicleSpawn.spawnRequest.push_back(
             {
@@ -458,7 +458,7 @@ static ScenarioMap_t make_scenarios()
                .velocity = {0.0, 0.0f, 50.0f * float(i)},
                .rotation = {}
             });
-            rVehicleSpawnVB.dataVB.push_back(rPrebuiltVehicles[gc_pbvSimpleCommandServiceModule].get());
+            rVehicleSpawnVB.dataVB.push_back(rPrebuiltVehicles[gc_pbvSolvalot1].get());
         }
     }});
 

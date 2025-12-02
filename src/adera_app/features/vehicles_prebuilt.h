@@ -46,7 +46,8 @@ struct PrebuiltVehicles : osp::KeyedVec< PrebuiltVhId, std::unique_ptr<adera::Ve
     OSP_MOVE_ONLY_CTOR_ASSIGN(PrebuiltVehicles);
 };
 
-inline PrebuiltVhId const gc_pbvSimpleCommandServiceModule = PrebuiltVhIdReg_t::create();
+inline PrebuiltVhId const gc_pbvSimpleCommandServiceModule  = PrebuiltVhIdReg_t::create();
+inline PrebuiltVhId const gc_pbvSolvalot1                   = PrebuiltVhIdReg_t::create();
 
 extern osp::fw::FeatureDef const ftrPrebuiltVehicles;
 
