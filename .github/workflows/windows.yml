@@ -31,7 +31,7 @@ jobs:
         # compiler: [msvc, clangcl, mingw, clang]
         compiler: [msvc]
         config: [Release, Debug]
-        image: [windows-2019, windows-2022]
+        image: [windows-2022, windows-2025]
 
     runs-on: ${{ matrix.image }}
 
