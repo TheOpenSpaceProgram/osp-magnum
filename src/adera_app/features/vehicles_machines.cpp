@@ -149,7 +149,7 @@ FeatureDef const ftrMagicRocketThrustIndicator = feature_def("MagicRocketThrustI
             PartId const    part            = rScnParts.machineToPart[anyId];
             ActiveEnt const partEnt         = rScnParts.partToActive[part];
 
-            auto const&     portSpan        = floats.machToNode[anyId];
+            auto const&     portSpan        = floats.machToNode[anyId.value];
             NodeId const    throttleIn      = connected_node(portSpan, ports_magicrocket::gc_throttleIn.port);
             NodeId const    multiplierIn    = connected_node(portSpan, ports_magicrocket::gc_multiplierIn.port);
 
@@ -212,7 +212,7 @@ FeatureDef const ftrMagicRocketThrustIndicator = feature_def("MagicRocketThrustI
                 DrawEnt const   drawEnt         = rThrustIndicator.rktToDrawEnt[pair.local];
                 MachAnyId const anyId           = rockets.localToAny[pair.local];
 
-                auto const&     portSpan        = floats.machToNode[anyId];
+                auto const&     portSpan        = floats.machToNode[anyId.value];
                 NodeId const    throttleIn      = connected_node(portSpan, ports_magicrocket::gc_throttleIn.port);
                 NodeId const    multiplierIn    = connected_node(portSpan, ports_magicrocket::gc_multiplierIn.port);
 
@@ -268,7 +268,7 @@ FeatureDef const ftrMachRCSDriver = feature_def("RCSDriver", [] (
         for (MachLocalId const local : rUpdMach.localDirty[gc_mtRcsDriver])
         {
             MachAnyId const mach     = rRockets.localToAny[local];
-            auto const      portSpan = lgrn::Span<NodeId const>{rFloatNodes.machToNode[mach]};
+            auto const      portSpan = lgrn::Span<NodeId const>{rFloatNodes.machToNode[mach.value]};
 
             NodeId const thrNode = connected_node(portSpan, ports_rcsdriver::gc_throttleOut.port);
             if (thrNode == lgrn::id_null<NodeId>())
@@ -383,9 +383,10 @@ FeatureDef const ftrVehicleControl = feature_def("VehicleControl", [] (
         // Select a UsrCtrl machine when pressing the switch button
         if (rUserInput.button_state(rVhControls.btnSwitch).m_triggered)
         {
-            ++rVhControls.selectedUsrCtrl;
+            ++rVhControls.selectedUsrCtrl.value;
             bool found = false;
-            for (MachLocalId local = rVhControls.selectedUsrCtrl; local < rUsrCtrl.localIds.capacity(); ++local)
+            auto const capacity = std::uint32_t(rUsrCtrl.localIds.capacity());
+            for (MachLocalId local = rVhControls.selectedUsrCtrl; local.value < capacity; ++local.value)
             {
                 if (rUsrCtrl.localIds.exists(local))
                 {
@@ -402,7 +403,7 @@ FeatureDef const ftrVehicleControl = feature_def("VehicleControl", [] (
             }
             else
             {
-                OSP_LOG_INFO("Selected User Control: {}", rVhControls.selectedUsrCtrl);
+                OSP_LOG_INFO("Selected User Control: {}", rVhControls.selectedUsrCtrl.value);
             }
         }
     });
@@ -440,7 +441,7 @@ FeatureDef const ftrVehicleControl = feature_def("VehicleControl", [] (
 
         PerMachType     &rUsrCtrl   = rLinks.machines.perType[gc_mtUserCtrl];
         MachAnyId const mach        = rUsrCtrl.localToAny[rVC.selectedUsrCtrl];
-        auto const      portSpan    = lgrn::Span<NodeId const>{rFloatNodes.machToNode[mach]};
+        auto const      portSpan    = lgrn::Span<NodeId const>{rFloatNodes.machToNode[mach.value]};
 
         bool changed = false;
         auto const write_control = [&rSigValFloat, &rSigUpdFloat, &changed, portSpan] (PortEntry const& entry, float write, bool replace = true, float min = 0.0f, float max = 1.0f)

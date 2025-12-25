@@ -33,9 +33,8 @@ namespace adera
 {
 
 using osp::link::PortEntry;
-using osp::link::gc_ntSigFloat;
-using osp::link::gc_sigIn;
-using osp::link::gc_sigOut;
+using osp::link::sigfloat_input;
+using osp::link::sigfloat_output;
 
 inline osp::link::MachTypeId const gc_mtUserCtrl    = osp::link::MachTypeReg_t::create();
 inline osp::link::MachTypeId const gc_mtMagicRocket = osp::link::MachTypeReg_t::create();
@@ -45,33 +44,33 @@ constexpr osp::Vector3 gc_rocketForward{0.0f, 0.0f, 1.0f};
 
 namespace ports_userctrl
 {
-PortEntry const gc_throttleOut      { gc_ntSigFloat, 0, gc_sigOut };
-PortEntry const gc_pitchOut         { gc_ntSigFloat, 1, gc_sigOut };
-PortEntry const gc_yawOut           { gc_ntSigFloat, 2, gc_sigOut };
-PortEntry const gc_rollOut          { gc_ntSigFloat, 3, gc_sigOut };
+PortEntry const gc_throttleOut      = sigfloat_output(0);
+PortEntry const gc_pitchOut         = sigfloat_output(1);
+PortEntry const gc_yawOut           = sigfloat_output(2);
+PortEntry const gc_rollOut          = sigfloat_output(3);
 }
 
 namespace ports_magicrocket
 {
-PortEntry const gc_throttleIn       { gc_ntSigFloat, 0, gc_sigIn };
-PortEntry const gc_multiplierIn     { gc_ntSigFloat, 1, gc_sigIn };
+PortEntry const gc_throttleIn       = sigfloat_input(0);
+PortEntry const gc_multiplierIn     = sigfloat_input(1);
 }
 
 namespace ports_rcsdriver
 {
-PortEntry const gc_posXIn           { gc_ntSigFloat, 0, gc_sigIn };
-PortEntry const gc_posYIn           { gc_ntSigFloat, 1, gc_sigIn };
-PortEntry const gc_posZIn           { gc_ntSigFloat, 2, gc_sigIn };
-PortEntry const gc_dirXIn           { gc_ntSigFloat, 3, gc_sigIn };
-PortEntry const gc_dirYIn           { gc_ntSigFloat, 4, gc_sigIn };
-PortEntry const gc_dirZIn           { gc_ntSigFloat, 5, gc_sigIn };
-PortEntry const gc_cmdLinXIn        { gc_ntSigFloat, 6, gc_sigIn };
-PortEntry const gc_cmdLinYIn        { gc_ntSigFloat, 7, gc_sigIn };
-PortEntry const gc_cmdLinZIn        { gc_ntSigFloat, 8, gc_sigIn };
-PortEntry const gc_cmdAngXIn        { gc_ntSigFloat, 9, gc_sigIn };
-PortEntry const gc_cmdAngYIn        { gc_ntSigFloat, 10, gc_sigIn };
-PortEntry const gc_cmdAngZIn        { gc_ntSigFloat, 11, gc_sigIn };
-PortEntry const gc_throttleOut      { gc_ntSigFloat, 12, gc_sigOut };
+PortEntry const gc_posXIn           = sigfloat_input(0);
+PortEntry const gc_posYIn           = sigfloat_input(1);
+PortEntry const gc_posZIn           = sigfloat_input(2);
+PortEntry const gc_dirXIn           = sigfloat_input(3);
+PortEntry const gc_dirYIn           = sigfloat_input(4);
+PortEntry const gc_dirZIn           = sigfloat_input(5);
+PortEntry const gc_cmdLinXIn        = sigfloat_input(6);
+PortEntry const gc_cmdLinYIn        = sigfloat_input(7);
+PortEntry const gc_cmdLinZIn        = sigfloat_input(8);
+PortEntry const gc_cmdAngXIn        = sigfloat_input(9);
+PortEntry const gc_cmdAngYIn        = sigfloat_input(10);
+PortEntry const gc_cmdAngZIn        = sigfloat_input(11);
+PortEntry const gc_throttleOut      = sigfloat_output(12);
 }
 
 float thruster_influence(osp::Vector3 pos, osp::Vector3 dir, osp::Vector3 cmdLin, osp::Vector3 cmdAng) noexcept;

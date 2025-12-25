@@ -555,7 +555,7 @@ static void assign_weld_rockets(
             }
 
             MachAnyId const  mach         = machtypeRocket.localToAny[pair.local];
-            auto      const& portSpan     = rFloatNodes.machToNode[mach];
+            auto      const& portSpan     = rFloatNodes.machToNode[mach.value];
             NodeId    const  throttleIn   = connected_node(portSpan, gc_throttleIn.port);
             NodeId    const  multiplierIn = connected_node(portSpan, gc_multiplierIn.port);
 

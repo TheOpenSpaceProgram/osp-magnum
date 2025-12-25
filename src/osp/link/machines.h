@@ -28,7 +28,7 @@
 #include "../core/copymove_macros.h"
 #include "../core/global_id.h"
 #include "../core/keyed_vector.h"
-
+#include "../core/strong_id.h"
 
 #include <longeron/containers/intarray_multimap.hpp>
 #include <longeron/containers/bit_view.hpp>
@@ -41,16 +41,16 @@
 namespace osp::link
 {
 
-using MachTypeId    = uint16_t;
-using MachAnyId     = uint32_t;
-using MachLocalId   = uint32_t;
+using MachTypeId    = osp::StrongId< std::uint16_t, struct DummyForMachTypeId >;
+using MachAnyId     = osp::StrongId< std::uint32_t, struct DummyForMachAnyId >;
+using MachLocalId   = osp::StrongId< std::uint32_t, struct DummyForMachLocalId >;
 
-using NodeTypeId    = uint16_t;
-using NodeId        = uint32_t;
+using NodeTypeId    = osp::StrongId< std::uint16_t, struct DummyForNodeTypeId >;
+using NodeId        = osp::StrongId< std::uint32_t, struct DummyForNodeId >;
 
-using PortId        = uint16_t;
-using JunctionId    = uint16_t;
-using JuncCustom    = uint16_t;
+using PortId        = osp::StrongId< std::uint16_t, struct DummyForPortId >;
+using JunctionId    = osp::StrongId< std::uint16_t, struct DummyForJunctionId >;
+using JuncCustom    = std::uint16_t;
 
 using MachTypeReg_t = GlobalIdReg<MachTypeId>;
 using NodeTypeReg_t = GlobalIdReg<NodeTypeId>;
@@ -62,8 +62,8 @@ inline NodeTypeId const gc_ntSigFloat = NodeTypeReg_t::create();
  */
 struct PerMachType
 {
-    lgrn::IdRegistryStl<MachLocalId>    localIds;
-    std::vector<MachAnyId>              localToAny;
+    lgrn::IdRegistryStl<MachLocalId>        localIds;
+    osp::KeyedVec<MachLocalId, MachAnyId>   localToAny;
 };
 
 /**
@@ -71,12 +71,12 @@ struct PerMachType
  */
 struct Machines
 {
-    lgrn::IdRegistryStl<MachAnyId>      ids;
+    lgrn::IdRegistryStl<MachAnyId>          ids;
 
-    std::vector<MachTypeId>             machTypes;
-    std::vector<MachLocalId>            machToLocal;
+    osp::KeyedVec<MachAnyId, MachTypeId>    machTypes;
+    osp::KeyedVec<MachAnyId, MachLocalId>   machToLocal;
 
-    std::vector<PerMachType>            perType;
+    osp::KeyedVec<MachTypeId, PerMachType>  perType;
 };
 
 struct MachineUpdater
@@ -91,14 +91,14 @@ struct MachineUpdater
 
 struct MachinePair
 {
-    MachLocalId     local   {lgrn::id_null<MachLocalId>()};
-    MachTypeId      type    {lgrn::id_null<MachTypeId>()};
+    MachLocalId     local;
+    MachTypeId      type;
 };
 
 struct Junction
 {
-    MachLocalId     local   {lgrn::id_null<MachLocalId>()};
-    MachTypeId      type    {lgrn::id_null<MachTypeId>()};
+    MachLocalId     local;
+    MachTypeId      type;
     JuncCustom      custom  {0};
 };
 
@@ -109,8 +109,8 @@ struct Nodes
 {
     // reminder: IntArrayMultiMap is kind of like an
     //           std::vector< std::vector<...> > but more memory efficient
-    using NodeToMach_t = lgrn::IntArrayMultiMap<NodeId, Junction>;
-    using MachToNode_t = lgrn::IntArrayMultiMap<MachAnyId, NodeId>;
+    using NodeToMach_t = lgrn::IntArrayMultiMap<std::uint32_t, Junction>;
+    using MachToNode_t = lgrn::IntArrayMultiMap<std::uint32_t, NodeId>;
 
     lgrn::IdRegistryStl<NodeId>         nodeIds;
 
@@ -132,7 +132,7 @@ struct PortEntry
 
 inline NodeId connected_node(lgrn::Span<NodeId const> portSpan, PortId port) noexcept
 {
-    return (portSpan.size() > port) ? portSpan[port] : lgrn::id_null<NodeId>();
+    return (portSpan.size() > port.value) ? portSpan[port.value] : NodeId{};
 }
 
 void copy_machines(
@@ -147,6 +147,5 @@ void copy_nodes(
         Nodes &rDstNodes,
         Machines &rDstMach,
         ArrayView<NodeId> remapNodeOut);
-
 
 } // namespace osp::wire

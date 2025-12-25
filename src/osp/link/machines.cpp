@@ -41,7 +41,7 @@ void copy_nodes(
     for (NodeId const srcNode : rSrcNodes.nodeIds)
     {
         NodeId const dstNode = rDstNodes.nodeIds.create();
-        remapNode[srcNode] = dstNode;
+        remapNode[srcNode.value] = dstNode;
     }
 
     // Copy node-to-machine connections
@@ -50,17 +50,17 @@ void copy_nodes(
                                         + rSrcNodes.nodeToMach.data_size());
     for (NodeId const srcNode : rSrcNodes.nodeIds)
     {
-        NodeId const dstNode = remapNode[srcNode];
-        Span<Junction const> srcJunction = rSrcNodes.nodeToMach[srcNode];
-        rDstNodes.nodeToMach.emplace(dstNode, srcJunction.size());
-        Span<Junction> dstJuncton = rDstNodes.nodeToMach[dstNode];
+        NodeId const dstNode = remapNode[srcNode.value];
+        Span<Junction const> srcJunction = rSrcNodes.nodeToMach[srcNode.value];
+        rDstNodes.nodeToMach.emplace(dstNode.value, srcJunction.size());
+        Span<Junction> dstJuncton = rDstNodes.nodeToMach[dstNode.value];
 
         auto dstJuncIt = std::begin(dstJuncton);
         for (Junction const& srcJunc : srcJunction)
         {
             MachTypeId const machType = srcJunc.type;
             MachAnyId const srcMach = rSrcMach.perType[machType].localToAny[srcJunc.local];
-            MachAnyId const dstMach = remapMach[srcMach];
+            MachAnyId const dstMach = remapMach[srcMach.value];
             MachLocalId const dstLocal = rDstMach.machToLocal[dstMach];
 
             dstJuncIt->local  = dstLocal;
@@ -77,18 +77,18 @@ void copy_nodes(
                                         + rSrcNodes.machToNode.data_size());
     for (MachAnyId const srcMach : rSrcMach.ids)
     {
-        if (rSrcNodes.machToNode.contains(srcMach))
+        if (rSrcNodes.machToNode.contains(srcMach.value))
         {
-            Span<NodeId const> srcPorts = rSrcNodes.machToNode[srcMach];
-            MachAnyId const dstMach = remapMach[srcMach];
-            rDstNodes.machToNode.emplace(dstMach, srcPorts.size());
-            Span<NodeId> dstPorts = rDstNodes.machToNode[dstMach];
+            Span<NodeId const> srcPorts = rSrcNodes.machToNode[srcMach.value];
+            MachAnyId const dstMach = remapMach[srcMach.value];
+            rDstNodes.machToNode.emplace(dstMach.value, srcPorts.size());
+            Span<NodeId> dstPorts = rDstNodes.machToNode[dstMach.value];
 
             auto dstPortIt = std::begin(dstPorts);
             for (NodeId const srcNode : srcPorts)
             {
                 *dstPortIt = (srcNode != lgrn::id_null<NodeId>())
-                           ? remapNode[srcNode]
+                           ? remapNode[srcNode.value]
                            : lgrn::id_null<NodeId>();
 
                 std::advance(dstPortIt, 1);

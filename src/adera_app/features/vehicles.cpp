@@ -243,9 +243,10 @@ FeatureDef const ftrVehicleSpawnVBData = feature_def("VehicleSpawnVBData", [] (
             remapMachTotal += bounds;
             machTotal += srcMachines.ids.size();
 
-            for (MachTypeId type = 0; type < MachTypeReg_t::largest(); ++type)
+            for (std::uint16_t typeInt = 0; typeInt < MachTypeReg_t::largest(); ++typeInt)
             {
-                rVSVB.machtypeCount[type] += srcMachines.perType[type].localIds.size();
+                MachTypeId const typeId{typeInt};
+                rVSVB.machtypeCount[typeId] += srcMachines.perType[typeId].localIds.size();
             }
         }
 
@@ -280,7 +281,7 @@ FeatureDef const ftrVehicleSpawnVBData = feature_def("VehicleSpawnVBData", [] (
                 ++itDstMachIds;
 
                 // Populate map for "VehicleBuilder MachAnyId -> ACtxParts MachAnyId"
-                rVSVB.remapMachs[remapMachOffset + srcMach] = dstMach;
+                rVSVB.remapMachs[remapMachOffset + srcMach.value] = dstMach;
 
                 // Create ACtxParts MachLocalIds
                 // MachLocalIds don't need a remap, since they can be obtained
@@ -327,7 +328,7 @@ FeatureDef const ftrVehicleSpawnVBData = feature_def("VehicleSpawnVBData", [] (
             // Update rScnParts machine->part map
             for (MachAnyId const srcMach : pVData->m_machines.ids)
             {
-                MachAnyId const dstMach = rVSVB.remapMachs[remapMachOffset + srcMach];
+                MachAnyId const dstMach = rVSVB.remapMachs[remapMachOffset + srcMach.value];
                 PartId const    srcPart = pVData->m_machToPart[srcMach];
                 PartId const    dstPart = rVSVB.remapParts[remapPartOffset + srcPart];
 
@@ -349,7 +350,7 @@ FeatureDef const ftrVehicleSpawnVBData = feature_def("VehicleSpawnVBData", [] (
                     MachinePair const&  srcPair  = srcPairs[i];
                     MachinePair&        rDstPair = dstPairs[i];
                     MachAnyId const     srcMach  = pVData->m_machines.perType[srcPair.type].localToAny[srcPair.local];
-                    MachAnyId const     dstMach  = rVSVB.remapMachs[remapMachOffset + srcMach];
+                    MachAnyId const     dstMach  = rVSVB.remapMachs[remapMachOffset + srcMach.value];
                     MachTypeId const    dstType  = srcPair.type;
                     MachLocalId const   dstLocal = rLinks.machines.machToLocal[dstMach];
 
@@ -399,16 +400,17 @@ FeatureDef const ftrVehicleSpawnVBData = feature_def("VehicleSpawnVBData", [] (
 
             auto machRemap = arrayView(std::as_const(rVSVB.remapMachs)).exceptPrefix(rVSVB.remapMachOffsets[vhId]);
 
-            for (NodeTypeId nodeType = 0; nodeType < NodeTypeReg_t::largest(); ++nodeType)
+            for (std::uint16_t nodeTypeInt = 0; nodeTypeInt < NodeTypeReg_t::largest(); ++nodeTypeInt)
             {
+                NodeTypeId const nodeType{nodeTypeInt};
                 PerNodeType const &rSrcNodeType = pVData->m_nodePerType[nodeType];
 
                 std::size_t const remapSize = rSrcNodeType.nodeIds.capacity();
                 auto nodeRemapOut = arrayView(rVSVB.remapNodes).sliceSize(nodeRemapUsed, remapSize);
-                remapNodeOffsets2d[vhId.value][nodeType] = nodeRemapUsed;
+                remapNodeOffsets2d[vhId.value][nodeTypeInt] = nodeRemapUsed;
                 nodeRemapUsed += remapSize;
                 copy_nodes(rSrcNodeType, pVData->m_machines, machRemap,
-                           rLinks.nodePerType[nodeType], rLinks.machines, nodeRemapOut);
+                           rLinks.nodePerType[NodeTypeId{nodeTypeInt}], rLinks.machines, nodeRemapOut);
             }
         }
     });
@@ -463,12 +465,12 @@ FeatureDef const ftrVehicleSpawnVBData = feature_def("VehicleSpawnVBData", [] (
             PerNodeType const&  srcFloatNodes       = pVData->m_nodePerType[gc_ntSigFloat];
             entt::any const&    srcFloatValuesAny   = srcFloatNodes.m_nodeValues;
             auto const&         srcFloatValues      = entt::any_cast< SignalValues_t<float> >(srcFloatValuesAny);
-            std::size_t const   nodeRemapOffset     = remapNodeOffsets2d[vhId.value][gc_ntSigFloat];
+            std::size_t const   nodeRemapOffset     = remapNodeOffsets2d[vhId.value][gc_ntSigFloat.value];
             auto const          nodeRemap           = arrayView(rVSVB.remapNodes).exceptPrefix(nodeRemapOffset);
 
             for (NodeId const srcNode : srcFloatNodes.nodeIds)
             {
-                NodeId const dstNode = nodeRemap[srcNode];
+                NodeId const dstNode = nodeRemap[srcNode.value];
                 rSigValFloat[dstNode] = srcFloatValues[srcNode];
             }
         }
@@ -535,16 +537,14 @@ FeatureDef const ftrSignalsFloat = feature_def("SignalsFloat", [] (
         }
         rUpdMach.machTypesDirty.clear();
 
-        // Sees which nodes changed, and writes into rUpdMach set dirty which MACHINES
-        // must be updated next
-        update_signal_nodes<float>(
-                rSigUpdFloat.nodeDirty,
-                rFloatNodes.nodeToMach,
-                rLinks.machines,
-                arrayView(rSigUpdFloat.nodeNewValues),
-                rSigValFloat,
-                rUpdMach);
+        // Apply new node values and notify connected inputs
+        for (NodeId const nodeId : rSigUpdFloat.nodeDirty)
+        {
+            rSigValFloat[nodeId] = rSigUpdFloat.nodeNewValues[nodeId];
+            notify_connected_inputs(nodeId, rFloatNodes.nodeToMach, rUpdMach);
+        }
         rSigUpdFloat.nodeDirty.clear();
+
         rSigUpdFloat.dirty = false;
 
         // Run tasks needed to update machine types that are dirty

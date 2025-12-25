@@ -56,19 +56,19 @@ struct StructureLink
 
 struct PerNodeType : osp::link::Nodes
 {
-    using MachToNodeCustom_t = lgrn::IntArrayMultiMap<osp::link::MachAnyId,
-                                                      osp::link::JuncCustom>;
+    // MachAnyId -> JuncCustom[]
+    using MachToNodeCustom_t = lgrn::IntArrayMultiMap<std::uint32_t, osp::link::JuncCustom>;
 
     MachToNodeCustom_t      m_machToNodeCustom; // parallel with m_machToNode
     entt::any               m_nodeValues;
-    std::vector<int>        m_nodeConnectCount;
+    osp::KeyedVec<osp::link::NodeId, int> m_nodeConnectCount;
     int                     m_connectCountTotal{0};
 };
 
 struct VehicleData
 {
-    using MachToNodeCustom_t = lgrn::IntArrayMultiMap<osp::link::MachAnyId,
-                                                      osp::link::JuncCustom>;
+    // MachAnyId -> JuncCustom[]
+    using MachToNodeCustom_t = lgrn::IntArrayMultiMap<std::uint32_t, osp::link::JuncCustom>;
     using MapPartToMachines_t = osp::active::ACtxParts::MapPartToMachines_t;
 
     VehicleData() = default;
@@ -84,9 +84,9 @@ struct VehicleData
     lgrn::IntArrayMultiMap<WeldId, PartId>  m_weldToParts;
 
     osp::link::Machines                     m_machines;
-    std::vector<PartId>                     m_machToPart;
+    osp::KeyedVec<osp::link::MachAnyId, PartId>     m_machToPart;
 
-    std::vector<PerNodeType>                m_nodePerType;
+    osp::KeyedVec<osp::link::NodeTypeId, PerNodeType>   m_nodePerType;
 };
 
 /**
@@ -95,6 +95,7 @@ struct VehicleData
 class VehicleBuilder
 {
     using MachAnyId     = osp::link::MachAnyId;
+    using MachLocalId   = osp::link::MachLocalId;
     using MachTypeId    = osp::link::MachTypeId;
     using NodeId        = osp::link::NodeId;
     using NodeTypeId    = osp::link::NodeTypeId;
