@@ -71,13 +71,13 @@ WeldId VehicleBuilder::weld(osp::ArrayView<PartToWeld const> toWeld)
     WeldId const weld = m_data->m_weldIds.create();
     m_data->m_weldToParts.ids_reserve(m_data->m_weldIds.capacity());
 
-    PartId *pPartInWeld = m_data->m_weldToParts.emplace(weld, toWeld.size());
+    PartId *pPartInWeld = m_data->m_weldToParts.emplace(weld.value, toWeld.size());
 
     for (PartToWeld const& set : toWeld)
     {
-        m_data->m_partTransformWeld[set.m_part] = set.m_transform;
+        m_data->m_partTransformWeld[set.m_part.value] = set.m_transform;
 
-        m_data->m_partToWeld[set.m_part] = weld;
+        m_data->m_partToWeld[set.m_part.value] = weld;
         (*pPartInWeld) = set.m_part;
         std::advance(pPartInWeld, 1);
     }
@@ -255,7 +255,7 @@ VehicleData VehicleBuilder::finalize_release()
     rData.m_partToMachines.data_reserve(rData.m_machines.ids.capacity());
     for (PartId const part : rData.m_partIds)
     {
-        rData.m_partToMachines.emplace(part, m_partMachCount[part]);
+        rData.m_partToMachines.emplace(part.value, m_partMachCount[part.value]);
     }
 
     // Assign part-to-machine partitions
@@ -264,11 +264,11 @@ VehicleData VehicleBuilder::finalize_release()
         MachLocalId const   local       = rData.m_machines.machToLocal[mach];
         MachTypeId const    type        = rData.m_machines.machTypes[mach];
         PartId const        part        = rData.m_machToPart[mach];
-        auto const          machines    = lgrn::Span<MachinePair>{rData.m_partToMachines[part]};
+        auto const          machines    = lgrn::Span<MachinePair>{rData.m_partToMachines[part.value]};
 
         // Reuse machine count to track how many are currently added.
         // By the end, these should all be zero
-        auto &rPartMachCount = m_partMachCount[part];
+        auto &rPartMachCount = m_partMachCount[part.value];
         assert(rPartMachCount != 0);
         -- rPartMachCount;
 

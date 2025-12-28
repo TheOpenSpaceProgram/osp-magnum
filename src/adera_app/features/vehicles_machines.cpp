@@ -205,7 +205,7 @@ FeatureDef const ftrMagicRocketThrustIndicator = feature_def("MagicRocketThrustI
         PartId const        part        = rScnParts.activeToPart[ent];
         ActiveEnt const     partEnt     = rScnParts.partToActive[part];
 
-        for (MachinePair const pair : rScnParts.partToMachines[part])
+        for (MachinePair const pair : rScnParts.partToMachines[part.value])
         {
             if (pair.type == gc_mtMagicRocket)
             {

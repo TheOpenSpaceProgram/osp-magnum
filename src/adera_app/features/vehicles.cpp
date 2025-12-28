@@ -330,7 +330,7 @@ FeatureDef const ftrVehicleSpawnVBData = feature_def("VehicleSpawnVBData", [] (
             {
                 MachAnyId const dstMach = rVSVB.remapMachs[remapMachOffset + srcMach.value];
                 PartId const    srcPart = pVData->m_machToPart[srcMach];
-                PartId const    dstPart = rVSVB.remapParts[remapPartOffset + srcPart];
+                PartId const    dstPart = rVSVB.remapParts[remapPartOffset + srcPart.value];
 
                 rScnParts.machineToPart[dstMach] = dstPart;
             }
@@ -338,12 +338,12 @@ FeatureDef const ftrVehicleSpawnVBData = feature_def("VehicleSpawnVBData", [] (
             // Update rScnParts part->machine multimap
             for (PartId const srcPart : pVData->m_partIds)
             {
-                PartId const dstPart = rVSVB.remapParts[remapPartOffset + srcPart];
+                PartId const dstPart = rVSVB.remapParts[remapPartOffset + srcPart.value];
 
-                auto const& srcPairs = pVData->m_partToMachines[srcPart];
+                auto const& srcPairs = pVData->m_partToMachines[srcPart.value];
 
-                rScnParts.partToMachines.emplace(dstPart, srcPairs.size());
-                auto dstPairs = rScnParts.partToMachines[dstPart];
+                rScnParts.partToMachines.emplace(dstPart.value, srcPairs.size());
+                auto dstPairs = rScnParts.partToMachines[dstPart.value];
 
                 for (int i = 0; i < srcPairs.size(); ++i)
                 {

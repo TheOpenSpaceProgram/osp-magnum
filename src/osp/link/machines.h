@@ -109,8 +109,8 @@ struct Nodes
 {
     // reminder: IntArrayMultiMap is kind of like an
     //           std::vector< std::vector<...> > but more memory efficient
-    using NodeToMach_t = lgrn::IntArrayMultiMap<std::uint32_t, Junction>;
-    using MachToNode_t = lgrn::IntArrayMultiMap<std::uint32_t, NodeId>;
+    using NodeToMach_t = lgrn::IntArrayMultiMap<NodeId::entity_type, Junction>;
+    using MachToNode_t = lgrn::IntArrayMultiMap<MachAnyId::entity_type, NodeId>;
 
     lgrn::IdRegistryStl<NodeId>         nodeIds;
 

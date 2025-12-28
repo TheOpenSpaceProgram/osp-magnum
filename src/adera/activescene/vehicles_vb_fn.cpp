@@ -130,7 +130,7 @@ void SysVehicleSpawnVB::create_parts_and_welds(ACtxVehicleSpawn& rVehicleSpawn, 
             ++itDstPartIds;
 
             // Populate map for "VehicleBuilder PartId -> ACtxParts PartId"
-            rVSVB.remapParts[remapPartOffset + srcPart] = dstPart;
+            rVSVB.remapParts[remapPartOffset + srcPart.value] = dstPart;
         }
 
         for (WeldId const srcWeld : pVData->m_weldIds)
@@ -140,17 +140,17 @@ void SysVehicleSpawnVB::create_parts_and_welds(ACtxVehicleSpawn& rVehicleSpawn, 
 
             // Populate map for "VehicleBuilder WeldId -> ACtxParts WeldId"
             // rVehicleSpawnVB.remapWelds
-            rVSVB.remapWelds[remapWeldOffset + srcWeld] = dstWeld;
+            rVSVB.remapWelds[remapWeldOffset + srcWeld.value] = dstWeld;
 
             // Use remaps to connect ACtxParts WeldIds and PartIds
             // rScnParts.m_partToWeld and rScnParts.m_weldToParts
 
-            auto const srcWeldPartSpan  = pVData->m_weldToParts[srcWeld];
-            WeldId *pDstWeldPartOut     = rScnParts.weldToParts.emplace(dstWeld, srcWeldPartSpan.size());
+            auto const srcWeldPartSpan  = pVData->m_weldToParts[srcWeld.value];
+            PartId *pDstWeldPartOut     = rScnParts.weldToParts.emplace(dstWeld.value, srcWeldPartSpan.size());
 
             for (PartId const srcPart : srcWeldPartSpan)
             {
-                PartId const dstPart = rVSVB.remapParts[remapPartOffset + srcPart];
+                PartId const dstPart = rVSVB.remapParts[remapPartOffset + srcPart.value];
 
                 (*pDstWeldPartOut) = dstPart;
                 std::advance(pDstWeldPartOut, 1);
@@ -180,13 +180,13 @@ void SysVehicleSpawnVB::request_prefabs(ACtxVehicleSpawn& rVehicleSpawn, ACtxVeh
         }
 
         // Copy Part data from VehicleBuilder to scene
-        for (uint32_t srcPart : pVData->m_partIds)
+        for (PartId srcPart : pVData->m_partIds)
         {
             PartId const dstPart = *itDstPartIds;
             ++itDstPartIds;
 
-            PrefabPair const& prefabPairSrc = pVData->m_partPrefabs[srcPart];
-            rScnParts.partTransformWeld[dstPart]  = pVData->m_partTransformWeld[srcPart];
+            PrefabPair const& prefabPairSrc = pVData->m_partPrefabs[srcPart.value];
+            rScnParts.partTransformWeld[dstPart]  = pVData->m_partTransformWeld[srcPart.value];
 
             // Add Prefab and Part init events
             (*itPrefabOut) = rPrefabs.spawnRequest.size();
@@ -195,7 +195,7 @@ void SysVehicleSpawnVB::request_prefabs(ACtxVehicleSpawn& rVehicleSpawn, ACtxVeh
             rPrefabs.spawnRequest.push_back(TmpPrefabRequest{
                 .m_importerRes = prefabPairSrc.m_importer,
                 .m_prefabId = prefabPairSrc.m_prefabId,
-                .m_pTransform = &pVData->m_partTransformWeld[srcPart]
+                .m_pTransform = &pVData->m_partTransformWeld[srcPart.value]
             });
         }
     }

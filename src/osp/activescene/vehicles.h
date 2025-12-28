@@ -26,22 +26,18 @@
 
 #include "active_ent.h"
 
-#include "../core/array_view.h"
 #include "../core/keyed_vector.h"
 #include "../core/math_types.h"
 #include "../link/machines.h"
-#include "../vehicles/prefabs.h"
 
 #include <longeron/id_management/registry_stl.hpp>
 #include <longeron/containers/intarray_multimap.hpp>
 
-#include <atomic>
-
 namespace osp::active
 {
 
-using PartId = uint32_t;
-using WeldId = uint32_t;
+using PartId = osp::StrongId<std::uint32_t, struct DummyForPartId>;
+using WeldId = osp::StrongId<std::uint32_t, struct DummyForWeldId>;
 
 struct ACtxLinks
 {
@@ -53,17 +49,17 @@ struct ACtxLinks
 
 struct ACtxParts
 {
-    using MapPartToMachines_t = lgrn::IntArrayMultiMap<PartId, link::MachinePair>;
+    using MapPartToMachines_t = lgrn::IntArrayMultiMap<PartId::entity_type, link::MachinePair>;
+    using MapWeldToPart_t = lgrn::IntArrayMultiMap<WeldId::entity_type, PartId>;
 
     lgrn::IdRegistryStl<PartId>                     partIds;
-    //KeyedVec<PartId, PrefabPair>                    partPrefabs;
     KeyedVec<PartId, Matrix4>                       partTransformWeld;    ///< Part's transform relative to the weld it's part of
     std::vector<PartId>                             partDirty;
 
     lgrn::IdRegistryStl<WeldId>                     weldIds;
     std::vector<WeldId>                             weldDirty;
 
-    lgrn::IntArrayMultiMap<WeldId, PartId>          weldToParts;
+    MapWeldToPart_t                                 weldToParts;
     KeyedVec<PartId, WeldId>                        partToWeld;
 
     MapPartToMachines_t                             partToMachines;
@@ -76,10 +72,10 @@ struct ACtxParts
 };
 
 
-using SpVehicleId = StrongId<uint32_t, struct DummyForSpVehicleId>;
-using SpPartId    = StrongId<uint32_t, struct DummyForSpPartId>;
-using SpWeldId    = StrongId<uint32_t, struct DummyForSpWeldId>;
-using SpMachAnyId = StrongId<uint32_t, struct DummyForSpMachAnyId>;
+using SpVehicleId = StrongId<std::uint32_t, struct DummyForSpVehicleId>;
+using SpPartId    = StrongId<std::uint32_t, struct DummyForSpPartId>;
+using SpWeldId    = StrongId<std::uint32_t, struct DummyForSpWeldId>;
+using SpMachAnyId = StrongId<std::uint32_t, struct DummyForSpMachAnyId>;
 
 struct ACtxVehicleSpawn
 {

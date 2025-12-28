@@ -60,7 +60,7 @@ struct ACtxVehicleSpawnVB
     std::vector<osp::active::PartId>        remapParts;
     osp::KeyedVec<SpVehicleId, std::size_t> remapPartOffsets;
 
-    std::vector<osp::active::PartId>        remapWelds;
+    std::vector<osp::active::WeldId>        remapWelds;
     osp::KeyedVec<SpVehicleId, std::size_t> remapWeldOffsets;
 
     osp::KeyedVec<osp::link::MachTypeId, std::size_t>  machtypeCount;

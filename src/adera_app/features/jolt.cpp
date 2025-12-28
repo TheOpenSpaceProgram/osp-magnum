@@ -355,7 +355,7 @@ FeatureDef const ftrVehicleSpawnJolt = feature_def("VehicleSpawnJolt", [] (
             {
                 // Count parts in this weld first
                 std::size_t entCount = 0;
-                for (PartId const part : rScnParts.weldToParts[weld])
+                for (PartId const part : rScnParts.weldToParts[weld.value])
                 {
                     SpPartId const newPart = rVehicleSpawn.partToSpawned[part];
                     uint32_t const prefabInit = rVehicleSpawn.spawnedPrefabs[newPart];
@@ -369,7 +369,7 @@ FeatureDef const ftrVehicleSpawnJolt = feature_def("VehicleSpawnJolt", [] (
                 SubtreeBuilder bldRoot = SysSceneGraph::add_descendants(rBasic.m_scnGraph, entCount + 1);
                 SubtreeBuilder bldWeld = bldRoot.add_child(weldEnt, entCount);
 
-                for (PartId const part : rScnParts.weldToParts[weld])
+                for (PartId const part : rScnParts.weldToParts[weld.value])
                 {
                     SpPartId const newPart      = rVehicleSpawn.partToSpawned[part];
                     uint32_t const prefabInit   = rVehicleSpawn.spawnedPrefabs[newPart];
@@ -542,12 +542,12 @@ static void assign_weld_rockets(
     // Each weld consists of multiple parts, iterate them all. Note that each part has their own
     // individual transforms, so math is needed to calculate stuff with thrust direction and
     // center-of-mass.
-    for (PartId const part : rScnParts.weldToParts[weld])
+    for (PartId const part : rScnParts.weldToParts[weld.value])
     {
         auto const sizeBefore = rRocketsFoundTemp.size();
 
         // Each part contains Machines, some of which may be rockets.
-        for (MachinePair const pair : rScnParts.partToMachines[part])
+        for (MachinePair const pair : rScnParts.partToMachines[part.value])
         {
             if (pair.type != gc_mtMagicRocket)
             {

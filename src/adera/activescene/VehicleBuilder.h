@@ -25,9 +25,10 @@
 #pragma once
 
 #include <osp/activescene/vehicles.h>
+#include <osp/vehicles/prefabs.h>
+#include <osp/link/machines.h>
 #include <osp/core/copymove_macros.h>
 #include <osp/core/resourcetypes.h>
-#include <osp/link/machines.h>
 
 #include <longeron/id_management/registry_stl.hpp>
 
@@ -56,8 +57,7 @@ struct StructureLink
 
 struct PerNodeType : osp::link::Nodes
 {
-    // MachAnyId -> JuncCustom[]
-    using MachToNodeCustom_t = lgrn::IntArrayMultiMap<std::uint32_t, osp::link::JuncCustom>;
+    using MachToNodeCustom_t = lgrn::IntArrayMultiMap<osp::link::MachAnyId::entity_type, osp::link::JuncCustom>;
 
     MachToNodeCustom_t      m_machToNodeCustom; // parallel with m_machToNode
     entt::any               m_nodeValues;
@@ -67,9 +67,8 @@ struct PerNodeType : osp::link::Nodes
 
 struct VehicleData
 {
-    // MachAnyId -> JuncCustom[]
-    using MachToNodeCustom_t = lgrn::IntArrayMultiMap<std::uint32_t, osp::link::JuncCustom>;
     using MapPartToMachines_t = osp::active::ACtxParts::MapPartToMachines_t;
+    using MapWeldToParts_t = lgrn::IntArrayMultiMap<WeldId::entity_type, PartId>;
 
     VehicleData() = default;
     OSP_MOVE_ONLY_CTOR(VehicleData);
@@ -81,7 +80,7 @@ struct VehicleData
     MapPartToMachines_t                     m_partToMachines;
 
     lgrn::IdRegistryStl<WeldId>             m_weldIds;
-    lgrn::IntArrayMultiMap<WeldId, PartId>  m_weldToParts;
+    MapWeldToParts_t                        m_weldToParts;
 
     osp::link::Machines                     m_machines;
     osp::KeyedVec<osp::link::MachAnyId, PartId>     m_machToPart;
