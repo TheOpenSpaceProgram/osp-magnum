@@ -137,9 +137,9 @@ FeatureDef const ftrMagicRocketThrustIndicator = feature_def("MagicRocketThrustI
         .args       ({ comScn.di.basic,      scnRender.di.scnRender,     comScn.di.drawing,              comScn.di.drawingRes,          parts.di.scnParts,          links.di.links,                   sigFloat.di.sigValFloat,    rktIndicate.di.indicator})
         .func([]    (ACtxBasic& rBasic, ACtxSceneRender &rScnRender, ACtxDrawing& rDrawing, ACtxDrawingRes const& rDrawingRes, ACtxParts const& rScnParts, ACtxLinks const& rLinks, SignalValues_t<float> const& rSigValFloat, ThrustIndicator& rIndicator) noexcept
     {
-        Material            &rMat           = rScnRender.m_materials[rIndicator.material];
-        PerMachType const   &rockets        = rLinks.machines.perType[gc_mtMagicRocket];
-        Nodes const         &floats         = rLinks.nodePerType[gc_ntSigFloat];
+        Material                &rMat       = rScnRender.m_materials[rIndicator.material];
+        PerMachType       const &rockets    = rLinks.machines.perType[gc_mtMagicRocket];
+        NodeConnections   const &floats     = rLinks.nodePerType[gc_ntSigFloat];
 
         for (MachLocalId const localId : rockets.localIds)
         {
@@ -199,8 +199,8 @@ FeatureDef const ftrMagicRocketThrustIndicator = feature_def("MagicRocketThrustI
         auto &rLinks                    = *static_cast< ACtxLinks* >                (data[2]);
         auto &rSigValFloat              = *static_cast< SignalValues_t<float>* >    (data[3]);
 
-        PerMachType const   &rockets    = rLinks.machines.perType[gc_mtMagicRocket];
-        Nodes const         &floats     = rLinks.nodePerType[gc_ntSigFloat];
+        PerMachType     const &rockets  = rLinks.machines.perType[gc_mtMagicRocket];
+        NodeConnections const &floats   = rLinks.nodePerType[gc_ntSigFloat];
 
         PartId const        part        = rScnParts.activeToPart[ent];
         ActiveEnt const     partEnt     = rScnParts.partToActive[part];
@@ -262,8 +262,8 @@ FeatureDef const ftrMachRCSDriver = feature_def("RCSDriver", [] (
         .args       ({      links.di.links,         links.di.updMach,             sigFloat.di.sigValFloat,          sigFloat.di.sigUpdFloat})
         .func       ([] (ACtxLinks& rLinks, MachineUpdater& rUpdMach, SignalValues_t<float>& rSigValFloat, UpdateNodes<float>& rSigUpdFloat) noexcept
     {
-        Nodes const &rFloatNodes = rLinks.nodePerType[gc_ntSigFloat];
-        PerMachType &rRockets    = rLinks.machines.perType[gc_mtRcsDriver];
+        NodeConnections const &rFloatNodes = rLinks.nodePerType[gc_ntSigFloat];
+        PerMachType           &rRockets    = rLinks.machines.perType[gc_mtRcsDriver];
 
         for (MachLocalId const local : rUpdMach.localDirty[gc_mtRcsDriver])
         {
@@ -425,8 +425,8 @@ FeatureDef const ftrVehicleControl = feature_def("VehicleControl", [] (
             return; // No vehicle selected
         }
 
-        Nodes const &rFloatNodes = rLinks.nodePerType[gc_ntSigFloat];
-        float const thrRate = deltaTimeIn;
+        NodeConnections const &rFloatNodes = rLinks.nodePerType[gc_ntSigFloat];
+        float           const thrRate      = deltaTimeIn;
 
         float const thrChange
             = held(rVC.btnThrMore, thrRate) - held(rVC.btnThrLess, thrRate)

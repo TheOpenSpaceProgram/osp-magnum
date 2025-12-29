@@ -87,11 +87,11 @@ FeatureDef const ftrParts = feature_def("Parts", [] (
     auto &rScnParts = rFB.data_emplace< ACtxParts >      (parts.di.scnParts);
 
     // Resize containers to fit all existing MachTypeIds and NodeTypeIds
-    // These Global IDs are dynamically initialized just as the program starts
-    rUpdMach.machTypesDirty.resize(MachTypeReg_t::size());
-    rUpdMach.localDirty    .resize(MachTypeReg_t::size());
-    rLinks.machines.perType.resize(MachTypeReg_t::size());
-    rLinks.nodePerType     .resize(NodeTypeReg_t::size());
+    std::size_t const machTypeIdCapacity = GlobalLinkInfo::instance().machtypeIds.capacity();
+    rUpdMach.machTypesDirty.resize(machTypeIdCapacity);
+    rUpdMach.localDirty    .resize(machTypeIdCapacity);
+    rLinks.machines.perType.resize(machTypeIdCapacity);
+    rLinks.nodePerType     .resize(machTypeIdCapacity);
 
     rFB.task()
         .name       ("Clear Part dirty vectors after use")
@@ -188,7 +188,9 @@ FeatureDef const ftrVehicleSpawnVBData = feature_def("VehicleSpawnVBData", [] (
     rFB.pipeline(vhclSpawnVB.pl.remapMachs)  .parent(mainApp.loopblks.mainLoop);
     rFB.pipeline(vhclSpawnVB.pl.remapNodes)  .parent(mainApp.loopblks.mainLoop);
 
-    rFB.data_emplace< ACtxVehicleSpawnVB >(vhclSpawnVB.di.vehicleSpawnVB);
+    auto& rVehicleSpawnVB = rFB.data_emplace< ACtxVehicleSpawnVB >(vhclSpawnVB.di.vehicleSpawnVB);
+
+    rVehicleSpawnVB.machtypeCount.resize(GlobalLinkInfo::instance().machtypeIds.capacity());
 
     rFB.task()
         .name       ("Create PartIds and WeldIds for vehicles to spawn from VehicleData")
@@ -217,13 +219,14 @@ FeatureDef const ftrVehicleSpawnVBData = feature_def("VehicleSpawnVBData", [] (
         std::size_t const newVehicleCount = rVehicleSpawn.new_vehicle_count();
         ACtxVehicleSpawnVB &rVSVB = rVehicleSpawnVB;
 
+        GlobalLinkInfo const& linkInfo = GlobalLinkInfo::instance();
+
         // Count total machines, and calculate offsets for remaps.
 
         std::size_t machTotal = 0;
         std::size_t remapMachTotal = 0;
 
-        rVSVB.machtypeCount.clear();
-        rVSVB.machtypeCount.resize(MachTypeReg_t::size(), 0);
+        std::fill(rVSVB.machtypeCount.begin(), rVSVB.machtypeCount.end(), 0);
 
         rVSVB.remapMachOffsets.resize(newVehicleCount);
 
@@ -243,9 +246,8 @@ FeatureDef const ftrVehicleSpawnVBData = feature_def("VehicleSpawnVBData", [] (
             remapMachTotal += bounds;
             machTotal += srcMachines.ids.size();
 
-            for (std::uint16_t typeInt = 0; typeInt < MachTypeReg_t::largest(); ++typeInt)
+            for (MachTypeId const typeId : linkInfo.machtypeIds)
             {
-                MachTypeId const typeId{typeInt};
                 rVSVB.machtypeCount[typeId] += srcMachines.perType[typeId].localIds.size();
             }
         }
@@ -370,7 +372,11 @@ FeatureDef const ftrVehicleSpawnVBData = feature_def("VehicleSpawnVBData", [] (
         std::size_t const newVehicleCount = rVehicleSpawn.new_vehicle_count();
         ACtxVehicleSpawnVB &rVSVB = rVehicleSpawnVB;
 
-        rVSVB.remapNodeOffsets.resize(newVehicleCount * NodeTypeReg_t::size());
+        GlobalLinkInfo const& linkInfo = GlobalLinkInfo::instance();
+
+        rVSVB.remapNodeOffsetStride = GlobalLinkInfo::instance().nodetypeIds.capacity();
+        rVSVB.remapNodeOffsets.resize(newVehicleCount * rVSVB.remapNodeOffsetStride);
+
         auto remapNodeOffsets2d = rVSVB.remap_node_offsets_2d();
 
         // Add up bounds needed for all nodes of every type for remaps
@@ -400,17 +406,16 @@ FeatureDef const ftrVehicleSpawnVBData = feature_def("VehicleSpawnVBData", [] (
 
             auto machRemap = arrayView(std::as_const(rVSVB.remapMachs)).exceptPrefix(rVSVB.remapMachOffsets[vhId]);
 
-            for (std::uint16_t nodeTypeInt = 0; nodeTypeInt < NodeTypeReg_t::largest(); ++nodeTypeInt)
+            for (NodeTypeId const nodeType : linkInfo.nodetypeIds)
             {
-                NodeTypeId const nodeType{nodeTypeInt};
                 PerNodeType const &rSrcNodeType = pVData->m_nodePerType[nodeType];
 
                 std::size_t const remapSize = rSrcNodeType.nodeIds.capacity();
                 auto nodeRemapOut = arrayView(rVSVB.remapNodes).sliceSize(nodeRemapUsed, remapSize);
-                remapNodeOffsets2d[vhId.value][nodeTypeInt] = nodeRemapUsed;
+                remapNodeOffsets2d[vhId.value][nodeType.value] = nodeRemapUsed;
                 nodeRemapUsed += remapSize;
                 copy_nodes(rSrcNodeType, pVData->m_machines, machRemap,
-                           rLinks.nodePerType[NodeTypeId{nodeTypeInt}], rLinks.machines, nodeRemapOut);
+                           rLinks.nodePerType[nodeType], rLinks.machines, nodeRemapOut);
             }
         }
     });
@@ -444,8 +449,8 @@ FeatureDef const ftrVehicleSpawnVBData = feature_def("VehicleSpawnVBData", [] (
         .args       ({         vhclSpawn.di.vehicleSpawn,             vhclSpawnVB.di.vehicleSpawnVB,    parts.di.scnParts,    links.di.links,             sigFloat.di.sigValFloat,          sigFloat.di.sigUpdFloat})
         .func       ([] (ACtxVehicleSpawn& rVehicleSpawn, ACtxVehicleSpawnVB const& rVehicleSpawnVB, ACtxParts& rScnParts, ACtxLinks &rLinks, SignalValues_t<float>& rSigValFloat, UpdateNodes<float>& rSigUpdFloat) noexcept
     {
-        Nodes const         &rFloatNodes    = rLinks.nodePerType[gc_ntSigFloat];
-        std::size_t const   maxNodes        = rFloatNodes.nodeIds.capacity();
+        NodeConnections const &rFloatNodes = rLinks.nodePerType[gc_ntSigFloat];
+        std::size_t     const maxNodes     = rFloatNodes.nodeIds.capacity();
         rSigUpdFloat.nodeNewValues.resize(maxNodes);
         rSigUpdFloat.nodeDirty.resize(maxNodes);
         rSigValFloat.resize(maxNodes);
@@ -526,7 +531,7 @@ FeatureDef const ftrSignalsFloat = feature_def("SignalsFloat", [] (
             return; // Not dirty, nothing to do
         }
 
-        Nodes const &rFloatNodes = rLinks.nodePerType[gc_ntSigFloat];
+        NodeConnections const &rFloatNodes = rLinks.nodePerType[gc_ntSigFloat];
 
         // NOTE: The various use of reset() clear entire bit arrays, which may or may
         //       not be expensive. They likely optimize to memset

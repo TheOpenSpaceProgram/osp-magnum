@@ -29,6 +29,15 @@
 namespace osp::link
 {
 
+
+inline TransmitModeId const gc_tmLogicSignal    = GlobalLinkInfo::instance().create_transmitmode();
+
+inline NodeTypeId const gc_ntSigFloat = GlobalLinkInfo::instance().create_nodetype(NodeTypeInfo{
+    .transmitMode = gc_tmLogicSignal, .nodeDataSize = sizeof(float)
+});
+
+
+
 constexpr JuncCustom gc_sigIn  = 0;
 constexpr JuncCustom gc_sigOut = 1;
 
@@ -54,7 +63,7 @@ struct UpdateNodes
     }
 };
 
-inline void notify_connected_inputs(NodeId const nodeId, Nodes::NodeToMach_t const& nodeToMach, MachineUpdater& rUpdMach)
+inline void notify_connected_inputs(NodeId const nodeId, NodeConnections::NodeToMach_t const& nodeToMach, MachineUpdater& rUpdMach)
 {
     for (Junction junc : nodeToMach[nodeId.value])
     {

@@ -36,9 +36,9 @@ using osp::link::PortEntry;
 using osp::link::sigfloat_input;
 using osp::link::sigfloat_output;
 
-inline osp::link::MachTypeId const gc_mtUserCtrl    = osp::link::MachTypeReg_t::create();
-inline osp::link::MachTypeId const gc_mtMagicRocket = osp::link::MachTypeReg_t::create();
-inline osp::link::MachTypeId const gc_mtRcsDriver   = osp::link::MachTypeReg_t::create();
+inline osp::link::MachTypeId const gc_mtUserCtrl    = osp::link::GlobalLinkInfo::instance().create_machtype();
+inline osp::link::MachTypeId const gc_mtMagicRocket = osp::link::GlobalLinkInfo::instance().create_machtype();
+inline osp::link::MachTypeId const gc_mtRcsDriver   = osp::link::GlobalLinkInfo::instance().create_machtype();
 
 constexpr osp::Vector3 gc_rocketForward{0.0f, 0.0f, 1.0f};
 

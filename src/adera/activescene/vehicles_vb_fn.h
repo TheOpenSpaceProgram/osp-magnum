@@ -46,13 +46,13 @@ struct ACtxVehicleSpawnVB
     inline Corrade::Containers::StridedArrayView2D<std::size_t> remap_node_offsets_2d() noexcept
     {
         return {Corrade::Containers::arrayView(remapNodeOffsets.data(), remapNodeOffsets.size()),
-                {dataVB.size(), osp::link::NodeTypeReg_t::size()}};
+                {dataVB.size(), remapNodeOffsetStride}};
     }
 
     inline Corrade::Containers::StridedArrayView2D<std::size_t const> remap_node_offsets_2d() const noexcept
     {
         return {Corrade::Containers::arrayView(remapNodeOffsets.data(), remapNodeOffsets.size()),
-                {dataVB.size(), osp::link::NodeTypeReg_t::size()}};
+                {dataVB.size(), remapNodeOffsetStride}};
     }
 
     osp::KeyedVec<SpVehicleId, VehicleData const*> dataVB;
@@ -71,6 +71,7 @@ struct ACtxVehicleSpawnVB
     // An offset can exist for each pair of [New Vehicle, Node Type]
     std::vector<osp::link::NodeId>          remapNodes;
     osp::KeyedVec<SpVehicleId, std::size_t> remapNodeOffsets;
+    std::size_t                             remapNodeOffsetStride;
 };
 
 class SysVehicleSpawnVB

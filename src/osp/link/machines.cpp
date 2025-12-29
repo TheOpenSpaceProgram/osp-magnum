@@ -27,13 +27,19 @@
 namespace osp::link
 {
 
+GlobalLinkInfo& GlobalLinkInfo::instance()
+{
+    static GlobalLinkInfo info;
+    return info;
+}
+
 void copy_nodes(
-        Nodes const &rSrcNodes,
-        Machines const &rSrcMach,
-        Corrade::Containers::ArrayView<MachAnyId const> remapMach,
-        Nodes &rDstNodes,
-        Machines &rDstMach,
-        Corrade::Containers::ArrayView<NodeId> remapNode)
+        NodeConnections                               const &rSrcNodes,
+        Machines                                      const &rSrcMach,
+        Corrade::Containers::ArrayView<MachAnyId const>     remapMach,
+        NodeConnections                                     &rDstNodes,
+        Machines                                            &rDstMach,
+        Corrade::Containers::ArrayView<NodeId>              remapNode)
 {
     using lgrn::Span;
 

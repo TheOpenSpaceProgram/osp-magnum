@@ -43,8 +43,8 @@ struct ACtxLinks
 {
     ACtxLinks() = default;
     OSP_MOVE_ONLY_CTOR_ASSIGN(ACtxLinks);
-    link::Machines                                  machines;
-    KeyedVec<link::NodeTypeId, link::Nodes>         nodePerType;
+    link::Machines                                      machines;
+    KeyedVec<link::NodeTypeId, link::NodeConnections>   nodePerType;
 };
 
 struct ACtxParts

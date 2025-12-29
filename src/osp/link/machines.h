@@ -37,25 +37,61 @@
 
 #include <atomic>
 #include <vector>
+#include <unordered_map>
+
 
 namespace osp::link
 {
 
-using MachTypeId    = osp::StrongId< std::uint16_t, struct DummyForMachTypeId >;
-using MachAnyId     = osp::StrongId< std::uint32_t, struct DummyForMachAnyId >;
-using MachLocalId   = osp::StrongId< std::uint32_t, struct DummyForMachLocalId >;
+using MachTypeId        = osp::StrongId< std::uint16_t, struct DummyForMachTypeId >;
+using MachAnyId         = osp::StrongId< std::uint32_t, struct DummyForMachAnyId >;
+using MachLocalId       = osp::StrongId< std::uint32_t, struct DummyForMachLocalId >;
 
-using NodeTypeId    = osp::StrongId< std::uint16_t, struct DummyForNodeTypeId >;
-using NodeId        = osp::StrongId< std::uint32_t, struct DummyForNodeId >;
+using NodeTypeId        = osp::StrongId< std::uint16_t, struct DummyForNodeTypeId >;
+using TransmitModeId    = osp::StrongId< std::uint16_t, struct DummyForTransmitModeId >;
+using NodeId            = osp::StrongId< std::uint32_t, struct DummyForNodeId >;
 
-using PortId        = osp::StrongId< std::uint16_t, struct DummyForPortId >;
-using JunctionId    = osp::StrongId< std::uint16_t, struct DummyForJunctionId >;
-using JuncCustom    = std::uint16_t;
+using PortId            = osp::StrongId< std::uint16_t, struct DummyForPortId >;
+using JunctionId        = osp::StrongId< std::uint16_t, struct DummyForJunctionId >;
+using JuncCustom        = std::uint16_t;
 
-using MachTypeReg_t = GlobalIdReg<MachTypeId>;
-using NodeTypeReg_t = GlobalIdReg<NodeTypeId>;
+struct NodeTypeInfo
+{
+    TransmitModeId  transmitMode;
+    std::size_t     nodeDataSize;
+};
 
-inline NodeTypeId const gc_ntSigFloat = NodeTypeReg_t::create();
+struct GlobalLinkInfo
+{
+    // TODO: maybe put some private or more encapsulation stuff here; just made this work for now
+
+    static GlobalLinkInfo& instance();
+
+    MachTypeId create_machtype() { return machtypeIds.create(); };
+
+    TransmitModeId create_transmitmode() { return transmitmodeIds.create(); };
+
+    NodeTypeId create_nodetype(NodeTypeInfo info)
+    {
+        NodeTypeId const id = nodetypeIds.create();
+        infoOfNodetype.resize(nodetypeIds.capacity());
+        infoOfNodetype[id] = info;
+        return id;
+    }
+
+    osp::KeyedVec<NodeTypeId, NodeTypeInfo> infoOfNodetype;
+
+    lgrn::IdRegistryStl<MachTypeId>         machtypeIds;
+    lgrn::IdRegistryStl<TransmitModeId>     transmitmodeIds;
+    lgrn::IdRegistryStl<NodeTypeId>         nodetypeIds;
+};
+
+// Not yet used, for example only
+inline TransmitModeId const gc_tmStructure      = GlobalLinkInfo::instance().transmitmodeIds.create();
+inline TransmitModeId const gc_tmSimpleFluid    = GlobalLinkInfo::instance().transmitmodeIds.create();
+
+
+
 
 /**
  * @brief Keeps track of Machines of a certain type that exists
@@ -85,7 +121,6 @@ struct MachineUpdater
 
     lgrn::IdSetStl<MachTypeId> machTypesDirty;
 
-    // [MachTypeId][MachLocalId]
     osp::KeyedVec<MachTypeId, lgrn::IdSetStl<MachLocalId>> localDirty;
 };
 
@@ -103,9 +138,9 @@ struct Junction
 };
 
 /**
- * @brief Connects Machines together with intermediate Nodes
+ * @brief Connects machines together
  */
-struct Nodes
+struct NodeConnections
 {
     // reminder: IntArrayMultiMap is kind of like an
     //           std::vector< std::vector<...> > but more memory efficient
@@ -123,6 +158,11 @@ struct Nodes
     MachToNode_t                        machToNode;
 };
 
+struct NodeValues
+{
+    std::vector<std::byte>              data;
+};
+
 struct PortEntry
 {
     NodeTypeId  type;
@@ -135,17 +175,12 @@ inline NodeId connected_node(lgrn::Span<NodeId const> portSpan, PortId port) noe
     return (portSpan.size() > port.value) ? portSpan[port.value] : NodeId{};
 }
 
-void copy_machines(
-        Machines const &rSrc,
-        Machines &rDst,
-        ArrayView<MachAnyId> remapMachOut);
-
 void copy_nodes(
-        Nodes const &rSrcNodes,
-        Machines const &rSrcMach,
-        ArrayView<MachAnyId const> remapMach,
-        Nodes &rDstNodes,
-        Machines &rDstMach,
-        ArrayView<NodeId> remapNodeOut);
+        NodeConnections           const &rSrcNodes,
+        Machines                  const &rSrcMach,
+        ArrayView<MachAnyId const>      remapMach,
+        NodeConnections                 &rDstNodes,
+        Machines                        &rDstMach,
+        ArrayView<NodeId>               remapNodeOut);
 
 } // namespace osp::wire

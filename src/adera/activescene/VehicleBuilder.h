@@ -55,7 +55,7 @@ struct StructureLink
     PartId m_less;
 };
 
-struct PerNodeType : osp::link::Nodes
+struct PerNodeType : osp::link::NodeConnections
 {
     using MachToNodeCustom_t = lgrn::IntArrayMultiMap<osp::link::MachAnyId::entity_type, osp::link::JuncCustom>;
 
@@ -113,9 +113,10 @@ public:
     VehicleBuilder(osp::Resources *pResources)
      : m_pResources{pResources}
     {
+        auto const& info = osp::link::GlobalLinkInfo::instance();
         auto &rData = m_data.emplace();
-        rData.m_machines.perType.resize(osp::link::MachTypeReg_t::size());
-        rData.m_nodePerType.resize(osp::link::NodeTypeReg_t::size());
+        rData.m_machines.perType.resize(info.machtypeIds.capacity());
+        rData.m_nodePerType.resize(info.nodetypeIds.capacity());
         index_prefabs();
     };
 

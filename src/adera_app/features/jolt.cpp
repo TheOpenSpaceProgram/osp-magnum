@@ -521,7 +521,7 @@ static void assign_weld_rockets(
         ACtxParts                const &rScnParts,
         ACtxJoltWorld                  &rJolt,
         ACtxRocketsJolt                &rRocketsJolt,
-        Nodes                    const &rFloatNodes,
+        NodeConnections          const &rFloatNodes,
         PerMachType              const &machtypeRocket,
         std::vector<BodyRocket>        &rRocketsFoundTemp)
 {
@@ -694,8 +694,8 @@ FeatureDef const ftrRocketThrustJolt = feature_def("RocketThrustJolt", [] (
     {
         using adera::gc_mtMagicRocket;
 
-        Nodes       const &rFloatNodes    = rLinks.nodePerType[gc_ntSigFloat];
-        PerMachType const &machtypeRocket = rLinks.machines.perType[gc_mtMagicRocket];
+        NodeConnections const &rFloatNodes    = rLinks.nodePerType[gc_ntSigFloat];
+        PerMachType     const &machtypeRocket = rLinks.machines.perType[gc_mtMagicRocket];
 
         rRocketsJolt.m_bodyRockets.ids_reserve(rJolt.m_bodyIds.size());
         rRocketsJolt.m_bodyRockets.data_reserve(rLinks.machines.perType[gc_mtMagicRocket].localIds.capacity());

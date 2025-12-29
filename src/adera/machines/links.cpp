@@ -26,9 +26,6 @@
 
 using namespace osp;
 
-using osp::link::MachTypeReg_t;
-using osp::link::MachTypeId;
-
 namespace adera
 {
 
