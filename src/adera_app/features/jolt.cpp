@@ -35,7 +35,7 @@
 #include <osp/drawing/drawing.h>
 #include <osp/vehicles/ImporterData.h>
 
-#include <adera/machines/links.h>
+#include <adera/links.h>
 
 #include <planet-a/activescene/terrain.h>
 

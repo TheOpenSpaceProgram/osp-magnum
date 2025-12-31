@@ -40,7 +40,7 @@
 #include <godot_cpp/variant/vector3.hpp>
 
 #include <adera/drawing/CameraController.h>
-#include <adera/machines/links.h>
+#include <adera/links.h>
 
 #include <osp/activescene/basic_fn.h>
 #include <osp/core/math_types.h>

@@ -454,11 +454,22 @@ static ScenarioMap_t make_scenarios()
         {
             rVehicleSpawn.spawnRequest.push_back(
             {
-               .position = {float(i - 2) * 8.0f, 30.0f, 10.0f},
-               .velocity = {0.0, 0.0f, 50.0f * float(i)},
+               .position = {float(i - 2) * 15.0f, 30.0f, 10.0f},
+               .velocity = {0.0, 0.0f, 0.0f},
                .rotation = {}
             });
             rVehicleSpawnVB.dataVB.push_back(rPrebuiltVehicles[gc_pbvSolvalot1].get());
+        }
+
+        for (int i = 0; i < 2; ++i)
+        {
+            rVehicleSpawn.spawnRequest.push_back(
+            {
+               .position = {float(i - 2) * 15.0f, 0.0f, 10.0f},
+               .velocity = {0.0, 0.0f, 0.0f},
+               .rotation = {}
+            });
+            rVehicleSpawnVB.dataVB.push_back(rPrebuiltVehicles[gc_pbvSimpleCommandServiceModule].get());
         }
     }});
 

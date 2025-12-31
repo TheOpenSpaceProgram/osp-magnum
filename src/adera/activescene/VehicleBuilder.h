@@ -26,7 +26,7 @@
 
 #include <osp/activescene/vehicles.h>
 #include <osp/vehicles/prefabs.h>
-#include <osp/link/machines.h>
+#include <osp/link/link.h>
 #include <osp/core/copymove_macros.h>
 #include <osp/core/resourcetypes.h>
 

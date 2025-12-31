@@ -28,7 +28,7 @@
 
 #include "../core/keyed_vector.h"
 #include "../core/math_types.h"
-#include "../link/machines.h"
+#include "../link/link.h"
 
 #include <longeron/id_management/registry_stl.hpp>
 #include <longeron/containers/intarray_multimap.hpp>

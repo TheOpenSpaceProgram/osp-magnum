@@ -26,7 +26,7 @@
 
 #include "../feature_interfaces.h"
 
-#include <adera/machines/links.h>
+#include <adera/links.h>
 
 #include <osp/core/Resources.h>
 

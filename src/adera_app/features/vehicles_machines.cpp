@@ -29,7 +29,7 @@
 
 #include <adera/activescene/vehicles_vb_fn.h>
 #include <adera/drawing/CameraController.h>
-#include <adera/machines/links.h>
+#include <adera/links.h>
 
 #include <osp/activescene/basic.h>
 #include <osp/activescene/physics.h>
