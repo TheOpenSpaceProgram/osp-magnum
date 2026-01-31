@@ -39,13 +39,13 @@ namespace osp::active
 using PartId = osp::StrongId<std::uint32_t, struct DummyForPartId>;
 using WeldId = osp::StrongId<std::uint32_t, struct DummyForWeldId>;
 
-struct ACtxLinks
-{
-    ACtxLinks() = default;
-    OSP_MOVE_ONLY_CTOR_ASSIGN(ACtxLinks);
-    link::Machines                                      machines;
-    KeyedVec<link::NodeTypeId, link::NodeConnections>   nodePerType;
-};
+//struct ACtxLinks
+//{
+//    ACtxLinks() = default;
+//    OSP_MOVE_ONLY_CTOR_ASSIGN(ACtxLinks);
+//    link::Machines                                  machines;
+//    KeyedVec<link::NodeTypeId, link::NodeType>      nodePerType;
+//};
 
 struct ACtxParts
 {

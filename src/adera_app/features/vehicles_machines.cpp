@@ -104,7 +104,6 @@ FeatureDef const ftrMagicRocketThrustIndicator = feature_def("MagicRocketThrustI
     auto &rDrawTfObservers  = rFB.data_get< DrawTfObservers >(scnRender.di.drawTfObservers);
     auto &rScnParts         = rFB.data_get< ACtxParts >      (parts.di.scnParts);
     auto &rLinks            = rFB.data_get< ACtxLinks >      (links.di.links);
-    auto &rSigValFloat      = rFB.data_get< SignalValues_t<float> > (sigFloat.di.sigValFloat);
     auto &rThrustIndicator  = rFB.data_emplace<ThrustIndicator>(rktIndicate.di.indicator);
 
     rThrustIndicator.material   = material;
@@ -117,7 +116,7 @@ FeatureDef const ftrMagicRocketThrustIndicator = feature_def("MagicRocketThrustI
         .args       ({    scnRender.di.scnRender,           parts.di.scnParts,          links.di.links,    rktIndicate.di.indicator})
         .func([]    (ACtxSceneRender &rScnRender,  ACtxParts const& rScnParts, ACtxLinks const& rLinks, ThrustIndicator& rIndicator) noexcept
     {
-        PerMachType const& rockets = rLinks.machines.perType[gc_mtMagicRocket];
+        MachType const& rockets = rLinks.machines.perType[gc_mtMagicRocket];
 
         rIndicator.rktToDrawEnt.resize(rockets.localIds.capacity());
 
@@ -138,14 +137,14 @@ FeatureDef const ftrMagicRocketThrustIndicator = feature_def("MagicRocketThrustI
         .func([]    (ACtxBasic& rBasic, ACtxSceneRender &rScnRender, ACtxDrawing& rDrawing, ACtxDrawingRes const& rDrawingRes, ACtxParts const& rScnParts, ACtxLinks const& rLinks, SignalValues_t<float> const& rSigValFloat, ThrustIndicator& rIndicator) noexcept
     {
         Material                &rMat       = rScnRender.m_materials[rIndicator.material];
-        PerMachType       const &rockets    = rLinks.machines.perType[gc_mtMagicRocket];
-        NodeConnections   const &floats     = rLinks.nodePerType[gc_ntSigFloat];
+        MachType          const &rockets    = rLinks.machines.perType[gc_mtMagicRocket];
+        NodeType          const &floats     = rLinks.nodePerType[gc_ntSigFloat];
 
         for (MachLocalId const localId : rockets.localIds)
         {
             DrawEnt const   drawEnt         = rIndicator.rktToDrawEnt[localId];
 
-            MachAnyId const anyId           = rockets.localToAny[localId];
+            MachAnyId const anyId           = rockets.machanyIdOf[localId];
             PartId const    part            = rScnParts.machineToPart[anyId];
             ActiveEnt const partEnt         = rScnParts.partToActive[part];
 
@@ -199,8 +198,8 @@ FeatureDef const ftrMagicRocketThrustIndicator = feature_def("MagicRocketThrustI
         auto &rLinks                    = *static_cast< ACtxLinks* >                (data[2]);
         auto &rSigValFloat              = *static_cast< SignalValues_t<float>* >    (data[3]);
 
-        PerMachType     const &rockets  = rLinks.machines.perType[gc_mtMagicRocket];
-        NodeConnections const &floats   = rLinks.nodePerType[gc_ntSigFloat];
+        MachType        const &rockets  = rLinks.machines.perType[gc_mtMagicRocket];
+        NodeType        const &floats   = rLinks.nodePerType[gc_ntSigFloat];
 
         PartId const        part        = rScnParts.activeToPart[ent];
         ActiveEnt const     partEnt     = rScnParts.partToActive[part];
@@ -210,7 +209,7 @@ FeatureDef const ftrMagicRocketThrustIndicator = feature_def("MagicRocketThrustI
             if (pair.type == gc_mtMagicRocket)
             {
                 DrawEnt const   drawEnt         = rThrustIndicator.rktToDrawEnt[pair.local];
-                MachAnyId const anyId           = rockets.localToAny[pair.local];
+                MachAnyId const anyId           = rockets.machanyIdOf[pair.local];
 
                 auto const&     portSpan        = floats.machToNode[anyId.value];
                 NodeId const    throttleIn      = connected_node(portSpan, ports_magicrocket::gc_throttleIn.port);
@@ -262,12 +261,12 @@ FeatureDef const ftrMachRCSDriver = feature_def("RCSDriver", [] (
         .args       ({      links.di.links,         links.di.updMach,             sigFloat.di.sigValFloat,          sigFloat.di.sigUpdFloat})
         .func       ([] (ACtxLinks& rLinks, MachineUpdater& rUpdMach, SignalValues_t<float>& rSigValFloat, UpdateNodes<float>& rSigUpdFloat) noexcept
     {
-        NodeConnections const &rFloatNodes = rLinks.nodePerType[gc_ntSigFloat];
-        PerMachType           &rRockets    = rLinks.machines.perType[gc_mtRcsDriver];
+        NodeType        const &rFloatNodes = rLinks.nodePerType[gc_ntSigFloat];
+        MachType              &rRockets    = rLinks.machines.perType[gc_mtRcsDriver];
 
         for (MachLocalId const local : rUpdMach.localDirty[gc_mtRcsDriver])
         {
-            MachAnyId const mach     = rRockets.localToAny[local];
+            MachAnyId const mach     = rRockets.machanyIdOf[local];
             auto const      portSpan = lgrn::Span<NodeId const>{rFloatNodes.machToNode[mach.value]};
 
             NodeId const thrNode = connected_node(portSpan, ports_rcsdriver::gc_throttleOut.port);
@@ -378,7 +377,7 @@ FeatureDef const ftrVehicleControl = feature_def("VehicleControl", [] (
         .args       ({      parts.di.scnParts,    links.di.links,                    windowApp.di.userInput,       vhclCtrl.di.vhControls})
         .func       ([] (ACtxParts& rScnParts, ACtxLinks& rLinks, input::UserInputHandler const &rUserInput, VehicleControls &rVhControls) noexcept
     {
-        PerMachType &rUsrCtrl = rLinks.machines.perType[gc_mtUserCtrl];
+        MachType &rUsrCtrl = rLinks.machines.perType[gc_mtUserCtrl];
 
         // Select a UsrCtrl machine when pressing the switch button
         if (rUserInput.button_state(rVhControls.btnSwitch).m_triggered)
@@ -425,7 +424,7 @@ FeatureDef const ftrVehicleControl = feature_def("VehicleControl", [] (
             return; // No vehicle selected
         }
 
-        NodeConnections const &rFloatNodes = rLinks.nodePerType[gc_ntSigFloat];
+        NodeType        const &rFloatNodes = rLinks.nodePerType[gc_ntSigFloat];
         float           const thrRate      = deltaTimeIn;
 
         float const thrChange
@@ -439,8 +438,8 @@ FeatureDef const ftrVehicleControl = feature_def("VehicleControl", [] (
             held(rVC.btnRollRt,  1.0f) - held(rVC.btnRollLf,  1.0f)
         };
 
-        PerMachType     &rUsrCtrl   = rLinks.machines.perType[gc_mtUserCtrl];
-        MachAnyId const mach        = rUsrCtrl.localToAny[rVC.selectedUsrCtrl];
+        MachType        &rUsrCtrl   = rLinks.machines.perType[gc_mtUserCtrl];
+        MachAnyId const mach        = rUsrCtrl.machanyIdOf[rVC.selectedUsrCtrl];
         auto const      portSpan    = lgrn::Span<NodeId const>{rFloatNodes.machToNode[mach.value]};
 
         bool changed = false;
@@ -487,11 +486,11 @@ FeatureDef const ftrVehicleControl = feature_def("VehicleControl", [] (
 
             // Obtain associated ActiveEnt
             // MachLocalId -> MachAnyId -> PartId -> RigidGroup -> ActiveEnt
-            PerMachType const&  rUsrCtrls       = rLinks.machines.perType.at(adera::gc_mtUserCtrl);
-            MachAnyId const     selectedMach    = rUsrCtrls.localToAny        .at(rVhControls.selectedUsrCtrl);
-            PartId const        selectedPart    = rScnParts.machineToPart     .at(selectedMach);
-            WeldId const        weld            = rScnParts.partToWeld        .at(selectedPart);
-            ActiveEnt const     selectedEnt     = rScnParts.weldToActive        .at(weld);
+            MachType     const& rUsrCtrls    = rLinks.machines.perType.at(adera::gc_mtUserCtrl);
+            MachAnyId     const selectedMach = rUsrCtrls.machanyIdOf     .at(rVhControls.selectedUsrCtrl);
+            PartId        const selectedPart = rScnParts.machineToPart   .at(selectedMach);
+            WeldId        const weld         = rScnParts.partToWeld      .at(selectedPart);
+            ActiveEnt     const selectedEnt  = rScnParts.weldToActive    .at(weld);
 
             if (rBasic.m_transform.contains(selectedEnt))
             {

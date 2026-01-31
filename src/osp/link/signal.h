@@ -63,7 +63,7 @@ struct UpdateNodes
     }
 };
 
-inline void notify_connected_inputs(NodeId const nodeId, NodeConnections::NodeToMach_t const& nodeToMach, MachineUpdater& rUpdMach)
+inline void notify_connected_inputs(NodeId const nodeId, NodeType::NodeToMach_t const& nodeToMach, MachineUpdater& rUpdMach)
 {
     for (Junction junc : nodeToMach[nodeId.value])
     {

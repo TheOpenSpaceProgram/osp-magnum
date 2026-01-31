@@ -521,8 +521,8 @@ static void assign_weld_rockets(
         ACtxParts                const &rScnParts,
         ACtxJoltWorld                  &rJolt,
         ACtxRocketsJolt                &rRocketsJolt,
-        NodeConnections          const &rFloatNodes,
-        PerMachType              const &machtypeRocket,
+        NodeType                 const &rFloatNodes,
+        MachType                 const &machtypeRocket,
         std::vector<BodyRocket>        &rRocketsFoundTemp)
 {
     using adera::gc_mtMagicRocket;
@@ -554,7 +554,7 @@ static void assign_weld_rockets(
                 continue; // This machine is not a rocket
             }
 
-            MachAnyId const  mach         = machtypeRocket.localToAny[pair.local];
+            MachAnyId const  mach         = machtypeRocket.machanyIdOf[pair.local];
             auto      const& portSpan     = rFloatNodes.machToNode[mach.value];
             NodeId    const  throttleIn   = connected_node(portSpan, gc_throttleIn.port);
             NodeId    const  multiplierIn = connected_node(portSpan, gc_multiplierIn.port);
@@ -694,8 +694,8 @@ FeatureDef const ftrRocketThrustJolt = feature_def("RocketThrustJolt", [] (
     {
         using adera::gc_mtMagicRocket;
 
-        NodeConnections const &rFloatNodes    = rLinks.nodePerType[gc_ntSigFloat];
-        PerMachType     const &machtypeRocket = rLinks.machines.perType[gc_mtMagicRocket];
+        NodeType        const &rFloatNodes    = rLinks.nodePerType[gc_ntSigFloat];
+        MachType        const &machtypeRocket = rLinks.machines.perType[gc_mtMagicRocket];
 
         rRocketsJolt.m_bodyRockets.ids_reserve(rJolt.m_bodyIds.size());
         rRocketsJolt.m_bodyRockets.data_reserve(rLinks.machines.perType[gc_mtMagicRocket].localIds.capacity());

@@ -32,6 +32,8 @@
 namespace adera
 {
 
+#if 0
+
 struct ACtxVehicleSpawnVB
 {
     using SpVehicleId = osp::active::SpVehicleId;
@@ -86,5 +88,6 @@ public:
     static void request_prefabs(ACtxVehicleSpawn& rVehicleSpawn, ACtxVehicleSpawnVB const& rVehicleSpawnVB, ACtxParts& rScnParts, ACtxPrefabs& rPrefabs, Resources& rResources);
 };
 
+#endif
 
 } // namespace adera

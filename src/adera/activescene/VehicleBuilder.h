@@ -45,6 +45,8 @@
 namespace adera
 {
 
+#if 0
+
 using osp::active::PartId;
 using osp::active::WeldId;
 
@@ -53,16 +55,6 @@ struct StructureLink
 {
     PartId m_greater;
     PartId m_less;
-};
-
-struct PerNodeType : osp::link::NodeConnections
-{
-    using MachToNodeCustom_t = lgrn::IntArrayMultiMap<osp::link::MachAnyId::entity_type, osp::link::JuncCustom>;
-
-    MachToNodeCustom_t      m_machToNodeCustom; // parallel with m_machToNode
-    entt::any               m_nodeValues;
-    osp::KeyedVec<osp::link::NodeId, int> m_nodeConnectCount;
-    int                     m_connectCountTotal{0};
 };
 
 struct VehicleData
@@ -82,10 +74,9 @@ struct VehicleData
     lgrn::IdRegistryStl<WeldId>             m_weldIds;
     MapWeldToParts_t                        m_weldToParts;
 
-    osp::link::Machines                     m_machines;
-    osp::KeyedVec<osp::link::MachAnyId, PartId>     m_machToPart;
+    osp::link::Links                        m_links;
 
-    osp::KeyedVec<osp::link::NodeTypeId, PerNodeType>   m_nodePerType;
+    osp::KeyedVec<osp::link::MachAnyId, PartId> m_machToPart;
 };
 
 /**
@@ -115,8 +106,8 @@ public:
     {
         auto const& info = osp::link::GlobalLinkInfo::instance();
         auto &rData = m_data.emplace();
-        rData.m_machines.perType.resize(info.machtypeIds.capacity());
-        rData.m_nodePerType.resize(info.nodetypeIds.capacity());
+        rData.m_links.machtype.resize(info.machtypeIds.capacity());
+        rData.m_links.nodetype.resize(info.nodetypeIds.capacity());
         index_prefabs();
     };
 
@@ -152,7 +143,7 @@ public:
 
     std::size_t node_capacity(NodeTypeId nodeType) const
     {
-        return m_data->m_nodePerType[nodeType].nodeIds.capacity();
+        return m_data->m_links.nodetype[nodeType].capacity;
     }
 
     struct Connection
@@ -204,12 +195,11 @@ std::array<osp::link::NodeId, N> VehicleBuilder::create_nodes(NodeTypeId const n
 {
     std::array<NodeId, N> out;
 
-    PerNodeType &rPerNodeType = m_data->m_nodePerType[nodeType];
+    osp::link::NodeType &rNodeType = m_data->m_links.nodetype[nodeType];
 
-    rPerNodeType.nodeIds.create(std::begin(out), std::end(out));
-    std::size_t const capacity = rPerNodeType.nodeIds.capacity();
-    rPerNodeType.nodeToMach.ids_reserve(rPerNodeType.nodeIds.capacity());
-    rPerNodeType.m_nodeConnectCount.resize(capacity, 0);
+    rNodeType.nodeIds.create(std::begin(out), std::end(out));
+    std::size_t const capacity = rNodeType.nodeIds.capacity();
+    rNodeType.nodeToMach.ids_reserve(rNodeType.nodeIds.capacity());
 
     return out;
 }
@@ -230,5 +220,7 @@ VALUES_T& VehicleBuilder::node_values(NodeTypeId nodeType)
 
     return rValues;
 }
+
+#endif
 
 } // namespace adera

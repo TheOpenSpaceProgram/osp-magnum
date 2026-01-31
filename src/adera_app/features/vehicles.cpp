@@ -82,16 +82,20 @@ FeatureDef const ftrParts = feature_def("Parts", [] (
     rFB.pipeline(parts.pl.mapPartActive)        .parent(mainApp.loopblks.mainLoop);
     rFB.pipeline(parts.pl.mapWeldActive)        .parent(mainApp.loopblks.mainLoop);
 
-    auto &rLinks    = rFB.data_emplace< ACtxLinks >      (links.di.links);
+    auto &rLinks    = rFB.data_emplace< Links >          (links.di.links);
     auto &rUpdMach  = rFB.data_emplace< MachineUpdater > (links.di.updMach);
     auto &rScnParts = rFB.data_emplace< ACtxParts >      (parts.di.scnParts);
 
     // Resize containers to fit all existing MachTypeIds and NodeTypeIds
-    std::size_t const machTypeIdCapacity = GlobalLinkInfo::instance().machtypeIds.capacity();
+    GlobalLinkInfo const& linkInfo = GlobalLinkInfo::instance();
+
+    std::size_t const machTypeIdCapacity = linkInfo.machtypeIds.capacity();
     rUpdMach.machTypesDirty.resize(machTypeIdCapacity);
     rUpdMach.localDirty    .resize(machTypeIdCapacity);
-    rLinks.machines.perType.resize(machTypeIdCapacity);
-    rLinks.nodePerType     .resize(machTypeIdCapacity);
+    rLinks  .machtype      .resize(machTypeIdCapacity);
+
+    std::size_t const nodeTypeIdCapacity = linkInfo.nodetypeIds.capacity();
+    rLinks.nodetype.resize(nodeTypeIdCapacity);
 
     rFB.task()
         .name       ("Clear Part dirty vectors after use")
@@ -239,12 +243,12 @@ FeatureDef const ftrVehicleSpawnVBData = feature_def("VehicleSpawnVBData", [] (
             }
 
             Machines const &srcMachines = pVData->m_machines;
-            std::size_t const bounds = srcMachines.ids.capacity();
+            std::size_t const bounds = srcMachines.machIds.capacity();
 
             rVSVB.remapMachOffsets[vhId] = remapMachTotal;
 
             remapMachTotal += bounds;
-            machTotal += srcMachines.ids.size();
+            machTotal += srcMachines.machIds.size();
 
             for (MachTypeId const typeId : linkInfo.machtypeIds)
             {
@@ -258,10 +262,10 @@ FeatureDef const ftrVehicleSpawnVBData = feature_def("VehicleSpawnVBData", [] (
         // Create ACtxParts MachAny/LocalIDs and populate remaps
 
         // MachAnyIDs created here
-        rLinks.machines.ids.create(rVehicleSpawn.spawnedMachs.begin(),
-                                   rVehicleSpawn.spawnedMachs.end());
+        rLinks.machines.machIds.create(rVehicleSpawn.spawnedMachs.begin(),
+                                       rVehicleSpawn.spawnedMachs.end());
 
-        rLinks.machines.machToLocal.resize(rLinks.machines.ids.capacity());
+        rLinks.machines.machlocalidOf.resize(rLinks.machines.machIds.capacity());
 
         auto itDstMachIds = rVehicleSpawn.spawnedMachs.cbegin();
 
@@ -277,7 +281,7 @@ FeatureDef const ftrVehicleSpawnVBData = feature_def("VehicleSpawnVBData", [] (
 
             std::size_t const remapMachOffset = rVSVB.remapMachOffsets[vhId];
 
-            for (MachAnyId const srcMach : srcMachines.ids)
+            for (MachAnyId const srcMach : srcMachines.machIds)
             {
                 MachAnyId const dstMach = *itDstMachIds;
                 ++itDstMachIds;
@@ -291,14 +295,14 @@ FeatureDef const ftrVehicleSpawnVBData = feature_def("VehicleSpawnVBData", [] (
                 // TODO: This can be optimized later, where all local IDs are
                 //       created at once with ids.create(first, last), and make
                 //       resize(..) called once per type too
-                MachTypeId const    type            = srcMachines.machTypes[srcMach];
-                PerMachType&        rDstPerType     = rLinks.machines.perType[type];
+                MachTypeId const    type            = srcMachines.machTypeOf[srcMach];
+                MachType&           rDstPerType     = rLinks.machines.perType[type];
 
                 MachLocalId const dstLocal = rDstPerType.localIds.create();
-                rDstPerType.localToAny.resize(rDstPerType.localIds.capacity());
+                rDstPerType.machanyIdOf.resize(rDstPerType.localIds.capacity());
 
-                rDstPerType.localToAny[dstLocal] = dstMach;
-                rLinks.machines.machToLocal[dstMach] = dstLocal;
+                rDstPerType.machanyIdOf[dstLocal] = dstMach;
+                rLinks.machines.machlocalidOf[dstMach] = dstLocal;
             }
         }
     });
@@ -320,15 +324,15 @@ FeatureDef const ftrVehicleSpawnVBData = feature_def("VehicleSpawnVBData", [] (
                 continue;
             }
 
-            rScnParts.machineToPart.resize(rLinks.machines.ids.capacity());
+            rScnParts.machineToPart.resize(rLinks.machines.machIds.capacity());
             rScnParts.partToMachines.ids_reserve(rScnParts.partIds.capacity());
-            rScnParts.partToMachines.data_reserve(rLinks.machines.ids.capacity());
+            rScnParts.partToMachines.data_reserve(rLinks.machines.machIds.capacity());
 
             std::size_t const remapMachOffset = rVSVB.remapMachOffsets[vhId];
             std::size_t const remapPartOffset = rVSVB.remapPartOffsets[vhId];
 
             // Update rScnParts machine->part map
-            for (MachAnyId const srcMach : pVData->m_machines.ids)
+            for (MachAnyId const srcMach : pVData->m_machines.machIds)
             {
                 MachAnyId const dstMach = rVSVB.remapMachs[remapMachOffset + srcMach.value];
                 PartId const    srcPart = pVData->m_machToPart[srcMach];
@@ -351,10 +355,10 @@ FeatureDef const ftrVehicleSpawnVBData = feature_def("VehicleSpawnVBData", [] (
                 {
                     MachinePair const&  srcPair  = srcPairs[i];
                     MachinePair&        rDstPair = dstPairs[i];
-                    MachAnyId const     srcMach  = pVData->m_machines.perType[srcPair.type].localToAny[srcPair.local];
+                    MachAnyId const     srcMach  = pVData->m_machines.perType[srcPair.type].machanyIdOf[srcPair.local];
                     MachAnyId const     dstMach  = rVSVB.remapMachs[remapMachOffset + srcMach.value];
                     MachTypeId const    dstType  = srcPair.type;
-                    MachLocalId const   dstLocal = rLinks.machines.machToLocal[dstMach];
+                    MachLocalId const   dstLocal = rLinks.machines.machlocalidOf[dstMach];
 
                     rDstPair = { .local = dstLocal, .type = dstType };
                 }
@@ -449,7 +453,7 @@ FeatureDef const ftrVehicleSpawnVBData = feature_def("VehicleSpawnVBData", [] (
         .args       ({         vhclSpawn.di.vehicleSpawn,             vhclSpawnVB.di.vehicleSpawnVB,    parts.di.scnParts,    links.di.links,             sigFloat.di.sigValFloat,          sigFloat.di.sigUpdFloat})
         .func       ([] (ACtxVehicleSpawn& rVehicleSpawn, ACtxVehicleSpawnVB const& rVehicleSpawnVB, ACtxParts& rScnParts, ACtxLinks &rLinks, SignalValues_t<float>& rSigValFloat, UpdateNodes<float>& rSigUpdFloat) noexcept
     {
-        NodeConnections const &rFloatNodes = rLinks.nodePerType[gc_ntSigFloat];
+        NodeType        const &rFloatNodes = rLinks.nodePerType[gc_ntSigFloat];
         std::size_t     const maxNodes     = rFloatNodes.nodeIds.capacity();
         rSigUpdFloat.nodeNewValues.resize(maxNodes);
         rSigUpdFloat.nodeDirty.resize(maxNodes);
@@ -531,7 +535,7 @@ FeatureDef const ftrSignalsFloat = feature_def("SignalsFloat", [] (
             return; // Not dirty, nothing to do
         }
 
-        NodeConnections const &rFloatNodes = rLinks.nodePerType[gc_ntSigFloat];
+        NodeType const &rFloatNodes = rLinks.nodePerType[gc_ntSigFloat];
 
         // NOTE: The various use of reset() clear entire bit arrays, which may or may
         //       not be expensive. They likely optimize to memset

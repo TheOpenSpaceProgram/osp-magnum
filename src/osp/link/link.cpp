@@ -34,11 +34,11 @@ GlobalLinkInfo& GlobalLinkInfo::instance()
 }
 
 void copy_nodes(
-        NodeConnections                               const &rSrcNodes,
-        Machines                                      const &rSrcMach,
+        NodeType                                      const &rSrcNodes,
+        Links                                         const &rSrcMach,
         Corrade::Containers::ArrayView<MachAnyId const>     remapMach,
-        NodeConnections                                     &rDstNodes,
-        Machines                                            &rDstMach,
+        NodeType                                            &rDstNodes,
+        Links                                               &rDstMach,
         Corrade::Containers::ArrayView<NodeId>              remapNode)
 {
     using lgrn::Span;
@@ -65,9 +65,9 @@ void copy_nodes(
         for (Junction const& srcJunc : srcJunction)
         {
             MachTypeId const machType = srcJunc.type;
-            MachAnyId const srcMach = rSrcMach.perType[machType].localToAny[srcJunc.local];
+            MachAnyId const srcMach = rSrcMach.machtype[machType].machanyIdOf[srcJunc.local];
             MachAnyId const dstMach = remapMach[srcMach.value];
-            MachLocalId const dstLocal = rDstMach.machToLocal[dstMach];
+            MachLocalId const dstLocal = rDstMach.machlocalidOf[dstMach];
 
             dstJuncIt->local  = dstLocal;
             dstJuncIt->type   = machType;
@@ -78,10 +78,10 @@ void copy_nodes(
     }
 
     // copy mach-to-node connections
-    rDstNodes.machToNode.ids_reserve(rDstMach.ids.capacity());
+    rDstNodes.machToNode.ids_reserve(rDstMach.machIds.capacity());
     rDstNodes.machToNode.data_reserve(rDstNodes.machToNode.data_size()
                                         + rSrcNodes.machToNode.data_size());
-    for (MachAnyId const srcMach : rSrcMach.ids)
+    for (MachAnyId const srcMach : rSrcMach.machIds)
     {
         if (rSrcNodes.machToNode.contains(srcMach.value))
         {

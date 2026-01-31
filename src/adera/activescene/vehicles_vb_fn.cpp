@@ -32,6 +32,8 @@ using namespace osp::active;
 namespace adera
 {
 
+#if 0
+
 void SysVehicleSpawnVB::create_parts_and_welds(ACtxVehicleSpawn& rVehicleSpawn, ACtxVehicleSpawnVB& rVehicleSpawnVB, ACtxParts& rScnParts)
 {
     std::size_t const newVehicleCount = rVehicleSpawn.new_vehicle_count();
@@ -201,5 +203,6 @@ void SysVehicleSpawnVB::request_prefabs(ACtxVehicleSpawn& rVehicleSpawn, ACtxVeh
     }
 }
 
+#endif
 
 } // namespace adera

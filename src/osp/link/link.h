@@ -87,33 +87,127 @@ struct GlobalLinkInfo
 };
 
 // Not yet used, for example only
-inline TransmitModeId const gc_tmStructure      = GlobalLinkInfo::instance().transmitmodeIds.create();
-inline TransmitModeId const gc_tmSimpleFluid    = GlobalLinkInfo::instance().transmitmodeIds.create();
-
-
+inline TransmitModeId const gc_tmStructure      = GlobalLinkInfo::instance().create_transmitmode();
+inline TransmitModeId const gc_tmSimpleFluid    = GlobalLinkInfo::instance().create_transmitmode();
 
 
 /**
  * @brief Keeps track of Machines of a certain type that exists
  */
-struct PerMachType
+struct MachType
 {
     lgrn::IdRegistryStl<MachLocalId>        localIds;
-    osp::KeyedVec<MachLocalId, MachAnyId>   localToAny;
+    osp::KeyedVec<MachLocalId, MachAnyId>   machanyIdOf;
+};
+
+struct Junction
+{
+    MachLocalId     local;
+    MachTypeId      type;
+    JuncCustom      custom  {0};
+};
+
+struct NodeType
+{
+    static constexpr std::size_t smc_blockSize  = 64;
+    static constexpr std::size_t smc_blockAlign = 64;
+    struct alignas(smc_blockAlign) Block
+    {
+        std::byte data[smc_blockAlign];
+    };
+
+    // reminder: IntArrayMultiMap is kind of like an
+    //           std::vector< std::vector<...> > but more memory efficient
+    using NodeToMach_t = lgrn::IntArrayMultiMap<NodeId::entity_type, Junction>;
+    using MachToNode_t = lgrn::IntArrayMultiMap<MachAnyId::entity_type, NodeId>;
+
+    lgrn::IdRegistryStl<NodeId>     nodeIds;
+
+    // Node-to-Machine connections
+    // [NodeId][JunctionIndex] -> Junction (type, MachLocalId, custom int)
+    NodeToMach_t                    nodeToMach;
+
+    // Corresponding Machine-to-Node connections
+    // [MachAnyId][PortIndex] -> NodeId
+    MachToNode_t                    machToNode;
+
+    std::size_t                     stride; // copy of NodeTypeInfo::nodeDataSize
+    std::vector<Block>              data;
+    std::size_t                     capacity;
+};
+
+struct Links
+{
+    lgrn::IdRegistryStl<MachAnyId>          machIds;
+
+    osp::KeyedVec<MachAnyId, MachTypeId>    machTypeOf;
+    osp::KeyedVec<MachAnyId, MachLocalId>   machlocalidOf;
+
+    osp::KeyedVec<MachTypeId, MachType>     machtype;
+    osp::KeyedVec<NodeTypeId, NodeType>     nodetype;
 };
 
 /**
- * @brief Keeps track of all Machines that exist and what type they are
+ * @brief Machine Local and type ID. Equivalent to a MachAnyId
  */
-struct Machines
+struct MachinePair
 {
-    lgrn::IdRegistryStl<MachAnyId>          ids;
-
-    osp::KeyedVec<MachAnyId, MachTypeId>    machTypes;
-    osp::KeyedVec<MachAnyId, MachLocalId>   machToLocal;
-
-    osp::KeyedVec<MachTypeId, PerMachType>  perType;
+    MachLocalId     local;
+    MachTypeId      type;
 };
+
+struct PortEntry
+{
+    NodeTypeId  type;
+    PortId      port;
+    JuncCustom  custom;
+};
+
+using RequestMachId = osp::StrongId< std::uint32_t, struct DummyForRequestMachId >;
+using RequestNodeId = osp::StrongId< std::uint32_t, struct DummyForRequestNodeId >;
+
+struct RequestMachine
+{
+    MachTypeId type;
+};
+
+struct RequestNode
+{
+    NodeTypeId type;
+};
+
+struct RequestConnect
+{
+    NodeId node;
+    NodeTypeId nodeType;
+};
+
+// what is the first thing we should make?
+// each part should just be a machine?
+// make a machine for 'part'
+// 'named part' system that acts like template.
+// u spawn a part, then update the craft for it to generate wire connections and stuff
+// change a part on the fly.
+// make a machine called 'part'
+// make a node data type
+
+// when iterating parts,
+
+// 1. make part registry system so we know what part things are lol
+//   *
+// 2. make a 'part' machine type
+
+// extendable
+// add part, it's a machine
+//
+
+// outputs: model and link
+
+struct PartType
+{
+
+};
+
 
 struct MachineUpdater
 {
@@ -124,63 +218,17 @@ struct MachineUpdater
     osp::KeyedVec<MachTypeId, lgrn::IdSetStl<MachLocalId>> localDirty;
 };
 
-struct MachinePair
-{
-    MachLocalId     local;
-    MachTypeId      type;
-};
-
-struct Junction
-{
-    MachLocalId     local;
-    MachTypeId      type;
-    JuncCustom      custom  {0};
-};
-
-/**
- * @brief Connects machines together
- */
-struct NodeConnections
-{
-    // reminder: IntArrayMultiMap is kind of like an
-    //           std::vector< std::vector<...> > but more memory efficient
-    using NodeToMach_t = lgrn::IntArrayMultiMap<NodeId::entity_type, Junction>;
-    using MachToNode_t = lgrn::IntArrayMultiMap<MachAnyId::entity_type, NodeId>;
-
-    lgrn::IdRegistryStl<NodeId>         nodeIds;
-
-    // Node-to-Machine connections
-    // [NodeId][JunctionIndex] -> Junction (type, MachLocalId, custom int)
-    NodeToMach_t                        nodeToMach;
-
-    // Corresponding Machine-to-Node connections
-    // [MachAnyId][PortIndex] -> NodeId
-    MachToNode_t                        machToNode;
-};
-
-struct NodeValues
-{
-    std::vector<std::byte>              data;
-};
-
-struct PortEntry
-{
-    NodeTypeId  type;
-    PortId      port;
-    JuncCustom  custom;
-};
-
 inline NodeId connected_node(lgrn::Span<NodeId const> portSpan, PortId port) noexcept
 {
     return (portSpan.size() > port.value) ? portSpan[port.value] : NodeId{};
 }
 
 void copy_nodes(
-        NodeConnections           const &rSrcNodes,
-        Machines                  const &rSrcMach,
+        NodeType                  const &rSrcNodes,
+        Links                     const &rSrcMach,
         ArrayView<MachAnyId const>      remapMach,
-        NodeConnections                 &rDstNodes,
-        Machines                        &rDstMach,
+        NodeType                        &rDstNodes,
+        Links                           &rDstMach,
         ArrayView<NodeId>               remapNodeOut);
 
 } // namespace osp::wire
