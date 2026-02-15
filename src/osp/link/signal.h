@@ -24,16 +24,28 @@
  */
 #pragma once
 
-#include "machines.h"
+#include "link.h"
 
 namespace osp::link
 {
 
+
+inline TransmitModeId const gc_tmLogicSignal    = GlobalLinkInfo::instance().create_transmitmode();
+
+inline NodeTypeId const gc_ntSigFloat = GlobalLinkInfo::instance().create_nodetype(NodeTypeInfo{
+    .transmitMode = gc_tmLogicSignal, .nodeDataSize = sizeof(float)
+});
+
+
+
 constexpr JuncCustom gc_sigIn  = 0;
 constexpr JuncCustom gc_sigOut = 1;
 
+inline PortEntry sigfloat_input(std::uint16_t portId) { return PortEntry{gc_ntSigFloat, PortId{portId}, gc_sigIn}; }
+inline PortEntry sigfloat_output(std::uint16_t portId) { return PortEntry{gc_ntSigFloat, PortId{portId}, gc_sigOut}; }
+
 template <typename VALUE_T>
-using SignalValues_t = std::vector<VALUE_T>;
+using SignalValues_t = osp::KeyedVec<NodeId, VALUE_T>;
 
 template <typename VALUE_T>
 struct UpdateNodes
@@ -51,39 +63,19 @@ struct UpdateNodes
     }
 };
 
-template <typename VALUE_T, typename RANGE_T>
-bool update_signal_nodes(
-        RANGE_T const&                  toUpdate,
-        Nodes::NodeToMach_t const&      nodeToMach,
-        Machines const&                 machines,
-        ArrayView<VALUE_T const>        newValues,
-        ArrayView<VALUE_T>              currentValues,
-        MachineUpdater&                 rUpdMach)
+inline void notify_connected_inputs(NodeId const nodeId, NodeType::NodeToMach_t const& nodeToMach, MachineUpdater& rUpdMach)
 {
-    bool somethingNotified = false;
-
-    for (uint32_t const node : toUpdate)
+    for (Junction junc : nodeToMach[nodeId.value])
     {
-        // Apply node value changes
-        currentValues[node] = newValues[node];
-
-        // Notify connected inputs
-        for (Junction junc : nodeToMach[node])
+        if (junc.custom == gc_sigIn)
         {
-            if (junc.custom == gc_sigIn)
-            {
-                somethingNotified = true;
+            // A machine of type "junc.m_type" has new values to read
+            rUpdMach.machTypesDirty.insert(MachTypeId{junc.type});
 
-                // A machine of type "junc.m_type" has new values to read
-                rUpdMach.machTypesDirty.insert(junc.type);
-
-                // Specify using local Id on which machine needs to update
-                rUpdMach.localDirty[junc.type].insert(junc.local);
-            }
+            // Specify using local Id on which machine needs to update
+            rUpdMach.localDirty[MachTypeId{junc.type}].insert(MachLocalId{junc.local});
         }
     }
-
-    return somethingNotified;
 }
 
 } // namespace osp::wire

@@ -29,8 +29,14 @@
 namespace adera
 {
 
+
 /**
- * @brief Support for Parts, Machines, and Links
+ * @brief TODO
+ */
+extern osp::fw::FeatureDef const ftrLinks;
+
+/**
+ * @brief TODO
  */
 extern osp::fw::FeatureDef const ftrParts;
 

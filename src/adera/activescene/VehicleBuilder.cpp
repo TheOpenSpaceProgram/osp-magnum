@@ -24,12 +24,36 @@
  */
 #include "VehicleBuilder.h"
 
+#include <adera_app/feature_interfaces.h>
+
+#include <osp/executor/singlethread_framework.h>
+#include <osp/framework/builder.h>
+
 #include <osp/core/Resources.h>
 #include <osp/util/logging.h>
 #include <osp/vehicles/ImporterData.h>
 
+using namespace osp::fw;
+
 namespace adera
 {
+
+struct VehicleBuilderImpl
+{
+    ContextId main;
+    Framework fw;
+    osp::exec::SinglethreadFWExecutor exec;
+};
+
+
+VehicleBuilder::VehicleBuilder(Framework fw, ContextId ctx)
+    : m_impl{std::make_unique<VehicleBuilderImpl>(ctx, std::move(fw), osp::exec::SinglethreadFWExecutor{})}
+{ }
+
+VehicleBuilder::~VehicleBuilder() = default;
+
+
+#if 0
 
 using osp::restypes::gc_importer;
 
@@ -71,13 +95,13 @@ WeldId VehicleBuilder::weld(osp::ArrayView<PartToWeld const> toWeld)
     WeldId const weld = m_data->m_weldIds.create();
     m_data->m_weldToParts.ids_reserve(m_data->m_weldIds.capacity());
 
-    PartId *pPartInWeld = m_data->m_weldToParts.emplace(weld, toWeld.size());
+    PartId *pPartInWeld = m_data->m_weldToParts.emplace(weld.value, toWeld.size());
 
     for (PartToWeld const& set : toWeld)
     {
-        m_data->m_partTransformWeld[set.m_part] = set.m_transform;
+        m_data->m_partTransformWeld[set.m_part.value] = set.m_transform;
 
-        m_data->m_partToWeld[set.m_part] = weld;
+        m_data->m_partToWeld[set.m_part.value] = weld;
         (*pPartInWeld) = set.m_part;
         std::advance(pPartInWeld, 1);
     }
@@ -116,26 +140,25 @@ osp::link::MachAnyId VehicleBuilder::create_machine(PartId const part,
                                                     std::initializer_list<Connection> const& connections)
 {
     auto &rData = m_data.value();
-    osp::link::PerMachType &rPerMachType = rData.m_machines.perType[machType];
+    osp::link::MachType &rPerMachType = rData.m_links.machtype[machType];
 
-    MachTypeId const mach = rData.m_machines.ids.create();
+    MachAnyId const mach = rData.m_links.machIds.create();
 
-    std::size_t const capacity = rData.m_machines.ids.capacity();
-    rData.m_machines.machTypes.resize(capacity);
-    rData.m_machines.machToLocal.resize(capacity);
-    rData.m_machToPart.resize(capacity);
-    for (PerNodeType &rPerNodeType : rData.m_nodePerType)
+    std::size_t const capacity = rData.m_links.machIds.capacity();
+    rData.m_links.machTypeOf    .resize(capacity);
+    rData.m_links.machlocalidOf .resize(capacity);
+    rData.m_machToPart          .resize(capacity);
+    for (osp::link::NodeType &rPerNodeType : rData.m_links.nodetype)
     {
         rPerNodeType.machToNode.ids_reserve(capacity);
-        rPerNodeType.m_machToNodeCustom.ids_reserve(capacity);
     }
 
-    MachTypeId const local = rPerMachType.localIds.create();
-    rPerMachType.localToAny.resize(rPerMachType.localIds.capacity());
+    MachLocalId const local = rPerMachType.localIds.create();
+    rPerMachType.machanyIdOf.resize(rPerMachType.localIds.capacity());
 
-    rData.m_machines.machTypes[mach] = machType;
-    rData.m_machines.machToLocal[mach] = local;
-    rPerMachType.localToAny[local] = mach;
+    rData.m_links.machTypeOf[mach]      = machType;
+    rData.m_links.machlocalidOf[mach]   = local;
+    rPerMachType.machanyIdOf[local]     = mach;
 
     m_partMachCount[std::size_t(part)] ++;
     rData.m_machToPart[mach] = part;
@@ -147,19 +170,21 @@ osp::link::MachAnyId VehicleBuilder::create_machine(PartId const part,
 
 void VehicleBuilder::connect(MachAnyId const mach, std::initializer_list<Connection> const& connections)
 {
+    auto const& linkInfo = osp::link::GlobalLinkInfo::instance();
+
     // get max port count for each node type
     auto &rData = m_data.value();
-    std::vector<int> nodePortMax(rData.m_nodePerType.size(), 0);
+    osp::KeyedVec<NodeTypeId, int> portSizeRequired(linkInfo.nodetypeIds.capacity(), 0);
     for (Connection const& connect : connections)
     {
-        int &rPortMax = nodePortMax[connect.m_port.type];
-        rPortMax = std::max<int>(rPortMax, connect.m_port.port + 1);
+        int &rPortMax = portSizeRequired[connect.m_port.type];
+        rPortMax = std::max<int>(rPortMax, connect.m_port.port.value + 1);
     }
 
-    for (NodeTypeId nodeType = 0; std::size_t(nodeType) < rData.m_nodePerType.size(); ++nodeType)
+    for (NodeTypeId const nodeType : linkInfo.nodetypeIds)
     {
-        int const portMax = nodePortMax[nodeType];
-        PerNodeType &rPerNodeType = rData.m_nodePerType[nodeType];
+        int const portMax = portSizeRequired[nodeType];
+        osp::link::NodeType &rPerNodeType = rData.m_links.nodetype[nodeType];
         if (portMax != 0)
         {
             // reallocate each time :)
@@ -167,19 +192,20 @@ void VehicleBuilder::connect(MachAnyId const mach, std::initializer_list<Connect
             rPerNodeType.m_machToNodeCustom.data_reserve(rPerNodeType.machToNode.data_capacity() + portMax);
 
             // emplace and fill with null
-            rPerNodeType.machToNode.emplace(mach, portMax);
-            lgrn::Span<NodeId> const portSpan = rPerNodeType.machToNode[mach];
+            rPerNodeType.machToNode.emplace(mach.value, portMax);
+            lgrn::Span<NodeId> const portSpan = rPerNodeType.machToNode[mach.value];
             std::fill(std::begin(portSpan), std::end(portSpan), lgrn::id_null<NodeId>());
-            rPerNodeType.m_machToNodeCustom.emplace(mach, portMax);
-            lgrn::Span<uint16_t> const customSpan = rPerNodeType.m_machToNodeCustom[mach];
+            rPerNodeType.m_machToNodeCustom.emplace(mach.value, portMax);
+            lgrn::Span<uint16_t> const customSpan = rPerNodeType.m_machToNodeCustom[mach.value];
             std::fill(std::begin(customSpan), std::end(customSpan), 0);
 
             for (Connection const& connect : connections)
             {
                 if (connect.m_port.type == nodeType)
                 {
-                    customSpan[connect.m_port.port] = connect.m_port.custom;
-                    portSpan[connect.m_port.port] = connect.m_node;
+                    customSpan[connect.m_port.port.value]   = connect.m_port.custom;
+                    portSpan[connect.m_port.port.value]     = connect.m_node;
+
                     rPerNodeType.m_nodeConnectCount[connect.m_node] ++;
                     rPerNodeType.m_connectCountTotal ++;
                 }
@@ -195,24 +221,26 @@ using osp::link::JuncCustom;
 VehicleData VehicleBuilder::finalize_release()
 {
     auto &rData = m_data.value();
-    for (NodeTypeId nodeType = 0; std::size_t(nodeType) < rData.m_nodePerType.size(); ++nodeType)
+    for (std::uint16_t nodeTypeInt = 0; nodeTypeInt < rData.m_nodePerType.size(); ++nodeTypeInt)
     {
+        NodeTypeId const nodeType{nodeTypeInt};
+
         PerNodeType &rPerNodeType = rData.m_nodePerType[nodeType];
 
         // reserve node-to-machine partitions
         rPerNodeType.nodeToMach.data_reserve(rPerNodeType.m_connectCountTotal);
         for (NodeId node : rPerNodeType.nodeIds)
         {
-            rPerNodeType.nodeToMach.emplace(node, rPerNodeType.m_nodeConnectCount[node]);
-            lgrn::Span<Junction> junction = rPerNodeType.nodeToMach[node];
+            rPerNodeType.nodeToMach.emplace(node.value, rPerNodeType.m_nodeConnectCount[node]);
+            lgrn::Span<Junction> junction = rPerNodeType.nodeToMach[node.value];
             std::fill(std::begin(junction), std::end(junction), Junction{});
         }
 
         // assign node-to-machine
-        for (MachAnyId const mach : rData.m_machines.ids)
+        for (MachAnyId const mach : rData.m_machines.machIds)
         {
-            lgrn::Span<NodeId> portSpan = rPerNodeType.machToNode[mach];
-            lgrn::Span<JuncCustom> customSpan = rPerNodeType.m_machToNodeCustom[mach];
+            lgrn::Span<NodeId> portSpan = rPerNodeType.machToNode[mach.value];
+            lgrn::Span<JuncCustom> customSpan = rPerNodeType.m_machToNodeCustom[mach.value];
 
             for (int i = 0; i < portSpan.size(); ++i)
             {
@@ -223,7 +251,7 @@ VehicleData VehicleBuilder::finalize_release()
                     continue;
                 }
 
-                lgrn::Span<Junction> const juncSpan = rPerNodeType.nodeToMach[node];
+                lgrn::Span<Junction> const juncSpan = rPerNodeType.nodeToMach[node.value];
 
                 // find empty spot
                 // should always succeed, as they were reserved a few lines ago
@@ -235,8 +263,8 @@ VehicleData VehicleBuilder::finalize_release()
                 });
                 assert(found != std::end(juncSpan));
 
-                MachTypeId const type = rData.m_machines.machTypes[mach];
-                MachLocalId const local = rData.m_machines.machToLocal[mach];
+                MachTypeId const type = rData.m_machines.machTypeOf[mach];
+                MachLocalId const local = rData.m_machines.machlocalidOf[mach];
 
                 found->local  = local;
                 found->type   = type;
@@ -248,23 +276,23 @@ VehicleData VehicleBuilder::finalize_release()
     // Reserve part-to-machine partitions
     using osp::link::MachinePair;
     rData.m_partToMachines.ids_reserve(rData.m_partIds.capacity());
-    rData.m_partToMachines.data_reserve(rData.m_machines.ids.capacity());
+    rData.m_partToMachines.data_reserve(rData.m_machines.machIds.capacity());
     for (PartId const part : rData.m_partIds)
     {
-        rData.m_partToMachines.emplace(part, m_partMachCount[part]);
+        rData.m_partToMachines.emplace(part.value, m_partMachCount[part.value]);
     }
 
     // Assign part-to-machine partitions
-    for (MachAnyId const mach : rData.m_machines.ids)
+    for (MachAnyId const mach : rData.m_machines.machIds)
     {
-        MachLocalId const   local       = rData.m_machines.machToLocal[mach];
-        MachTypeId const    type        = rData.m_machines.machTypes[mach];
+        MachLocalId const   local       = rData.m_machines.machlocalidOf[mach];
+        MachTypeId const    type        = rData.m_machines.machTypeOf[mach];
         PartId const        part        = rData.m_machToPart[mach];
-        auto const          machines    = lgrn::Span<MachinePair>{rData.m_partToMachines[part]};
+        auto const          machines    = lgrn::Span<MachinePair>{rData.m_partToMachines[part.value]};
 
         // Reuse machine count to track how many are currently added.
         // By the end, these should all be zero
-        auto &rPartMachCount = m_partMachCount[part];
+        auto &rPartMachCount = m_partMachCount[part.value];
         assert(rPartMachCount != 0);
         -- rPartMachCount;
 
@@ -281,5 +309,7 @@ VehicleData VehicleBuilder::finalize_release()
     m_data.emplace();
     return dataOut;
 }
+
+#endif
 
 } // namespace adera

@@ -32,6 +32,8 @@
 namespace adera
 {
 
+#if 0
+
 struct ACtxVehicleSpawnVB
 {
     using SpVehicleId = osp::active::SpVehicleId;
@@ -46,13 +48,13 @@ struct ACtxVehicleSpawnVB
     inline Corrade::Containers::StridedArrayView2D<std::size_t> remap_node_offsets_2d() noexcept
     {
         return {Corrade::Containers::arrayView(remapNodeOffsets.data(), remapNodeOffsets.size()),
-                {dataVB.size(), osp::link::NodeTypeReg_t::size()}};
+                {dataVB.size(), remapNodeOffsetStride}};
     }
 
     inline Corrade::Containers::StridedArrayView2D<std::size_t const> remap_node_offsets_2d() const noexcept
     {
         return {Corrade::Containers::arrayView(remapNodeOffsets.data(), remapNodeOffsets.size()),
-                {dataVB.size(), osp::link::NodeTypeReg_t::size()}};
+                {dataVB.size(), remapNodeOffsetStride}};
     }
 
     osp::KeyedVec<SpVehicleId, VehicleData const*> dataVB;
@@ -60,10 +62,10 @@ struct ACtxVehicleSpawnVB
     std::vector<osp::active::PartId>        remapParts;
     osp::KeyedVec<SpVehicleId, std::size_t> remapPartOffsets;
 
-    std::vector<osp::active::PartId>        remapWelds;
+    std::vector<osp::active::WeldId>        remapWelds;
     osp::KeyedVec<SpVehicleId, std::size_t> remapWeldOffsets;
 
-    std::vector<std::size_t>                machtypeCount;
+    osp::KeyedVec<osp::link::MachTypeId, std::size_t>  machtypeCount;
     std::vector<osp::link::MachAnyId>       remapMachs;
     osp::KeyedVec<SpVehicleId, std::size_t> remapMachOffsets;
 
@@ -71,6 +73,7 @@ struct ACtxVehicleSpawnVB
     // An offset can exist for each pair of [New Vehicle, Node Type]
     std::vector<osp::link::NodeId>          remapNodes;
     osp::KeyedVec<SpVehicleId, std::size_t> remapNodeOffsets;
+    std::size_t                             remapNodeOffsetStride;
 };
 
 class SysVehicleSpawnVB
@@ -85,5 +88,6 @@ public:
     static void request_prefabs(ACtxVehicleSpawn& rVehicleSpawn, ACtxVehicleSpawnVB const& rVehicleSpawnVB, ACtxParts& rScnParts, ACtxPrefabs& rPrefabs, Resources& rResources);
 };
 
+#endif
 
 } // namespace adera

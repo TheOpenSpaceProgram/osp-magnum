@@ -35,7 +35,7 @@
 #include <osp/drawing/drawing.h>
 #include <osp/vehicles/ImporterData.h>
 
-#include <adera/machines/links.h>
+#include <adera/links.h>
 
 #include <planet-a/activescene/terrain.h>
 
@@ -355,7 +355,7 @@ FeatureDef const ftrVehicleSpawnJolt = feature_def("VehicleSpawnJolt", [] (
             {
                 // Count parts in this weld first
                 std::size_t entCount = 0;
-                for (PartId const part : rScnParts.weldToParts[weld])
+                for (PartId const part : rScnParts.weldToParts[weld.value])
                 {
                     SpPartId const newPart = rVehicleSpawn.partToSpawned[part];
                     uint32_t const prefabInit = rVehicleSpawn.spawnedPrefabs[newPart];
@@ -369,7 +369,7 @@ FeatureDef const ftrVehicleSpawnJolt = feature_def("VehicleSpawnJolt", [] (
                 SubtreeBuilder bldRoot = SysSceneGraph::add_descendants(rBasic.m_scnGraph, entCount + 1);
                 SubtreeBuilder bldWeld = bldRoot.add_child(weldEnt, entCount);
 
-                for (PartId const part : rScnParts.weldToParts[weld])
+                for (PartId const part : rScnParts.weldToParts[weld.value])
                 {
                     SpPartId const newPart      = rVehicleSpawn.partToSpawned[part];
                     uint32_t const prefabInit   = rVehicleSpawn.spawnedPrefabs[newPart];
@@ -521,8 +521,8 @@ static void assign_weld_rockets(
         ACtxParts                const &rScnParts,
         ACtxJoltWorld                  &rJolt,
         ACtxRocketsJolt                &rRocketsJolt,
-        Nodes                    const &rFloatNodes,
-        PerMachType              const &machtypeRocket,
+        NodeType                 const &rFloatNodes,
+        MachType                 const &machtypeRocket,
         std::vector<BodyRocket>        &rRocketsFoundTemp)
 {
     using adera::gc_mtMagicRocket;
@@ -542,20 +542,20 @@ static void assign_weld_rockets(
     // Each weld consists of multiple parts, iterate them all. Note that each part has their own
     // individual transforms, so math is needed to calculate stuff with thrust direction and
     // center-of-mass.
-    for (PartId const part : rScnParts.weldToParts[weld])
+    for (PartId const part : rScnParts.weldToParts[weld.value])
     {
         auto const sizeBefore = rRocketsFoundTemp.size();
 
         // Each part contains Machines, some of which may be rockets.
-        for (MachinePair const pair : rScnParts.partToMachines[part])
+        for (MachinePair const pair : rScnParts.partToMachines[part.value])
         {
             if (pair.type != gc_mtMagicRocket)
             {
                 continue; // This machine is not a rocket
             }
 
-            MachAnyId const  mach         = machtypeRocket.localToAny[pair.local];
-            auto      const& portSpan     = rFloatNodes.machToNode[mach];
+            MachAnyId const  mach         = machtypeRocket.machanyIdOf[pair.local];
+            auto      const& portSpan     = rFloatNodes.machToNode[mach.value];
             NodeId    const  throttleIn   = connected_node(portSpan, gc_throttleIn.port);
             NodeId    const  multiplierIn = connected_node(portSpan, gc_multiplierIn.port);
 
@@ -614,6 +614,8 @@ static void assign_weld_rockets(
         rRocketsJolt.m_bodyRockets.emplace(body.value, rRocketsFoundTemp.begin(), rRocketsFoundTemp.end());
     }
 }
+
+#if 0
 
 struct RocketThrustUserData
 {
@@ -694,8 +696,8 @@ FeatureDef const ftrRocketThrustJolt = feature_def("RocketThrustJolt", [] (
     {
         using adera::gc_mtMagicRocket;
 
-        Nodes       const &rFloatNodes    = rLinks.nodePerType[gc_ntSigFloat];
-        PerMachType const &machtypeRocket = rLinks.machines.perType[gc_mtMagicRocket];
+        NodeType        const &rFloatNodes    = rLinks.nodePerType[gc_ntSigFloat];
+        MachType        const &machtypeRocket = rLinks.machines.perType[gc_mtMagicRocket];
 
         rRocketsJolt.m_bodyRockets.ids_reserve(rJolt.m_bodyIds.size());
         rRocketsJolt.m_bodyRockets.data_reserve(rLinks.machines.perType[gc_mtMagicRocket].localIds.capacity());
@@ -727,6 +729,9 @@ FeatureDef const ftrRocketThrustJolt = feature_def("RocketThrustJolt", [] (
     rRocketsJolt.factorIndex = static_cast<std::uint8_t>(index);
 }); // ftrRocketThrustJolt
 
+#endif
+
+
 struct ACtxTerrainJolt
 {
     BodyId bodyId;
@@ -737,6 +742,7 @@ struct ACtxTerrainJolt
     // useful for when translating everything for MutableCompountShape::ModifyShapes
     std::vector<JPH::Vec3> positions;
 };
+
 
 FeatureDef const ftrTerrainJolt = feature_def("ftrTerrainJolt", [] (
         FeatureBuilder              &rFB,

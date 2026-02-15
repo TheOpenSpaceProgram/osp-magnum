@@ -22,18 +22,24 @@
  * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
  * SOFTWARE.
  */
-#include "machines.h"
+#include "link.h"
 
 namespace osp::link
 {
 
+GlobalLinkInfo& GlobalLinkInfo::instance()
+{
+    static GlobalLinkInfo info;
+    return info;
+}
+
 void copy_nodes(
-        Nodes const &rSrcNodes,
-        Machines const &rSrcMach,
-        Corrade::Containers::ArrayView<MachAnyId const> remapMach,
-        Nodes &rDstNodes,
-        Machines &rDstMach,
-        Corrade::Containers::ArrayView<NodeId> remapNode)
+        NodeType                                      const &rSrcNodes,
+        Links                                         const &rSrcMach,
+        Corrade::Containers::ArrayView<MachAnyId const>     remapMach,
+        NodeType                                            &rDstNodes,
+        Links                                               &rDstMach,
+        Corrade::Containers::ArrayView<NodeId>              remapNode)
 {
     using lgrn::Span;
 
@@ -41,7 +47,7 @@ void copy_nodes(
     for (NodeId const srcNode : rSrcNodes.nodeIds)
     {
         NodeId const dstNode = rDstNodes.nodeIds.create();
-        remapNode[srcNode] = dstNode;
+        remapNode[srcNode.value] = dstNode;
     }
 
     // Copy node-to-machine connections
@@ -50,21 +56,21 @@ void copy_nodes(
                                         + rSrcNodes.nodeToMach.data_size());
     for (NodeId const srcNode : rSrcNodes.nodeIds)
     {
-        NodeId const dstNode = remapNode[srcNode];
-        Span<Junction const> srcJunction = rSrcNodes.nodeToMach[srcNode];
-        rDstNodes.nodeToMach.emplace(dstNode, srcJunction.size());
-        Span<Junction> dstJuncton = rDstNodes.nodeToMach[dstNode];
+        NodeId const dstNode = remapNode[srcNode.value];
+        Span<Junction const> srcJunction = rSrcNodes.nodeToMach[srcNode.value];
+        rDstNodes.nodeToMach.emplace(dstNode.value, srcJunction.size());
+        Span<Junction> dstJuncton = rDstNodes.nodeToMach[dstNode.value];
 
         auto dstJuncIt = std::begin(dstJuncton);
         for (Junction const& srcJunc : srcJunction)
         {
-            MachTypeId const machType = srcJunc.type;
-            MachAnyId const srcMach = rSrcMach.perType[machType].localToAny[srcJunc.local];
-            MachAnyId const dstMach = remapMach[srcMach];
-            MachLocalId const dstLocal = rDstMach.machToLocal[dstMach];
+            MachTypeId const machType = MachTypeId{srcJunc.type};
+            MachAnyId const srcMach = rSrcMach.machtype[machType].machanyIdOf[MachLocalId{srcJunc.local}];
+            MachAnyId const dstMach = remapMach[srcMach.value];
+            MachLocalId const dstLocal = rDstMach.machlocalidOf[dstMach];
 
-            dstJuncIt->local  = dstLocal;
-            dstJuncIt->type   = machType;
+            dstJuncIt->local  = dstLocal.value;
+            dstJuncIt->type   = machType.value;
             dstJuncIt->custom = srcJunc.custom;
 
             std::advance(dstJuncIt, 1);
@@ -72,23 +78,23 @@ void copy_nodes(
     }
 
     // copy mach-to-node connections
-    rDstNodes.machToNode.ids_reserve(rDstMach.ids.capacity());
+    rDstNodes.machToNode.ids_reserve(rDstMach.machIds.capacity());
     rDstNodes.machToNode.data_reserve(rDstNodes.machToNode.data_size()
                                         + rSrcNodes.machToNode.data_size());
-    for (MachAnyId const srcMach : rSrcMach.ids)
+    for (MachAnyId const srcMach : rSrcMach.machIds)
     {
-        if (rSrcNodes.machToNode.contains(srcMach))
+        if (rSrcNodes.machToNode.contains(srcMach.value))
         {
-            Span<NodeId const> srcPorts = rSrcNodes.machToNode[srcMach];
-            MachAnyId const dstMach = remapMach[srcMach];
-            rDstNodes.machToNode.emplace(dstMach, srcPorts.size());
-            Span<NodeId> dstPorts = rDstNodes.machToNode[dstMach];
+            Span<NodeId const> srcPorts = rSrcNodes.machToNode[srcMach.value];
+            MachAnyId const dstMach = remapMach[srcMach.value];
+            rDstNodes.machToNode.emplace(dstMach.value, srcPorts.size());
+            Span<NodeId> dstPorts = rDstNodes.machToNode[dstMach.value];
 
             auto dstPortIt = std::begin(dstPorts);
             for (NodeId const srcNode : srcPorts)
             {
                 *dstPortIt = (srcNode != lgrn::id_null<NodeId>())
-                           ? remapNode[srcNode]
+                           ? remapNode[srcNode.value]
                            : lgrn::id_null<NodeId>();
 
                 std::advance(dstPortIt, 1);

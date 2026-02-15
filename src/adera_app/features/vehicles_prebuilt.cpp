@@ -23,10 +23,12 @@
  * SOFTWARE.
  */
 #include "vehicles_prebuilt.h"
+#include "vehicles.h"
+
 
 #include "../feature_interfaces.h"
 
-#include <adera/machines/links.h>
+#include <adera/links.h>
 
 #include <osp/core/Resources.h>
 
@@ -56,6 +58,7 @@ struct RCSInputs
     NodeId m_roll   {lgrn::id_null<NodeId>()};
 };
 
+/*
 static void add_rcs_machines(VehicleBuilder& rFB, RCSInputs const& inputs, PartId part, float thrustMul, Matrix4 const& tf)
 {
     namespace ports_rcsdriver = adera::ports_rcsdriver;
@@ -114,6 +117,31 @@ static void add_rcs_block(VehicleBuilder& rFB, VehicleBuilder::WeldVec_t& rWeldT
     rWeldTo.push_back({ nozzleB, nozzleTfB });
 }
 
+static void add_rcs_mirrored(VehicleBuilder& rFB, VehicleBuilder::WeldVec_t& rWeldTo, RCSInputs const& inputs, float thrustMul, Vector3 pos, Quaternion rot)
+{
+    auto const [ nozzleA, nozzleB ] = rFB.create_parts<2>();
+    rFB.set_prefabs({
+        { nozzleA,  "phLinRCS" },
+        { nozzleB,  "phLinRCS" }
+    });
+
+    constexpr Vector3 mirrorX = Vector3{-1.0f, 1.0f, 1.0f};
+
+    // sort of just guessed, and this happened to work
+    Quaternion const rotMirrored{rot.vector() * mirrorX, -rot.scalar() };
+
+    Matrix4 const nozzleTfA = quick_transform(pos, rot);
+    Matrix4 const nozzleTfB = quick_transform(pos * mirrorX, rotMirrored);
+
+
+    add_rcs_machines(rFB, inputs, nozzleA, thrustMul, nozzleTfA);
+    add_rcs_machines(rFB, inputs, nozzleB, thrustMul, nozzleTfB);
+
+    rWeldTo.push_back({ nozzleA, nozzleTfA });
+    rWeldTo.push_back({ nozzleB, nozzleTfB });
+}
+*/
+
 FeatureDef const ftrPrebuiltVehicles = feature_def("PrebuiltVehicles", [] (
         FeatureBuilder              &rFB,
         Implement<FITestVehicles>   testVhcls,
@@ -123,11 +151,30 @@ FeatureDef const ftrPrebuiltVehicles = feature_def("PrebuiltVehicles", [] (
 {
     auto &rResources = rFB.data_get<Resources>(mainApp.di.resources);
 
-    auto &rPrebuiltVehicles = rFB.data_emplace<PrebuiltVehicles>(testVhcls.di.prebuiltVehicles);
-    rPrebuiltVehicles.resize(PrebuiltVhIdReg_t::size());
+    //auto &rPrebuiltVehicles = rFB.data_emplace<PrebuiltVehicles>(testVhcls.di.prebuiltVehicles);
+    //rPrebuiltVehicles.resize(PrebuiltVhIdReg_t::size());
 
     using namespace adera;
 
+
+    Framework fw;
+
+    // Contexts adds a way to separate major sections of the Framework.
+    // Feature Interfaces are added per-context. A context can't have two of the same
+    // implementations of a Feature Interface. If we were to add two aquariums that are logically
+    // separated and can run in parallel, we can use two contexts.
+    ContextId const ctx = fw.m_contextIds.create();
+
+    ContextBuilder cb{ctx, {}, fw};
+    cb.add_feature(ftrLinks);
+    ContextBuilder::finalize(std::move(cb));
+
+    VehicleBuilder vb(std::move(fw), ctx);
+
+
+
+    /*
+asdf
     // Build "PartVehicle"
     {
         VehicleBuilder vbuilder{&rResources};
@@ -212,8 +259,84 @@ FeatureDef const ftrPrebuiltVehicles = feature_def("PrebuiltVehicles", [] (
     }
 
 
+    // Build "Solvalot-1"
+    {
+        VehicleBuilder vbuilder{&rResources};
+        VehicleBuilder::WeldVec_t toWeld;
+
+        auto const [ fusalage, engineA, engineB ] = vbuilder.create_parts<3>();
+        vbuilder.set_prefabs({
+            { fusalage, "solvalot1" },
+            { engineA,  "phEngine" },
+            { engineB,  "phEngine" },
+        });
+
+        toWeld.push_back( {fusalage, quick_transform({ 0.0f,  0.0f,  0.0f}, {})} );
+        toWeld.push_back( {engineA,  quick_transform({ 0.0f,  -0.12f, -3.76f}, {} )} );
+        toWeld.push_back( {engineB,  quick_transform({ 0.0f,  1.1f, -3.70f}, Quaternion::rotation(17.8_degf, {1.0f, 0.0f, 0.0f}))} );
+        namespace ports_magicrocket = adera::ports_magicrocket;
+        namespace ports_userctrl = adera::ports_userctrl;
+
+        auto const [ pitch, yaw, roll, throttle, thrustMul ] = vbuilder.create_nodes<5>(gc_ntSigFloat);
+
+        auto &rFloatValues = vbuilder.node_values< SignalValues_t<float> >(gc_ntSigFloat);
+        rFloatValues[thrustMul] = 120000.0f;
+
+        vbuilder.create_machine(fusalage, gc_mtUserCtrl, {
+            { ports_userctrl::gc_throttleOut,   throttle },
+            { ports_userctrl::gc_pitchOut,      pitch    },
+            { ports_userctrl::gc_yawOut,        yaw      },
+            { ports_userctrl::gc_rollOut,       roll     }
+        } );
+
+        vbuilder.create_machine(engineA, gc_mtMagicRocket, {
+            { ports_magicrocket::gc_throttleIn, throttle },
+            { ports_magicrocket::gc_multiplierIn, thrustMul }
+        } );
+
+        vbuilder.create_machine(engineB, gc_mtMagicRocket, {
+            { ports_magicrocket::gc_throttleIn, throttle },
+            { ports_magicrocket::gc_multiplierIn, thrustMul }
+        } );
+
+
+        RCSInputs rcsInputs{pitch, yaw, roll};
+
+        // for roll
+        add_rcs_mirrored(vbuilder, toWeld, rcsInputs, 12000.0f, Vector3{4.952f, -0.351f, -1.492f}, Quaternion::rotation(90.0_degf, {1.0f, 0.0f, 0.0f}));
+        add_rcs_mirrored(vbuilder, toWeld, rcsInputs, 12000.0f, Vector3{4.952f, -0.827f, -1.492f}, Quaternion::rotation(-90.0_degf, {1.0f, 0.0f, 0.0f}));
+
+        // for pitch
+        add_rcs_mirrored(vbuilder, toWeld, rcsInputs, 5000.0f, Vector3{0.506f, 0.545f, 3.412f}, Quaternion::rotation(90.0_degf, {1.0f, 0.0f, 0.0f}));
+        add_rcs_mirrored(vbuilder, toWeld, rcsInputs, 5000.0f, Vector3{0.506f, -1.441f, 3.412f}, Quaternion::rotation(-90.0_degf, {1.0f, 0.0f, 0.0f}));
+
+        add_rcs_mirrored(vbuilder, toWeld, rcsInputs, 4000.0f, Vector3{0.5061700940132141,
+                -1.4411895275115967,
+                -3.2911040782928467}, Quaternion::rotation(-90.0_degf, {1.0f, 0.0f, 0.0f}));
+        add_rcs_mirrored(vbuilder, toWeld, rcsInputs, 4000.0f, Vector3{0.5061700940132141f,
+                2.2311899662017822f,
+                -3.2911040782928467f}, Quaternion::rotation(90.0_degf, {1.0f, 0.0f, 0.0f}));
+
+
+        // for yaw
+        add_rcs_mirrored(vbuilder, toWeld, rcsInputs, 15000.0f, Vector3{0.6308508515357971,
+                -0.6648790836334229,
+                4.920871734619141}, Quaternion::rotation(-90.0_degf, {0.0f, 1.0f, 0.0f}));
+        add_rcs_mirrored(vbuilder, toWeld, rcsInputs, 15000.0f, Vector3{				5.238207817077637,
+                -0.6648790836334229,
+                -5.217004776000977}, Quaternion::rotation(-90.0_degf, {0.0f, 1.0f, 0.0f}));
+
+
+        vbuilder.weld(toWeld);
+
+        rPrebuiltVehicles[gc_pbvSolvalot1] = std::make_unique<VehicleData>(std::move(vbuilder.finalize_release()));
+    }
+*/
+
+
     // Put more prebuilt vehicles here!
 
+    /*
 
     rFB.task()
         .name       ("Clean up prebuilt vehicles")
@@ -233,6 +356,7 @@ FeatureDef const ftrPrebuiltVehicles = feature_def("PrebuiltVehicles", [] (
         }
         rPrebuildVehicles.clear();
     });
+*/
 
 }); // setup_prebuilt_vehicles
 

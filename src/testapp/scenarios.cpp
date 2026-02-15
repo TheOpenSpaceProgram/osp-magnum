@@ -178,29 +178,30 @@ static ScenarioMap_t make_scenarios()
         sceneCB.add_feature(ftrBounds);
 
         sceneCB.add_feature(ftrPrefabs);
-        sceneCB.add_feature(ftrParts);
-        sceneCB.add_feature(ftrSignalsFloat);
-        sceneCB.add_feature(ftrVehicleSpawn);
-        sceneCB.add_feature(ftrVehicleSpawnVBData);
-        sceneCB.add_feature(ftrPrebuiltVehicles);
+//        sceneCB.add_feature(ftrParts);
+//        sceneCB.add_feature(ftrSignalsFloat);
+//        sceneCB.add_feature(ftrVehicleSpawn);
+//        sceneCB.add_feature(ftrVehicleSpawnVBData);
+//        sceneCB.add_feature(ftrPrebuiltVehicles);
 
-        sceneCB.add_feature(ftrMachMagicRockets);
-        sceneCB.add_feature(ftrMachRCSDriver);
+//        sceneCB.add_feature(ftrMachMagicRockets);
+//        sceneCB.add_feature(ftrMachRCSDriver);
 
         sceneCB.add_feature(ftrJolt);
         sceneCB.add_feature(ftrJoltConstAccel);
         sceneCB.add_feature(ftrPhysicsShapesJolt);
-        sceneCB.add_feature(ftrVehicleSpawnJolt);
-        sceneCB.add_feature(ftrRocketThrustJolt);
+//        sceneCB.add_feature(ftrVehicleSpawnJolt);
+//        sceneCB.add_feature(ftrRocketThrustJolt);
 
         ContextBuilder::finalize(std::move(sceneCB));
 
         ospjolt::ForceFactors_t const gravity = add_constant_acceleration(sc_gravityForce, args.rFW, sceneCtx);
         set_phys_shape_factors     (gravity, args.rFW, sceneCtx);
-        set_vehicle_default_factors(gravity, args.rFW, sceneCtx);
+//        set_vehicle_default_factors(gravity, args.rFW, sceneCtx);
 
         add_floor(args.rFW, sceneCtx, args.defaultPkg, 4);
 
+#if 0
         auto vhclSpawn          = args.rFW.get_interface<FIVehicleSpawn>(sceneCtx);
         auto vhclSpawnVB        = args.rFW.get_interface<FIVehicleSpawnVB>(sceneCtx);
         auto testVhcls          = args.rFW.get_interface<FITestVehicles>(sceneCtx);
@@ -219,6 +220,7 @@ static ScenarioMap_t make_scenarios()
             });
             rVehicleSpawnVB.dataVB.push_back(rPrebuiltVehicles[gc_pbvSimpleCommandServiceModule].get());
         }
+#endif
     }});
 
 
@@ -414,20 +416,20 @@ static ScenarioMap_t make_scenarios()
         sceneCB.add_feature(ftrBounds);
 
         sceneCB.add_feature(ftrPrefabs);
-        sceneCB.add_feature(ftrParts);
-        sceneCB.add_feature(ftrSignalsFloat);
-        sceneCB.add_feature(ftrVehicleSpawn);
-        sceneCB.add_feature(ftrVehicleSpawnVBData);
-        sceneCB.add_feature(ftrPrebuiltVehicles);
+//        sceneCB.add_feature(ftrParts);
+//        sceneCB.add_feature(ftrSignalsFloat);
+//        sceneCB.add_feature(ftrVehicleSpawn);
+//        sceneCB.add_feature(ftrVehicleSpawnVBData);
+//        sceneCB.add_feature(ftrPrebuiltVehicles);
 
-        sceneCB.add_feature(ftrMachMagicRockets);
-        sceneCB.add_feature(ftrMachRCSDriver);
+//        sceneCB.add_feature(ftrMachMagicRockets);
+//        sceneCB.add_feature(ftrMachRCSDriver);
 
         sceneCB.add_feature(ftrJolt);
         sceneCB.add_feature(ftrJoltConstAccel);
         sceneCB.add_feature(ftrPhysicsShapesJolt);
-        sceneCB.add_feature(ftrVehicleSpawnJolt);
-        sceneCB.add_feature(ftrRocketThrustJolt);
+//        sceneCB.add_feature(ftrVehicleSpawnJolt);
+//        sceneCB.add_feature(ftrRocketThrustJolt);
 
         sceneCB.add_feature(ftrTerrainJolt);
 
@@ -438,10 +440,11 @@ static ScenarioMap_t make_scenarios()
 
         ospjolt::ForceFactors_t const gravity = add_constant_acceleration(sc_gravityForce, args.rFW, sceneCtx);
         set_phys_shape_factors(gravity, args.rFW, sceneCtx);
-        set_vehicle_default_factors(gravity, args.rFW, sceneCtx);
+//        set_vehicle_default_factors(gravity, args.rFW, sceneCtx);
 
         //add_floor(args.rFW, sceneCtx, args.defaultPkg, 4);
 
+#if 0
         auto vhclSpawn          = args.rFW.get_interface<FIVehicleSpawn>(sceneCtx);
         auto vhclSpawnVB        = args.rFW.get_interface<FIVehicleSpawnVB>(sceneCtx);
         auto testVhcls          = args.rFW.get_interface<FITestVehicles>(sceneCtx);
@@ -450,16 +453,28 @@ static ScenarioMap_t make_scenarios()
         auto &rVehicleSpawnVB   = args.rFW.data_get<ACtxVehicleSpawnVB>   (vhclSpawnVB.di.vehicleSpawnVB);
         auto &rPrebuiltVehicles = args.rFW.data_get<PrebuiltVehicles>     (testVhcls.di.prebuiltVehicles);
 
-        for (int i = 0; i < 10; ++i)
+        for (int i = 0; i < 2; ++i)
         {
             rVehicleSpawn.spawnRequest.push_back(
             {
-               .position = {float(i - 2) * 8.0f, 30.0f, 10.0f},
-               .velocity = {0.0, 0.0f, 50.0f * float(i)},
+               .position = {float(i - 2) * 15.0f, 30.0f, 10.0f},
+               .velocity = {0.0, 0.0f, 0.0f},
+               .rotation = {}
+            });
+            rVehicleSpawnVB.dataVB.push_back(rPrebuiltVehicles[gc_pbvSolvalot1].get());
+        }
+
+        for (int i = 0; i < 2; ++i)
+        {
+            rVehicleSpawn.spawnRequest.push_back(
+            {
+               .position = {float(i - 2) * 15.0f, 0.0f, 10.0f},
+               .velocity = {0.0, 0.0f, 0.0f},
                .rotation = {}
             });
             rVehicleSpawnVB.dataVB.push_back(rPrebuiltVehicles[gc_pbvSimpleCommandServiceModule].get());
         }
+#endif
     }});
 
     return scenarioMap;

@@ -24,10 +24,13 @@
  */
 #pragma once
 
+#include <osp/framework/framework.h>
+
 #include <osp/activescene/vehicles.h>
+#include <osp/vehicles/prefabs.h>
+#include <osp/link/link.h>
 #include <osp/core/copymove_macros.h>
 #include <osp/core/resourcetypes.h>
-#include <osp/link/machines.h>
 
 #include <longeron/id_management/registry_stl.hpp>
 
@@ -44,6 +47,55 @@
 namespace adera
 {
 
+struct VehicleBuilderImpl;
+
+class VehicleBuilder
+{
+public:
+
+    VehicleBuilder(osp::fw::Framework fw, osp::fw::ContextId ctx);
+    ~VehicleBuilder();
+
+    struct Connection
+    {
+        osp::link::PortEntry m_port;
+        osp::link::NodeId m_node;
+    };
+
+    template <std::size_t N>
+    [[nodiscard]] std::array<osp::link::NodeId, N> create_nodes(osp::link::NodeTypeId nodeType);
+
+    osp::link::MachAnyId create_machine(osp::link::MachTypeId machType, std::initializer_list<Connection> const& connections);
+
+    void connect(osp::link::MachAnyId mach, std::initializer_list<Connection> const& connections);
+
+    void update();
+
+    osp::link::Links& links();
+
+private:
+
+    std::unique_ptr<VehicleBuilderImpl> m_impl;
+};
+
+
+template <std::size_t N>
+std::array<osp::link::NodeId, N> VehicleBuilder::create_nodes(osp::link::NodeTypeId const nodeType)
+{
+    std::array<osp::link::NodeId, N> out;
+
+    osp::link::NodeType &rNodeType = *links().nodetype[nodeType];
+
+    rNodeType.nodeIds.create(std::begin(out), std::end(out));
+    std::size_t const capacity = rNodeType.nodeIds.capacity();
+    rNodeType.nodeToMach.ids_reserve(rNodeType.nodeIds.capacity());
+
+    return out;
+}
+
+
+#if 0
+
 using osp::active::PartId;
 using osp::active::WeldId;
 
@@ -54,22 +106,10 @@ struct StructureLink
     PartId m_less;
 };
 
-struct PerNodeType : osp::link::Nodes
-{
-    using MachToNodeCustom_t = lgrn::IntArrayMultiMap<osp::link::MachAnyId,
-                                                      osp::link::JuncCustom>;
-
-    MachToNodeCustom_t      m_machToNodeCustom; // parallel with m_machToNode
-    entt::any               m_nodeValues;
-    std::vector<int>        m_nodeConnectCount;
-    int                     m_connectCountTotal{0};
-};
-
 struct VehicleData
 {
-    using MachToNodeCustom_t = lgrn::IntArrayMultiMap<osp::link::MachAnyId,
-                                                      osp::link::JuncCustom>;
     using MapPartToMachines_t = osp::active::ACtxParts::MapPartToMachines_t;
+    using MapWeldToParts_t = lgrn::IntArrayMultiMap<WeldId::entity_type, PartId>;
 
     VehicleData() = default;
     OSP_MOVE_ONLY_CTOR(VehicleData);
@@ -81,12 +121,11 @@ struct VehicleData
     MapPartToMachines_t                     m_partToMachines;
 
     lgrn::IdRegistryStl<WeldId>             m_weldIds;
-    lgrn::IntArrayMultiMap<WeldId, PartId>  m_weldToParts;
+    MapWeldToParts_t                        m_weldToParts;
 
-    osp::link::Machines                     m_machines;
-    std::vector<PartId>                     m_machToPart;
+    osp::link::Links                        m_links;
 
-    std::vector<PerNodeType>                m_nodePerType;
+    osp::KeyedVec<osp::link::MachAnyId, PartId> m_machToPart;
 };
 
 /**
@@ -95,6 +134,7 @@ struct VehicleData
 class VehicleBuilder
 {
     using MachAnyId     = osp::link::MachAnyId;
+    using MachLocalId   = osp::link::MachLocalId;
     using MachTypeId    = osp::link::MachTypeId;
     using NodeId        = osp::link::NodeId;
     using NodeTypeId    = osp::link::NodeTypeId;
@@ -113,9 +153,10 @@ public:
     VehicleBuilder(osp::Resources *pResources)
      : m_pResources{pResources}
     {
+        auto const& info = osp::link::GlobalLinkInfo::instance();
         auto &rData = m_data.emplace();
-        rData.m_machines.perType.resize(osp::link::MachTypeReg_t::size());
-        rData.m_nodePerType.resize(osp::link::NodeTypeReg_t::size());
+        rData.m_links.machtype.resize(info.machtypeIds.capacity());
+        rData.m_links.nodetype.resize(info.nodetypeIds.capacity());
         index_prefabs();
     };
 
@@ -151,7 +192,7 @@ public:
 
     std::size_t node_capacity(NodeTypeId nodeType) const
     {
-        return m_data->m_nodePerType[nodeType].nodeIds.capacity();
+        return m_data->m_links.nodetype[nodeType].capacity;
     }
 
     struct Connection
@@ -203,12 +244,11 @@ std::array<osp::link::NodeId, N> VehicleBuilder::create_nodes(NodeTypeId const n
 {
     std::array<NodeId, N> out;
 
-    PerNodeType &rPerNodeType = m_data->m_nodePerType[nodeType];
+    osp::link::NodeType &rNodeType = m_data->m_links.nodetype[nodeType];
 
-    rPerNodeType.nodeIds.create(std::begin(out), std::end(out));
-    std::size_t const capacity = rPerNodeType.nodeIds.capacity();
-    rPerNodeType.nodeToMach.ids_reserve(rPerNodeType.nodeIds.capacity());
-    rPerNodeType.m_nodeConnectCount.resize(capacity, 0);
+    rNodeType.nodeIds.create(std::begin(out), std::end(out));
+    std::size_t const capacity = rNodeType.nodeIds.capacity();
+    rNodeType.nodeToMach.ids_reserve(rNodeType.nodeIds.capacity());
 
     return out;
 }
@@ -229,5 +269,7 @@ VALUES_T& VehicleBuilder::node_values(NodeTypeId nodeType)
 
     return rValues;
 }
+
+#endif
 
 } // namespace adera

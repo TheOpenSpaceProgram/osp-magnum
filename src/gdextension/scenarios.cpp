@@ -155,6 +155,7 @@ static ScenarioMap_t make_scenarios()
 
         add_floor(rFW, sceneCtx, pkg, 4);
 
+#if 0
         auto vhclSpawn          = rFW.get_interface<FIVehicleSpawn>(sceneCtx);
         auto vhclSpawnVB        = rFW.get_interface<FIVehicleSpawnVB>(sceneCtx);
         auto testVhcls          = rFW.get_interface<FITestVehicles>(sceneCtx);
@@ -173,7 +174,7 @@ static ScenarioMap_t make_scenarios()
             });
             rVehicleSpawnVB.dataVB.push_back(rPrebuiltVehicles[gc_pbvSimpleCommandServiceModule].get());
         }
-
+#endif
     }});
 
     return scenarioMap;
