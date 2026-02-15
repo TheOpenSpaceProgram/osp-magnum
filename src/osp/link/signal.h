@@ -41,8 +41,8 @@ inline NodeTypeId const gc_ntSigFloat = GlobalLinkInfo::instance().create_nodety
 constexpr JuncCustom gc_sigIn  = 0;
 constexpr JuncCustom gc_sigOut = 1;
 
-constexpr PortEntry sigfloat_input(std::uint16_t portId) { return PortEntry{gc_ntSigFloat, PortId{portId}, gc_sigIn}; }
-constexpr PortEntry sigfloat_output(std::uint16_t portId) { return PortEntry{gc_ntSigFloat, PortId{portId}, gc_sigOut}; }
+inline PortEntry sigfloat_input(std::uint16_t portId) { return PortEntry{gc_ntSigFloat, PortId{portId}, gc_sigIn}; }
+inline PortEntry sigfloat_output(std::uint16_t portId) { return PortEntry{gc_ntSigFloat, PortId{portId}, gc_sigOut}; }
 
 template <typename VALUE_T>
 using SignalValues_t = osp::KeyedVec<NodeId, VALUE_T>;
@@ -70,10 +70,10 @@ inline void notify_connected_inputs(NodeId const nodeId, NodeType::NodeToMach_t 
         if (junc.custom == gc_sigIn)
         {
             // A machine of type "junc.m_type" has new values to read
-            rUpdMach.machTypesDirty.insert(junc.type);
+            rUpdMach.machTypesDirty.insert(MachTypeId{junc.type});
 
             // Specify using local Id on which machine needs to update
-            rUpdMach.localDirty[junc.type].insert(junc.local);
+            rUpdMach.localDirty[MachTypeId{junc.type}].insert(MachLocalId{junc.local});
         }
     }
 }

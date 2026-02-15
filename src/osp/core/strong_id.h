@@ -45,6 +45,7 @@ namespace osp
 template <typename INT_T, typename DUMMY_T>
 struct StrongId
 {
+    using int_t = INT_T;
     using entity_type = INT_T; // Name used for entt compatibility
 
     constexpr StrongId() noexcept = default;

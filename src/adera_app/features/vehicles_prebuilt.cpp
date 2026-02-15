@@ -23,6 +23,8 @@
  * SOFTWARE.
  */
 #include "vehicles_prebuilt.h"
+#include "vehicles.h"
+
 
 #include "../feature_interfaces.h"
 
@@ -56,6 +58,7 @@ struct RCSInputs
     NodeId m_roll   {lgrn::id_null<NodeId>()};
 };
 
+/*
 static void add_rcs_machines(VehicleBuilder& rFB, RCSInputs const& inputs, PartId part, float thrustMul, Matrix4 const& tf)
 {
     namespace ports_rcsdriver = adera::ports_rcsdriver;
@@ -137,7 +140,7 @@ static void add_rcs_mirrored(VehicleBuilder& rFB, VehicleBuilder::WeldVec_t& rWe
     rWeldTo.push_back({ nozzleA, nozzleTfA });
     rWeldTo.push_back({ nozzleB, nozzleTfB });
 }
-
+*/
 
 FeatureDef const ftrPrebuiltVehicles = feature_def("PrebuiltVehicles", [] (
         FeatureBuilder              &rFB,
@@ -148,11 +151,30 @@ FeatureDef const ftrPrebuiltVehicles = feature_def("PrebuiltVehicles", [] (
 {
     auto &rResources = rFB.data_get<Resources>(mainApp.di.resources);
 
-    auto &rPrebuiltVehicles = rFB.data_emplace<PrebuiltVehicles>(testVhcls.di.prebuiltVehicles);
-    rPrebuiltVehicles.resize(PrebuiltVhIdReg_t::size());
+    //auto &rPrebuiltVehicles = rFB.data_emplace<PrebuiltVehicles>(testVhcls.di.prebuiltVehicles);
+    //rPrebuiltVehicles.resize(PrebuiltVhIdReg_t::size());
 
     using namespace adera;
 
+
+    Framework fw;
+
+    // Contexts adds a way to separate major sections of the Framework.
+    // Feature Interfaces are added per-context. A context can't have two of the same
+    // implementations of a Feature Interface. If we were to add two aquariums that are logically
+    // separated and can run in parallel, we can use two contexts.
+    ContextId const ctx = fw.m_contextIds.create();
+
+    ContextBuilder cb{ctx, {}, fw};
+    cb.add_feature(ftrLinks);
+    ContextBuilder::finalize(std::move(cb));
+
+    VehicleBuilder vb(std::move(fw), ctx);
+
+
+
+    /*
+asdf
     // Build "PartVehicle"
     {
         VehicleBuilder vbuilder{&rResources};
@@ -309,10 +331,12 @@ FeatureDef const ftrPrebuiltVehicles = feature_def("PrebuiltVehicles", [] (
 
         rPrebuiltVehicles[gc_pbvSolvalot1] = std::make_unique<VehicleData>(std::move(vbuilder.finalize_release()));
     }
+*/
 
 
     // Put more prebuilt vehicles here!
 
+    /*
 
     rFB.task()
         .name       ("Clean up prebuilt vehicles")
@@ -332,6 +356,7 @@ FeatureDef const ftrPrebuiltVehicles = feature_def("PrebuiltVehicles", [] (
         }
         rPrebuildVehicles.clear();
     });
+*/
 
 }); // setup_prebuilt_vehicles
 

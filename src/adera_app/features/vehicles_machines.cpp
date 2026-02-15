@@ -52,6 +52,8 @@ using namespace osp;
 namespace adera
 {
 
+#if 0
+
 FeatureDef const ftrMachMagicRockets = feature_def("MachMagicRockets", [] (
         FeatureBuilder              &rFB,
         DependOn<FIScene>           scn,
@@ -506,6 +508,7 @@ FeatureDef const ftrVehicleControl = feature_def("VehicleControl", [] (
 
 }); // ftrVehicleControl
 
+#endif
 
 
 } // namespace adera

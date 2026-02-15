@@ -102,13 +102,20 @@ struct MachType
 
 struct Junction
 {
-    MachLocalId     local;
-    MachTypeId      type;
-    JuncCustom      custom  {0};
+    MachLocalId::int_t  local;
+    MachTypeId::int_t   type;
+    JuncCustom          custom  {0};
 };
 
 struct NodeType
 {
+    NodeType() = default;
+    OSP_MOVE_ONLY_CTOR(NodeType);
+//    NodeType(NodeType const& copy)              = delete;
+//    NodeType(NodeType&& move)                   = delete;
+//    NodeType& operator= (NodeType const& copy)  = delete;
+//    NodeType& operator= (NodeType&& move)       = delete;
+
     static constexpr std::size_t smc_blockSize  = 64;
     static constexpr std::size_t smc_blockAlign = 64;
     struct alignas(smc_blockAlign) Block
@@ -118,8 +125,8 @@ struct NodeType
 
     // reminder: IntArrayMultiMap is kind of like an
     //           std::vector< std::vector<...> > but more memory efficient
-    using NodeToMach_t = lgrn::IntArrayMultiMap<NodeId::entity_type, Junction>;
-    using MachToNode_t = lgrn::IntArrayMultiMap<MachAnyId::entity_type, NodeId>;
+    using NodeToMach_t = lgrn::IntArrayMultiMap<NodeId::int_t, Junction>;
+    using MachToNode_t = lgrn::IntArrayMultiMap<MachAnyId::int_t, NodeId>;
 
     lgrn::IdRegistryStl<NodeId>     nodeIds;
 
@@ -138,13 +145,16 @@ struct NodeType
 
 struct Links
 {
+    Links() = default;
+    OSP_MOVE_ONLY_CTOR_ASSIGN(Links);
+
     lgrn::IdRegistryStl<MachAnyId>          machIds;
 
     osp::KeyedVec<MachAnyId, MachTypeId>    machTypeOf;
     osp::KeyedVec<MachAnyId, MachLocalId>   machlocalidOf;
 
     osp::KeyedVec<MachTypeId, MachType>     machtype;
-    osp::KeyedVec<NodeTypeId, NodeType>     nodetype;
+    osp::KeyedVec< NodeTypeId, std::unique_ptr<NodeType> >     nodetype;
 };
 
 /**
@@ -182,26 +192,6 @@ struct RequestConnect
     NodeTypeId nodeType;
 };
 
-// what is the first thing we should make?
-// each part should just be a machine?
-// make a machine for 'part'
-// 'named part' system that acts like template.
-// u spawn a part, then update the craft for it to generate wire connections and stuff
-// change a part on the fly.
-// make a machine called 'part'
-// make a node data type
-
-// when iterating parts,
-
-// 1. make part registry system so we know what part things are lol
-//   *
-// 2. make a 'part' machine type
-
-// extendable
-// add part, it's a machine
-//
-
-// outputs: model and link
 
 struct PartType
 {

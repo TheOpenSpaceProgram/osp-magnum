@@ -615,6 +615,8 @@ static void assign_weld_rockets(
     }
 }
 
+#if 0
+
 struct RocketThrustUserData
 {
     ACtxRocketsJolt       const &rRocketsJolt;
@@ -727,6 +729,9 @@ FeatureDef const ftrRocketThrustJolt = feature_def("RocketThrustJolt", [] (
     rRocketsJolt.factorIndex = static_cast<std::uint8_t>(index);
 }); // ftrRocketThrustJolt
 
+#endif
+
+
 struct ACtxTerrainJolt
 {
     BodyId bodyId;
@@ -737,6 +742,7 @@ struct ACtxTerrainJolt
     // useful for when translating everything for MutableCompountShape::ModifyShapes
     std::vector<JPH::Vec3> positions;
 };
+
 
 FeatureDef const ftrTerrainJolt = feature_def("ftrTerrainJolt", [] (
         FeatureBuilder              &rFB,

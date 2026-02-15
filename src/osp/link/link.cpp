@@ -64,13 +64,13 @@ void copy_nodes(
         auto dstJuncIt = std::begin(dstJuncton);
         for (Junction const& srcJunc : srcJunction)
         {
-            MachTypeId const machType = srcJunc.type;
-            MachAnyId const srcMach = rSrcMach.machtype[machType].machanyIdOf[srcJunc.local];
+            MachTypeId const machType = MachTypeId{srcJunc.type};
+            MachAnyId const srcMach = rSrcMach.machtype[machType].machanyIdOf[MachLocalId{srcJunc.local}];
             MachAnyId const dstMach = remapMach[srcMach.value];
             MachLocalId const dstLocal = rDstMach.machlocalidOf[dstMach];
 
-            dstJuncIt->local  = dstLocal;
-            dstJuncIt->type   = machType;
+            dstJuncIt->local  = dstLocal.value;
+            dstJuncIt->type   = machType.value;
             dstJuncIt->custom = srcJunc.custom;
 
             std::advance(dstJuncIt, 1);

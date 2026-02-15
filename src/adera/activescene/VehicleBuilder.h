@@ -24,6 +24,8 @@
  */
 #pragma once
 
+#include <osp/framework/framework.h>
+
 #include <osp/activescene/vehicles.h>
 #include <osp/vehicles/prefabs.h>
 #include <osp/link/link.h>
@@ -44,6 +46,53 @@
 
 namespace adera
 {
+
+struct VehicleBuilderImpl;
+
+class VehicleBuilder
+{
+public:
+
+    VehicleBuilder(osp::fw::Framework fw, osp::fw::ContextId ctx);
+    ~VehicleBuilder();
+
+    struct Connection
+    {
+        osp::link::PortEntry m_port;
+        osp::link::NodeId m_node;
+    };
+
+    template <std::size_t N>
+    [[nodiscard]] std::array<osp::link::NodeId, N> create_nodes(osp::link::NodeTypeId nodeType);
+
+    osp::link::MachAnyId create_machine(osp::link::MachTypeId machType, std::initializer_list<Connection> const& connections);
+
+    void connect(osp::link::MachAnyId mach, std::initializer_list<Connection> const& connections);
+
+    void update();
+
+    osp::link::Links& links();
+
+private:
+
+    std::unique_ptr<VehicleBuilderImpl> m_impl;
+};
+
+
+template <std::size_t N>
+std::array<osp::link::NodeId, N> VehicleBuilder::create_nodes(osp::link::NodeTypeId const nodeType)
+{
+    std::array<osp::link::NodeId, N> out;
+
+    osp::link::NodeType &rNodeType = *links().nodetype[nodeType];
+
+    rNodeType.nodeIds.create(std::begin(out), std::end(out));
+    std::size_t const capacity = rNodeType.nodeIds.capacity();
+    rNodeType.nodeToMach.ids_reserve(rNodeType.nodeIds.capacity());
+
+    return out;
+}
+
 
 #if 0
 

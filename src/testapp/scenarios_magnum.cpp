@@ -148,8 +148,8 @@ ContextId make_scene_renderer(Framework &rFW, PkgId defaultPkg, ContextId mainCo
 
     if (rFW.get_interface_id<FIVehicleSpawn>(sceneCtx).has_value())
     {
-        scnRdrCB.add_feature(ftrVehicleSpawnDraw);
-        scnRdrCB.add_feature(ftrVehicleControl);
+//        scnRdrCB.add_feature(ftrVehicleSpawnDraw);
+//        scnRdrCB.add_feature(ftrVehicleControl);
     }
     else
     {
@@ -158,7 +158,7 @@ ContextId make_scene_renderer(Framework &rFW, PkgId defaultPkg, ContextId mainCo
 
     if (rFW.get_interface_id<FIRocketsJolt>(sceneCtx).has_value())
     {
-        scnRdrCB.add_feature(ftrMagicRocketThrustIndicator, TplPkgIdMaterialId{ defaultPkg, matFlat });
+//        scnRdrCB.add_feature(ftrMagicRocketThrustIndicator, TplPkgIdMaterialId{ defaultPkg, matFlat });
     }
 
     if ( ! scnRdrCB.has_error() && rFW.get_interface_id<FITerrain>(sceneCtx).has_value() )

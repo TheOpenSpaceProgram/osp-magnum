@@ -52,6 +52,13 @@ using namespace Magnum::Math::Literals;
 namespace adera
 {
 
+FeatureDef const ftrLinks = feature_def("Links", [] (
+        FeatureBuilder              &rFB,
+        Implement<FILinks>          links,
+        DependOn<FICleanupContext>  cleanup)
+{
+    auto &rLinks    = rFB.data_emplace< Links >          (links.di.links);
+});
 
 FeatureDef const ftrParts = feature_def("Parts", [] (
         FeatureBuilder              &rFB,
@@ -173,6 +180,8 @@ FeatureDef const ftrVehicleSpawn = feature_def("VehicleSpawn", [] (
     });
 }); // ftrVehicleSpawn
 
+
+#if 0
 
 FeatureDef const ftrVehicleSpawnVBData = feature_def("VehicleSpawnVBData", [] (
         FeatureBuilder              &rFB,
@@ -568,6 +577,8 @@ FeatureDef const ftrSignalsFloat = feature_def("SignalsFloat", [] (
         }
     });
 }); // ftrSignalsFloat
+
+#endif
 
 
 } // namespace adera

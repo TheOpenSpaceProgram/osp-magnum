@@ -24,12 +24,34 @@
  */
 #include "VehicleBuilder.h"
 
+#include <adera_app/feature_interfaces.h>
+
+#include <osp/executor/singlethread_framework.h>
+#include <osp/framework/builder.h>
+
 #include <osp/core/Resources.h>
 #include <osp/util/logging.h>
 #include <osp/vehicles/ImporterData.h>
 
+using namespace osp::fw;
+
 namespace adera
 {
+
+struct VehicleBuilderImpl
+{
+    ContextId main;
+    Framework fw;
+    osp::exec::SinglethreadFWExecutor exec;
+};
+
+
+VehicleBuilder::VehicleBuilder(Framework fw, ContextId ctx)
+    : m_impl{std::make_unique<VehicleBuilderImpl>(ctx, std::move(fw), osp::exec::SinglethreadFWExecutor{})}
+{ }
+
+VehicleBuilder::~VehicleBuilder() = default;
+
 
 #if 0
 

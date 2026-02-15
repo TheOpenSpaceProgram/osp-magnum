@@ -40,11 +40,11 @@ namespace adera
 using PrebuiltVhId          = osp::StrongId<uint32_t, struct DummyForPBV>;
 using PrebuiltVhIdReg_t     = osp::GlobalIdReg<PrebuiltVhId>;
 
-struct PrebuiltVehicles : osp::KeyedVec< PrebuiltVhId, std::unique_ptr<adera::VehicleData> >
-{
-    PrebuiltVehicles() = default;
-    OSP_MOVE_ONLY_CTOR_ASSIGN(PrebuiltVehicles);
-};
+// struct PrebuiltVehicles : osp::KeyedVec< PrebuiltVhId, std::unique_ptr<adera::VehicleData> >
+// {
+//     PrebuiltVehicles() = default;
+//     OSP_MOVE_ONLY_CTOR_ASSIGN(PrebuiltVehicles);
+// };
 
 inline PrebuiltVhId const gc_pbvSimpleCommandServiceModule  = PrebuiltVhIdReg_t::create();
 inline PrebuiltVhId const gc_pbvSolvalot1                   = PrebuiltVhIdReg_t::create();
