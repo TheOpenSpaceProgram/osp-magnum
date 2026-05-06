@@ -26,8 +26,6 @@
 
 #include <osp/framework/builder.h>
 
-#include <adera/activescene/VehicleBuilder.h>
-
 #include <osp/core/copymove_macros.h>
 #include <osp/core/global_id.h>
 #include <osp/core/strong_id.h>
@@ -40,10 +38,9 @@ namespace adera
 using PrebuiltVhId          = osp::StrongId<uint32_t, struct DummyForPBV>;
 using PrebuiltVhIdReg_t     = osp::GlobalIdReg<PrebuiltVhId>;
 
-struct PrebuiltVehicles : osp::KeyedVec< PrebuiltVhId, std::unique_ptr<adera::VehicleData> >
+struct PrebuiltVehicles
 {
-    PrebuiltVehicles() = default;
-    OSP_MOVE_ONLY_CTOR_ASSIGN(PrebuiltVehicles);
+
 };
 
 inline PrebuiltVhId const gc_pbvSimpleCommandServiceModule = PrebuiltVhIdReg_t::create();

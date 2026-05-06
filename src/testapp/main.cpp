@@ -48,8 +48,6 @@
 #include <osp/framework/builder.h>
 #include <osp/framework/builder.h>
 #include <osp/util/logging.h>
-#include <osp/vehicles/ImporterData.h>
-#include <osp/vehicles/load_tinygltf.h>
 
 #include <spdlog/fmt/ostr.h>
 #include <spdlog/sinks/stdout_color_sinks.h>
@@ -404,9 +402,6 @@ void load_a_bunch_of_stuff()
     rResources.data_register<Trade::TextureData>    (gc_texture);
     rResources.data_register<osp::TextureImgSource> (gc_texture);
     rResources.data_register<Trade::MeshData>       (gc_mesh);
-    rResources.data_register<osp::ImporterData>     (gc_importer);
-    rResources.data_register<osp::Prefabs>          (gc_importer);
-    osp::register_tinygltf_resources(rResources);
 
     // Load sturdy glTF files
     const std::string_view datapath = { "OSPData/adera/" };
@@ -426,8 +421,8 @@ void load_a_bunch_of_stuff()
     //       images, textures, and other relevant data into osp::Resources
     for (auto const& meshName : meshes)
     {
-        osp::ResId res = osp::load_tinygltf_file(osp::string_concat(datapath, meshName), rResources, g_defaultPkg);
-        osp::assigns_prefabs_tinygltf(rResources, res);
+        //osp::ResId res = osp::load_tinygltf_file(osp::string_concat(datapath, meshName), rResources, g_defaultPkg);
+        //osp::assigns_prefabs_tinygltf(rResources, res);
     }
 
     // Add a default primitives

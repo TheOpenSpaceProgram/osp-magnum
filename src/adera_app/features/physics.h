@@ -37,11 +37,5 @@ namespace adera
  */
 extern osp::fw::FeatureDef const ftrPhysics;
 
-/**
- * @brief Queues and logic for spawning Prefab resources
- */
-extern osp::fw::FeatureDef const ftrPrefabs;
-
-extern osp::fw::FeatureDef const ftrPrefabDraw;
 
 } // namespace adera

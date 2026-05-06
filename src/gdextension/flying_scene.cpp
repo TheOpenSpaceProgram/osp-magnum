@@ -34,7 +34,6 @@
 #include <adera_app/features/terrain.h>
 #include <adera_app/features/universe.h>
 #include <adera_app/features/vehicles.h>
-#include <adera_app/features/vehicles_machines.h>
 
 #include <osp/core/Resources.h>
 #include <osp/core/string_concat.h>
@@ -42,8 +41,6 @@
 #include <osp/framework/builder.h>
 #include <osp/util/UserInputHandler.h>
 #include <osp/util/logging.h>
-#include <osp/vehicles/ImporterData.h>
-#include <osp/vehicles/load_tinygltf.h>
 
 #include <Corrade/Utility/Debug.h>
 #include <Magnum/MeshTools/Transform.h>
@@ -259,25 +256,6 @@ void FlyingScene::clear_resource_owners() {
     }
   };
 
-  // Importer data own a lot of other resources
-  for (osp::ResId const id : rResources.ids(gc_importer)) {
-    auto *const pData =
-        rResources.data_try_get<osp::ImporterData>(gc_importer, id);
-    if (pData != nullptr) {
-      for (osp::ResIdOwner_t &rOwner : std::move(pData->m_images)) {
-        rResources.owner_destroy(gc_image, std::move(rOwner));
-      }
-
-      for (osp::ResIdOwner_t &rOwner : std::move(pData->m_textures)) {
-        rResources.owner_destroy(gc_texture, std::move(rOwner));
-      }
-
-      for (osp::ResIdOwner_t &rOwner : std::move(pData->m_meshes)) {
-        rResources.owner_destroy(gc_mesh, std::move(rOwner));
-      }
-    }
-  };
-
   godot::RenderingServer *rs = godot::RenderingServer::get_singleton();
   rs->free_rid(m_lightInstance);
   rs->free_rid(m_light);
@@ -300,9 +278,6 @@ void FlyingScene::load_a_bunch_of_stuff() {
   rResources.data_register<Trade::TextureData>(gc_texture);
   rResources.data_register<osp::TextureImgSource>(gc_texture);
   rResources.data_register<Trade::MeshData>(gc_mesh);
-  rResources.data_register<osp::ImporterData>(gc_importer);
-  rResources.data_register<osp::Prefabs>(gc_importer);
-  osp::register_tinygltf_resources(rResources);
   // Load sturdy glTF files
   // FIXME this works in editor, but probably not for exported game.
   const std::string_view datapath = {"OSPData/adera/"};
@@ -315,13 +290,13 @@ void FlyingScene::load_a_bunch_of_stuff() {
   };
   // TODO: Make new gltf loader. This will read gltf files and dump meshes,
   //       images, textures, and other relevant data into osp::Resources
-  for (auto const &meshName : meshes) {
-    auto str = osp::string_concat(datapath, meshName);
-    osp::ResId res = osp::load_tinygltf_file(str, rResources, m_defaultPkg);
-    if (res != lgrn::id_null<ResId>()) {
-      osp::assigns_prefabs_tinygltf(rResources, res);
-    }
-  }
+//  for (auto const &meshName : meshes) {
+//    auto str = osp::string_concat(datapath, meshName);
+//    osp::ResId res = osp::load_tinygltf_file(str, rResources, m_defaultPkg);
+//    if (res != lgrn::id_null<ResId>()) {
+//      osp::assigns_prefabs_tinygltf(rResources, res);
+//    }
+//  }
 
   // Add a default primitives
   auto const add_mesh_quick = [&rResources = rResources,
@@ -382,19 +357,9 @@ ContextId make_scene_renderer(Framework &rFW, ContextId mainCtx,
         scnRdrCB.add_feature(ftrPhysicsShapesDraw, matFlat);
         scnRdrCB.add_feature(ftrCursor, TplPkgIdMaterialId{defaultPkg, matFlat});
 
-        if (rFW.get_interface_id<FIPrefabs>(sceneCtx).has_value()) {
-            scnRdrCB.add_feature(ftrPrefabDraw, matFlat);
-        }
-
-        if (rFW.get_interface_id<FIVehicleSpawn>(sceneCtx).has_value()) {
-            scnRdrCB.add_feature(ftrVehicleControl);
-            scnRdrCB.add_feature(ftrVehicleSpawnDraw);
-        } else {
-            scnRdrCB.add_feature(ftrCameraFree);
-        }
 
         if (rFW.get_interface_id<FIRocketsJolt>(sceneCtx).has_value()) {
-            scnRdrCB.add_feature(ftrMagicRocketThrustIndicator, TplPkgIdMaterialId{defaultPkg, matFlat});
+            //scnRdrCB.add_feature(ftrMagicRocketThrustIndicator, TplPkgIdMaterialId{defaultPkg, matFlat});
         }
 
         auto &rScnRenderGd = rFW.data_get<draw::ACtxSceneRenderGd>(gdScn.di.scnRenderGd);

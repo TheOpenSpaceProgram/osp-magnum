@@ -29,13 +29,8 @@
 
 #include <osp/activescene/basic_fn.h>
 #include <osp/activescene/physics_fn.h>
-#include <osp/activescene/prefab_fn.h>
-#include <osp/activescene/vehicles.h>
 #include <osp/core/Resources.h>
 #include <osp/drawing/drawing.h>
-#include <osp/vehicles/ImporterData.h>
-
-#include <adera/machines/links.h>
 
 #include <planet-a/activescene/terrain.h>
 
@@ -48,7 +43,6 @@ using namespace ftr_inter::stages;
 using namespace ftr_inter;
 using namespace osp::active;
 using namespace osp::fw;
-using namespace osp::link;
 using namespace osp;
 using namespace ospjolt;
 
@@ -56,7 +50,6 @@ using namespace ospjolt;
 using ospjolt::ACtxJoltWorld;
 
 using Corrade::Containers::arrayView;
-using osp::restypes::gc_importer;
 
 namespace adera
 {
@@ -287,341 +280,14 @@ void compound_collect_recurse(
 } // void compound_collect_recurse
 
 
-FeatureDef const ftrVehicleSpawnJolt = feature_def("VehicleSpawnJolt", [] (
-        FeatureBuilder              &rFB,
-        Implement<FIVhclSpawnJolt>  vhclSpawnJolt,
-        DependOn<FIMainApp>         mainApp,
-        DependOn<FICommonScene>     comScn,
-        DependOn<FIPhysics>         phys,
-        DependOn<FIPhysShapes>      physShapes,
-        DependOn<FIPrefabs>         prefabs,
-        DependOn<FIParts>           parts,
-        DependOn<FIJolt>            jolt,
-        DependOn<FIVehicleSpawn>    vhclSpawn)
-{
-    rFB.data_emplace<ForceFactors_t>(vhclSpawnJolt.di.factors);
-
-    rFB.task()
-        .name       ("Create root ActiveEnts for each Weld")
-        .sync_with  ({vhclSpawn.pl.spawnRequest(UseOrRun), comScn.pl.activeEnt(New), parts.pl.mapWeldActive(New), vhclSpawn.pl.rootEnts(Resize)})
-        .args       ({      comScn.di.basic,                  vhclSpawn.di.vehicleSpawn,           parts.di.scnParts})
-        .func       ([] (ACtxBasic& rBasic, ACtxVehicleSpawn& rVehicleSpawn, ACtxParts& rScnParts) noexcept
-    {
-        LGRN_ASSERT(rVehicleSpawn.new_vehicle_count() != 0);
-
-        rVehicleSpawn.rootEnts.resize(rVehicleSpawn.spawnedWelds.size());
-        rBasic.m_activeIds.create(rVehicleSpawn.rootEnts.begin(), rVehicleSpawn.rootEnts.end());
-
-        // update WeldId->ActiveEnt mapping
-        auto itWeldEnt = rVehicleSpawn.rootEnts.begin();
-        for (WeldId const weld : rVehicleSpawn.spawnedWelds)
-        {
-            rScnParts.weldToActive[weld] = *itWeldEnt;
-            ++itWeldEnt;
-        }
-    });
-
-
-    rFB.task()
-        .name       ("Add vehicle entities to Scene Graph")
-        .sync_with  ({vhclSpawn.pl.spawnRequest(UseOrRun), vhclSpawn.pl.rootEnts(UseOrRun),
-                      parts.pl.mapWeldActive(Ready),
-                      prefabs.pl.spawnedEnts(UseOrRun), prefabs.pl.spawnRequest(UseOrRun), prefabs.pl.inSubtree(Run),
-                      comScn.pl.transform(New), comScn.pl.hierarchy(New)})
-        .args       ({      comScn.di.basic,                        vhclSpawn.di.vehicleSpawn,           parts.di.scnParts,             prefabs.di.prefabs,            mainApp.di.resources})
-        .func       ([] (ACtxBasic& rBasic, ACtxVehicleSpawn const& rVehicleSpawn, ACtxParts& rScnParts, ACtxPrefabs& rPrefabs, Resources& rResources) noexcept
-    {
-        LGRN_ASSERT(rVehicleSpawn.new_vehicle_count() != 0);
-
-        // ActiveEnts created for welds + ActiveEnts created for vehicle prefabs
-        std::size_t const totalEnts = rVehicleSpawn.rootEnts.size() + rPrefabs.newEnts.size();
-
-        auto const& itWeldsFirst        = rVehicleSpawn.spawnedWelds.begin();
-        auto const& itWeldOffsetsLast   = rVehicleSpawn.spawnedWeldOffsets.end();
-        auto itWeldOffsets              = rVehicleSpawn.spawnedWeldOffsets.begin();
-
-        rBasic.m_scnGraph.resize(rBasic.m_activeIds.capacity());
-
-        for (ACtxVehicleSpawn::TmpToInit const& toInit : rVehicleSpawn.spawnRequest)
-        {
-            auto const itWeldOffsetsNext = std::next(itWeldOffsets);
-            SpWeldId const weldOffsetNext = (itWeldOffsetsNext != itWeldOffsetsLast)
-                                          ? (*itWeldOffsetsNext)
-                                          : SpWeldId(uint32_t(rVehicleSpawn.spawnedWelds.size()));
-
-            std::for_each(itWeldsFirst + std::ptrdiff_t{*itWeldOffsets},
-                          itWeldsFirst + std::ptrdiff_t{weldOffsetNext},
-                          [&rBasic, &rScnParts, &rVehicleSpawn, &rPrefabs, &rResources, &toInit] (WeldId const weld)
-            {
-                // Count parts in this weld first
-                std::size_t entCount = 0;
-                for (PartId const part : rScnParts.weldToParts[weld])
-                {
-                    SpPartId const newPart = rVehicleSpawn.partToSpawned[part];
-                    uint32_t const prefabInit = rVehicleSpawn.spawnedPrefabs[newPart];
-                    entCount += rPrefabs.spawnedEntsOffset[prefabInit].size();
-                }
-
-                ActiveEnt const weldEnt = rScnParts.weldToActive[weld];
-
-                rBasic.m_transform.emplace(weldEnt, Matrix4::from(toInit.rotation.toMatrix(), toInit.position));
-
-                SubtreeBuilder bldRoot = SysSceneGraph::add_descendants(rBasic.m_scnGraph, entCount + 1);
-                SubtreeBuilder bldWeld = bldRoot.add_child(weldEnt, entCount);
-
-                for (PartId const part : rScnParts.weldToParts[weld])
-                {
-                    SpPartId const newPart      = rVehicleSpawn.partToSpawned[part];
-                    uint32_t const prefabInit   = rVehicleSpawn.spawnedPrefabs[newPart];
-                    auto const& basic           = rPrefabs.spawnRequest[prefabInit];
-                    auto const& ents            = rPrefabs.spawnedEntsOffset[prefabInit];
-
-                    SysPrefabInit::add_to_subtree(basic, ents, rResources, bldWeld);
-                }
-            });
-
-            itWeldOffsets = itWeldOffsetsNext;
-        }
-    });
-
-
-    rFB.task()
-        .name       ("Add Jolt physics to Weld entities")
-        .sync_with  ({vhclSpawn.pl.spawnRequest(UseOrRun), vhclSpawn.pl.rootEnts(UseOrRun), prefabs.pl.spawnedEnts(UseOrRun), comScn.pl.transform(Ready), phys.pl.mass(Ready), jolt.pl.joltBody(New), comScn.pl.hierarchy(Ready)})
-        .args       ({     comScn.di.basic,       phys.di.phys,         jolt.di.jolt,             vhclSpawn.di.vehicleSpawn,          parts.di.scnParts,     vhclSpawnJolt.di.factors})
-        .func       ([] (ACtxBasic const& rBasic, ACtxPhysics& rPhys, ACtxJoltWorld& rJolt, ACtxVehicleSpawn const& rVehicleSpawn, ACtxParts const& rScnParts, ForceFactors_t const factors) noexcept
-    {
-        LGRN_ASSERT(rVehicleSpawn.new_vehicle_count() != 0);
-
-        rPhys.m_hasColliders.resize(rBasic.m_activeIds.capacity());
-
-        auto const& itWeldsFirst        = std::begin(rVehicleSpawn.spawnedWelds);
-        auto const& itWeldOffsetsLast   = std::end(rVehicleSpawn.spawnedWeldOffsets);
-        auto itWeldOffsets              = std::begin(rVehicleSpawn.spawnedWeldOffsets);
-
-        JPH::BodyInterface &bodyInterface = rJolt.m_physicsSystem.GetBodyInterface();
-
-        std::vector<JPH::BodyID> addedBodies;
-
-        for (ACtxVehicleSpawn::TmpToInit const& toInit : rVehicleSpawn.spawnRequest)
-        {
-            auto const itWeldOffsetsNext = std::next(itWeldOffsets);
-            SpWeldId const weldOffsetNext = (itWeldOffsetsNext != itWeldOffsetsLast)
-                                           ? (*itWeldOffsetsNext)
-                                           : SpWeldId(uint32_t(rVehicleSpawn.spawnedWelds.size()));
-
-            std::for_each(itWeldsFirst + std::ptrdiff_t{*itWeldOffsets},
-                          itWeldsFirst + std::ptrdiff_t{weldOffsetNext},
-                          [&rBasic, &rScnParts, &rVehicleSpawn, &toInit, &rPhys, &rJolt, &addedBodies, factors] (WeldId const weld)
-            {
-                ActiveEnt const weldEnt = rScnParts.weldToActive[weld];
-
-                JPH::MutableCompoundShapeSettings compound;
-
-                rPhys.m_hasColliders.insert(weldEnt);
-
-                // Collect all colliders from hierarchy.
-                compound_collect_recurse( rPhys, rJolt, rBasic, weldEnt, Matrix4{}, compound );
-
-                JPH::Ref<JPH::Shape> compoundShape = compound.Create().Get();
-                JPH::BodyCreationSettings bodyCreation(compoundShape, JPH::Vec3Arg::sZero(), JPH::Quat::sZero(), JPH::EMotionType::Dynamic, Layers::MOVING);
-                bodyCreation.mMaxLinearVelocity = 65536.0f;
-
-                BodyId const bodyId = rJolt.m_bodyIds.create();
-
-                rJolt.m_bodyUseOriginTranslate.resize(rJolt.m_bodyIds.capacity());
-                rJolt.m_bodyUseOriginTranslate.emplace(bodyId);
-
-                rJolt.m_bodyToEnt[bodyId] = weldEnt;
-                rJolt.m_bodyFactors[bodyId] = factors;
-                rJolt.m_entToBody.emplace(weldEnt, bodyId);
-
-                float   totalMass = 0.0f;
-                Vector3 massPos{0.0f};
-                SysPhysics::calculate_subtree_mass_center(rBasic.m_transform, rPhys, rBasic.m_scnGraph, weldEnt, massPos, totalMass);
-
-                Vector3 const com = massPos / totalMass;
-                auto const comToOrigin = Matrix4::translation( - com );
-
-                Matrix3 inertiaTensor{0.0f};
-                SysPhysics::calculate_subtree_mass_inertia(rBasic.m_transform, rPhys, rBasic.m_scnGraph, weldEnt, inertiaTensor, comToOrigin);
-
-                Matrix4 const inertiaTensorMat4{inertiaTensor};
-
-                JPH::MassProperties massProp;
-                massProp.mMass = totalMass;
-                massProp.mInertia = JPH::Mat44::sLoadFloat4x4((JPH::Float4*) inertiaTensorMat4.data());
-
-                bodyCreation.mMassPropertiesOverride = massProp;
-                bodyCreation.mOverrideMassProperties = JPH::EOverrideMassProperties::MassAndInertiaProvided;
-
-                bodyCreation.mLinearDamping = 0.0f;
-
-                // TODO: temporary, suppose to be zero. This makes it easier to steer
-                bodyCreation.mAngularDamping = 0.8f;
-
-                bodyCreation.mPosition = Vec3MagnumToJolt(toInit.position);
-
-                auto rawQuat = toInit.rotation.data();
-                JPH::Quat joltRotation(rawQuat[0], rawQuat[1], rawQuat[2], rawQuat[3]);
-    
-                bodyCreation.mRotation = joltRotation;
-
-                JPH::BodyInterface &bodyInterface = rJolt.m_physicsSystem.GetBodyInterface();
-                JPH::BodyID joltBodyId = BToJolt(bodyId);
-                bodyInterface.CreateBodyWithID(joltBodyId, bodyCreation);
-                addedBodies.push_back(joltBodyId);
-                rPhys.m_setVelocity.emplace_back(weldEnt, toInit.velocity);
-            });
-
-            itWeldOffsets = itWeldOffsetsNext;
-        }
-        //Bodies are added all at once for performance reasons.
-        int numBodies = static_cast<int>(addedBodies.size());
-        JPH::BodyInterface::AddState addState = bodyInterface.AddBodiesPrepare(addedBodies.data(), numBodies);
-        bodyInterface.AddBodiesFinalize(addedBodies.data(), numBodies, addState, JPH::EActivation::Activate);
-    });
-}); // ftrVehicleSpawnJolt
-
-
-void set_vehicle_default_factors(
-        ForceFactors_t              factors,
-        osp::fw::Framework          &rFW,
-        osp::fw::ContextId          sceneCtx)
-{
-    rFW.data_get<ospjolt::ForceFactors_t&>(
-    rFW.get_interface<FIVhclSpawnJolt>(sceneCtx).di.factors) = factors;
-}
-
-struct BodyRocket
-{
-    Quaternion      m_rotation;
-    Vector3         m_offset;
-
-    MachLocalId     m_local         {lgrn::id_null<MachLocalId>()};
-    NodeId          m_throttleIn    {lgrn::id_null<NodeId>()};
-    NodeId          m_multiplierIn  {lgrn::id_null<NodeId>()};
-};
-
 struct ACtxRocketsJolt
 {
     // map each bodyId to a {machine, offset}
     //TODO: make an IdMultiMap or something.
-    lgrn::IntArrayMultiMap<BodyId::entity_type, BodyRocket> m_bodyRockets;
     std::uint8_t factorIndex;
 };
 
-/**
- * @brief Search for Rockets in a newly added vehicle rigid body (a Weld), calculate offset and
- *        rotation, then assign the right force factors to them.
- */
-static void assign_weld_rockets(
-        WeldId                   const weld,
-        ACtxBasic                const &rBasic,
-        ACtxParts                const &rScnParts,
-        ACtxJoltWorld                  &rJolt,
-        ACtxRocketsJolt                &rRocketsJolt,
-        Nodes                    const &rFloatNodes,
-        PerMachType              const &machtypeRocket,
-        std::vector<BodyRocket>        &rRocketsFoundTemp)
-{
-    using adera::gc_mtMagicRocket;
-    using adera::ports_magicrocket::gc_throttleIn;
-    using adera::ports_magicrocket::gc_multiplierIn;
-
-    rRocketsFoundTemp.clear();
-
-    ActiveEnt const weldEnt = rScnParts.weldToActive[weld];
-    BodyId const body    = rJolt.m_entToBody.at(weldEnt);
-
-    if (rRocketsJolt.m_bodyRockets.contains(body.value))
-    {
-        rRocketsJolt.m_bodyRockets.erase(body.value);
-    }
-
-    // Each weld consists of multiple parts, iterate them all. Note that each part has their own
-    // individual transforms, so math is needed to calculate stuff with thrust direction and
-    // center-of-mass.
-    for (PartId const part : rScnParts.weldToParts[weld])
-    {
-        auto const sizeBefore = rRocketsFoundTemp.size();
-
-        // Each part contains Machines, some of which may be rockets.
-        for (MachinePair const pair : rScnParts.partToMachines[part])
-        {
-            if (pair.type != gc_mtMagicRocket)
-            {
-                continue; // This machine is not a rocket
-            }
-
-            MachAnyId const  mach         = machtypeRocket.localToAny[pair.local];
-            auto      const& portSpan     = rFloatNodes.machToNode[mach];
-            NodeId    const  throttleIn   = connected_node(portSpan, gc_throttleIn.port);
-            NodeId    const  multiplierIn = connected_node(portSpan, gc_multiplierIn.port);
-
-            if (   (throttleIn   == lgrn::id_null<NodeId>())
-                || (multiplierIn == lgrn::id_null<NodeId>()) )
-            {
-                continue; // Throttle and/or multiplier is not connected
-            }
-
-            BodyRocket &rBodyRocket     = rRocketsFoundTemp.emplace_back();
-            rBodyRocket.m_local         = pair.local;
-            rBodyRocket.m_throttleIn    = throttleIn;
-            rBodyRocket.m_multiplierIn  = multiplierIn;
-        }
-
-        auto const rocketsFoundForPart = arrayView(rRocketsFoundTemp).exceptPrefix(sizeBefore);
-
-        if (rocketsFoundForPart.isEmpty())
-        {
-            continue; // No rockets found on this part
-        }
-
-        // calculate transform relative to body root
-        // start from part, then walk parents up
-        ActiveEnt const partEnt = rScnParts.partToActive[part];
-
-        Matrix4     transform   = rBasic.m_transform.get(partEnt).m_transform;
-        ActiveEnt   parent      = rBasic.m_scnGraph.m_entParent[partEnt];
-
-        while (parent != weldEnt)
-        {
-            Matrix4 const& parentTransform = rBasic.m_transform.get(parent).m_transform;
-            transform = parentTransform * transform;
-            parent = rBasic.m_scnGraph.m_entParent[parent];
-        }
-
-        auto const      rotation    = Quaternion::fromMatrix(transform.rotation());
-        Vector3 const   offset      = transform.translation();
-
-        for (BodyRocket &rBodyRocket : rocketsFoundForPart)
-        {
-            rBodyRocket.m_rotation  = rotation;
-            rBodyRocket.m_offset    = offset;
-        }
-    }
-
-    ForceFactors_t &rBodyFactors = rJolt.m_bodyFactors[body];
-
-    if ( rRocketsFoundTemp.empty() )
-    {
-        rBodyFactors.reset(rRocketsJolt.factorIndex);
-    }
-    else
-    {
-        rBodyFactors.set(rRocketsJolt.factorIndex);
-        rRocketsJolt.m_bodyRockets.emplace(body.value, rRocketsFoundTemp.begin(), rRocketsFoundTemp.end());
-    }
-}
-
-struct RocketThrustUserData
-{
-    ACtxRocketsJolt       const &rRocketsJolt;
-    Machines              const &rMachines;
-    SignalValues_t<float> const &rSigValFloat;
-};
-
+/*
 // ACtxjoltWorld::ForceFactorFunc::Func_t
 static void rocket_thrust_force(BodyId const bodyId, ACtxJoltWorld const& rJolt, entt::any userData, Vector3& rForce, Vector3& rTorque) noexcept
 {
@@ -669,6 +335,7 @@ static void rocket_thrust_force(BodyId const bodyId, ACtxJoltWorld const& rJolt,
     }
 }
 
+
 FeatureDef const ftrRocketThrustJolt = feature_def("RocketThrustJolt", [] (
         FeatureBuilder              &rFB,
         Implement<FIRocketsJolt>    rktJolt,
@@ -685,6 +352,7 @@ FeatureDef const ftrRocketThrustJolt = feature_def("RocketThrustJolt", [] (
         DependOn<FIVehicleSpawn>    vhclSpawn)
 {
     auto &rRocketsJolt = rFB.data_emplace< ACtxRocketsJolt >(rktJolt.di.rocketsJolt);
+
 
     rFB.task()
         .name       ("Assign rockets to Jolt bodies")
@@ -725,7 +393,9 @@ FeatureDef const ftrRocketThrustJolt = feature_def("RocketThrustJolt", [] (
     rJolt.m_factors.emplace_back(factor);
 
     rRocketsJolt.factorIndex = static_cast<std::uint8_t>(index);
+
 }); // ftrRocketThrustJolt
+*/
 
 struct ACtxTerrainJolt
 {

@@ -160,40 +160,6 @@ inline osp::PipelineTypeInfo const gc_infoForEStgFBO
 };
 
 
-enum class EStgLink
-{
-    ScheduleLink,
-    NodeUpd,
-    MachUpd
-};
-inline osp::PipelineTypeInfo const gc_infoForEStgLink
-{
-    .debugName = "osp::link Nested update loop",
-    .stages = {{
-        { .name = "ScheduleLink", .isSchedule = true},
-        { .name = "NodeUpd",      .useCancel = true },
-        { .name = "MachUpd",      .useCancel = true }
-    }},
-    .initialStage = osp::StageId{0}
-};
-
-enum class EStgLinkValue : uint8_t
-{
-    ExternalIn      = 0,
-    LoopRunning     = 1,
-    LoopDone        = 2
-};
-inline osp::PipelineTypeInfo const gc_infoForEStgLinkValue
-{
-    .debugName = "EStgLinkValue",
-    .stages = {{
-        { .name = "ExternalIn",                     },
-        { .name = "LoopRunning",                    },
-        { .name = "LoopDone",                       }
-    }},
-    .initialStage = osp::StageId{0 /* ExternalIn */}
-};
-
 namespace stages
 {
     using enum EStgOptn;
@@ -201,8 +167,6 @@ namespace stages
     using enum EStgIntr;
     using enum EStgEvnt;
     using enum EStgFBO;
-    using enum EStgLink;
-    using enum EStgLinkValue;
 } // namespace stages
 
 inline void register_stage_enums()
@@ -213,8 +177,6 @@ inline void register_stage_enums()
     rPltypeReg.assign_pltype_info<EStgIntr>(gc_infoForEStgIntr);
     rPltypeReg.assign_pltype_info<EStgCont>(gc_infoForEStgCont);
     rPltypeReg.assign_pltype_info<EStgFBO> (gc_infoForEStgFBO);
-    rPltypeReg.assign_pltype_info<EStgLink>(gc_infoForEStgLink);
-    rPltypeReg.assign_pltype_info<EStgLinkValue>(gc_infoForEStgLinkValue);
 }
 
 
@@ -383,32 +345,6 @@ struct FIDroppers {
 };
 
 
-struct FIPrefabs {
-    struct DataIds {
-        DataId prefabs;
-    };
-
-    struct Pipelines {
-        PipelineDef<EStgIntr> spawnRequest      {"spawnRequest"};
-        PipelineDef<EStgIntr> spawnedEnts       {"spawnedEnts"};
-        PipelineDef<EStgIntr> ownedEnts         {"ownedEnts"};
-
-        PipelineDef<EStgCont> instanceInfo      {"instanceInfo"};
-
-        PipelineDef<EStgOptn> inSubtree         {"inSubtree"};
-    };
-};
-
-
-struct FIPrefabDraw {
-    struct DataIds {
-        DataId material;
-    };
-
-    struct Pipelines { };
-};
-
-
 struct FIBounds {
     struct DataIds {
         DataId bounds;
@@ -421,85 +357,6 @@ struct FIBounds {
 };
 
 
-struct FILinks {
-
-    struct LoopBlockIds {
-        LoopBlockId link;
-    };
-
-    struct DataIds {
-        DataId links;
-        DataId updMach;
-    };
-
-    struct Pipelines {
-        PipelineDef<EStgIntr> requestMachUpdExt {"requestMachUpdExt"};
-        PipelineDef<EStgIntr> requestMachUpdLoop{"requestMachUpdLoop"};
-        PipelineDef<EStgEvnt> linkLoopExt       {"linkLoopExt"};
-        PipelineDef<EStgLink> linkLoop          {"linkLoop"};
-
-        PipelineDef<EStgCont> machIds           {"machIds"};
-        PipelineDef<EStgCont> nodeIds           {"nodeIds"};
-        PipelineDef<EStgCont> connect           {"connect"};
-    };
-};
-
-
-struct FIParts {
-
-
-    struct DataIds {
-        DataId scnParts;
-    };
-
-    struct Pipelines {
-        PipelineDef<EStgCont> partIds           {"partIds           - ACtxParts::partIds"};
-        PipelineDef<EStgCont> partPrefabs       {"partPrefabs       - ACtxParts::partPrefabs"};
-        PipelineDef<EStgCont> partTransformWeld {"partTransformWeld - ACtxParts::partTransformWeld"};
-        PipelineDef<EStgIntr> partDirty         {"partDirty         - ACtxParts::partDirty"};
-
-        PipelineDef<EStgCont> weldIds           {"weldIds           - ACtxParts::weldIds"};
-        PipelineDef<EStgIntr> weldDirty         {"weldDirty         - ACtxParts::weldDirty"};
-
-        PipelineDef<EStgCont> mapWeldPart       {"mapPartWeld       - ACtxParts::weldToParts/partToWeld"};
-        PipelineDef<EStgCont> mapPartMach       {"mapPartMach       - ACtxParts::partToMachines/machineToPart"};
-        PipelineDef<EStgCont> mapPartActive     {"mapPartActive     - ACtxParts::partToActive/activeToPart"};
-        PipelineDef<EStgCont> mapWeldActive     {"mapWeldActive     - ACtxParts::weldToActive"};
-
-
-    };
-};
-
-
-struct FIVehicleSpawn {
-    struct DataIds {
-        DataId vehicleSpawn;
-    };
-
-    struct Pipelines {
-        PipelineDef<EStgIntr> spawnRequest      {"spawnRequest      - ACtxVehicleSpawn::spawnRequest"};
-        PipelineDef<EStgIntr> spawnedParts      {"spawnedParts      - ACtxVehicleSpawn::spawnedPart*"};
-        PipelineDef<EStgIntr> spawnedWelds      {"spawnedWelds      - ACtxVehicleSpawn::spawnedWeld*"};
-        PipelineDef<EStgIntr> rootEnts          {"rootEnts          - ACtxVehicleSpawn::rootEnts"};
-        PipelineDef<EStgIntr> spawnedMachs      {"spawnedMachs      - ACtxVehicleSpawn::spawnedMachs"};
-    };
-};
-
-
-struct FIVehicleSpawnVB {
-    struct DataIds {
-        DataId vehicleSpawnVB;
-    };
-
-    struct Pipelines {
-        PipelineDef<EStgIntr> dataVB            {"dataVB            - ACtxVehicleSpawnVB::dataVB"};
-        PipelineDef<EStgIntr> remapParts        {"remapParts        - ACtxVehicleSpawnVB::remapPart*"};
-        PipelineDef<EStgIntr> remapWelds        {"remapWelds        - ACtxVehicleSpawnVB::remapWeld*"};
-        PipelineDef<EStgIntr> remapMachs        {"remapMachs        - ACtxVehicleSpawnVB::remapMach*"};
-        PipelineDef<EStgIntr> remapNodes        {"remapNodes        - ACtxVehicleSpawnVB::remapNode*"};
-    };
-};
-
 struct FITestVehicles {
     struct DataIds {
         DataId prebuiltVehicles;
@@ -508,18 +365,6 @@ struct FITestVehicles {
     struct Pipelines { };
 };
 
-
-struct FISignalsFloat {
-    struct DataIds {
-        DataId sigValFloat;
-        DataId sigUpdFloat;
-    };
-
-    struct Pipelines {
-        PipelineDef<EStgLinkValue>  sigValFloatExt    {"sigValFloatExt"}; ///< sigValFloat outside link loop
-        PipelineDef<EStgCont>       sigValFloatLoop   {"sigValFloatLoop"}; ///< sigValFloat internal to link loop
-    };
-};
 
 struct FITerrain {
     struct DataIds {

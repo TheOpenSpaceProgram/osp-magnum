@@ -39,7 +39,6 @@
 #include <adera_app/features/universe_sims.h>
 #include <adera_app/features/universe_scene.h>
 #include <adera_app/features/vehicles.h>
-#include <adera_app/features/vehicles_machines.h>
 
 #include <adera/drawing/CameraController.h>
 
@@ -141,25 +140,12 @@ ContextId make_scene_renderer(Framework &rFW, PkgId defaultPkg, ContextId mainCo
 
     scnRdrCB.add_feature(ftrCursor, TplPkgIdMaterialId{ defaultPkg, matFlat });
 
-    if (rFW.get_interface_id<FIPrefabs>(sceneCtx).has_value())
-    {
-        scnRdrCB.add_feature(ftrPrefabDraw, matPhong);
-    }
+    scnRdrCB.add_feature(ftrCameraFree);
 
-    if (rFW.get_interface_id<FIVehicleSpawn>(sceneCtx).has_value())
-    {
-        scnRdrCB.add_feature(ftrVehicleSpawnDraw);
-        scnRdrCB.add_feature(ftrVehicleControl);
-    }
-    else
-    {
-        scnRdrCB.add_feature(ftrCameraFree);
-    }
-
-    if (rFW.get_interface_id<FIRocketsJolt>(sceneCtx).has_value())
-    {
-        scnRdrCB.add_feature(ftrMagicRocketThrustIndicator, TplPkgIdMaterialId{ defaultPkg, matFlat });
-    }
+//    if (rFW.get_interface_id<FIRocketsJolt>(sceneCtx).has_value())
+//    {
+//        scnRdrCB.add_feature(ftrMagicRocketThrustIndicator, TplPkgIdMaterialId{ defaultPkg, matFlat });
+//    }
 
     if ( ! scnRdrCB.has_error() && rFW.get_interface_id<FITerrain>(sceneCtx).has_value() )
     {
