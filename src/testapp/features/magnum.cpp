@@ -29,7 +29,6 @@
 
 
 #include <adera/drawing/CameraController.h>
-#include <adera/machines/links.h>
 #include <adera_drawing_gl/flat_shader.h>
 #include <adera_drawing_gl/phong_shader.h>
 #include <adera_drawing_gl/visualizer_shader.h>

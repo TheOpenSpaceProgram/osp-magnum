@@ -31,7 +31,6 @@
 #include <osp/activescene/basic.h>
 #include <osp/activescene/physics_fn.h>
 #include <osp/drawing/drawing_fn.h>
-#include <osp/drawing/prefab_draw.h>
 
 using namespace adera;
 using namespace ftr_inter::stages;

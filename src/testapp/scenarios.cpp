@@ -37,12 +37,10 @@
 #include <adera_app/features/universe_sims.h>
 #include <adera_app/features/universe_scene.h>
 #include <adera_app/features/vehicles.h>
-#include <adera_app/features/vehicles_machines.h>
 #include <adera_app/features/vehicles_prebuilt.h>
 
 #include <adera_app/application.h>
 #include <adera_app/scenario_setup.h>
-#include <adera/activescene/vehicles_vb_fn.h>
 #include <adera/drawing/CameraController.h>
 
 #include <planet-a/activescene/terrain.h>
@@ -142,7 +140,7 @@ static ScenarioMap_t make_scenarios()
     }});
 
 
-
+/*
     add_scenario({
         .name        = "vehicles",
         .brief       = "Physics scenario but with Vehicles",
@@ -220,7 +218,7 @@ static ScenarioMap_t make_scenarios()
             rVehicleSpawnVB.dataVB.push_back(rPrebuiltVehicles[gc_pbvSimpleCommandServiceModule].get());
         }
     }});
-
+*/
 
 
     add_scenario({
@@ -413,21 +411,12 @@ static ScenarioMap_t make_scenarios()
         //sceneCB.add_feature(ftrDroppers);
         sceneCB.add_feature(ftrBounds);
 
-        sceneCB.add_feature(ftrPrefabs);
-        sceneCB.add_feature(ftrParts);
-        sceneCB.add_feature(ftrSignalsFloat);
-        sceneCB.add_feature(ftrVehicleSpawn);
-        sceneCB.add_feature(ftrVehicleSpawnVBData);
-        sceneCB.add_feature(ftrPrebuiltVehicles);
-
-        sceneCB.add_feature(ftrMachMagicRockets);
-        sceneCB.add_feature(ftrMachRCSDriver);
+        //sceneCB.add_feature(ftrPrebuiltVehicles);
 
         sceneCB.add_feature(ftrJolt);
         sceneCB.add_feature(ftrJoltConstAccel);
         sceneCB.add_feature(ftrPhysicsShapesJolt);
-        sceneCB.add_feature(ftrVehicleSpawnJolt);
-        sceneCB.add_feature(ftrRocketThrustJolt);
+        //sceneCB.add_feature(ftrRocketThrustJolt);
 
         sceneCB.add_feature(ftrTerrainJolt);
 
@@ -438,28 +427,6 @@ static ScenarioMap_t make_scenarios()
 
         ospjolt::ForceFactors_t const gravity = add_constant_acceleration(sc_gravityForce, args.rFW, sceneCtx);
         set_phys_shape_factors(gravity, args.rFW, sceneCtx);
-        set_vehicle_default_factors(gravity, args.rFW, sceneCtx);
-
-        //add_floor(args.rFW, sceneCtx, args.defaultPkg, 4);
-
-        auto vhclSpawn          = args.rFW.get_interface<FIVehicleSpawn>(sceneCtx);
-        auto vhclSpawnVB        = args.rFW.get_interface<FIVehicleSpawnVB>(sceneCtx);
-        auto testVhcls          = args.rFW.get_interface<FITestVehicles>(sceneCtx);
-
-        auto &rVehicleSpawn     = args.rFW.data_get<ACtxVehicleSpawn>     (vhclSpawn.di.vehicleSpawn);
-        auto &rVehicleSpawnVB   = args.rFW.data_get<ACtxVehicleSpawnVB>   (vhclSpawnVB.di.vehicleSpawnVB);
-        auto &rPrebuiltVehicles = args.rFW.data_get<PrebuiltVehicles>     (testVhcls.di.prebuiltVehicles);
-
-        for (int i = 0; i < 10; ++i)
-        {
-            rVehicleSpawn.spawnRequest.push_back(
-            {
-               .position = {float(i - 2) * 8.0f, 30.0f, 10.0f},
-               .velocity = {0.0, 0.0f, 50.0f * float(i)},
-               .rotation = {}
-            });
-            rVehicleSpawnVB.dataVB.push_back(rPrebuiltVehicles[gc_pbvSimpleCommandServiceModule].get());
-        }
     }});
 
     return scenarioMap;

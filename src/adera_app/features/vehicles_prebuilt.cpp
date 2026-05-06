@@ -26,9 +26,10 @@
 
 #include "../feature_interfaces.h"
 
-#include <adera/machines/links.h>
-
 #include <osp/core/Resources.h>
+#include <osp/core/math_types.h>
+
+#if 0
 
 using namespace Magnum::Math::Literals;
 using namespace adera;
@@ -124,7 +125,6 @@ FeatureDef const ftrPrebuiltVehicles = feature_def("PrebuiltVehicles", [] (
     auto &rResources = rFB.data_get<Resources>(mainApp.di.resources);
 
     auto &rPrebuiltVehicles = rFB.data_emplace<PrebuiltVehicles>(testVhcls.di.prebuiltVehicles);
-    rPrebuiltVehicles.resize(PrebuiltVhIdReg_t::size());
 
     using namespace adera;
 
@@ -202,39 +202,19 @@ FeatureDef const ftrPrebuiltVehicles = feature_def("PrebuiltVehicles", [] (
             for (Rad ang = 0.0_degf; ang < Rad(360.0_degf); ang += Rad(360.0_degf)/rcsRingBlocks)
             {
                Quaternion const rotZ = Quaternion::rotation(ang, {0.0f, 0.0f, 1.0f});
-               add_rcs_block(vbuilder, toWeld, rcsInputs, rcsThrust, rotZ.transformVector(rcsOset), rotZ);
+               //add_rcs_block(vbuilder, toWeld, rcsInputs, rcsThrust, rotZ.transformVector(rcsOset), rotZ);
             }
         }
-
-        vbuilder.weld(toWeld);
-
-        rPrebuiltVehicles[gc_pbvSimpleCommandServiceModule] = std::make_unique<VehicleData>(std::move(vbuilder.finalize_release()));
     }
 
 
     // Put more prebuilt vehicles here!
 
 
-    rFB.task()
-        .name       ("Clean up prebuilt vehicles")
-        .sync_with  ({cleanup.pl.cleanup(Run_)})
-        .args       ({         testVhcls.di.prebuiltVehicles,  mainApp.di.resources})
-        .func       ([] (PrebuiltVehicles &rPrebuildVehicles, Resources& rResources) noexcept
-    {
-        for (std::unique_ptr<VehicleData> &rpData : rPrebuildVehicles)
-        {
-            if (rpData != nullptr)
-            {
-                for (PrefabPair &rPrefabPair : rpData->m_partPrefabs)
-                {
-                    rResources.owner_destroy(gc_importer, std::move(rPrefabPair.m_importer));
-                }
-            }
-        }
-        rPrebuildVehicles.clear();
-    });
-
 }); // setup_prebuilt_vehicles
 
 
 } // namespace adera
+
+
+#endif

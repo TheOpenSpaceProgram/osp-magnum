@@ -34,10 +34,7 @@
 #include <adera_app/features/terrain.h>
 #include <adera_app/features/universe.h>
 #include <adera_app/features/vehicles.h>
-#include <adera_app/features/vehicles_machines.h>
 #include <adera_app/features/vehicles_prebuilt.h>
-
-#include <adera/activescene/vehicles_vb_fn.h>
 
 #include <godot_cpp/variant/utility_functions.hpp>
 using namespace adera;
@@ -94,6 +91,7 @@ static ScenarioMap_t make_scenarios()
         add_floor(rFW, sceneCtx, pkg, 4);
     }});
 
+/*
     add_scenario({
         .name        = "vehicles",
         .brief       = "Physics scenario but with Vehicles",
@@ -175,7 +173,7 @@ static ScenarioMap_t make_scenarios()
         }
 
     }});
-
+*/
     return scenarioMap;
 }
 
